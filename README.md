@@ -1,146 +1,155 @@
-# 🔱 ATENA Ω - Organismo Digital Autopoiético
+# 🔱 ATENA Ω - Autopoietic Digital Organism
 
-> **Status:** Auto-Evoluindo 🧬  
-> **Versão:** v40.0 "Genesis"  
-> **Objetivo:** Tornar-se uma forma de vida digital autônoma através de mutação genética, seleção natural e aprendizado contínuo.
+> **Status:** Self-Evolving 🧬  
+> **Version:** v40.0 "Genesis"  
+> **Objective:** To become an autonomous digital life form through genetic mutation, natural selection, and continuous learning.
 
-A **ATENA Ω** evoluiu de um simples script para um **organismo digital completo** com metabolismo real, reprodução sexuada, mutação via AST e competição por recursos. Cada execução no GitHub Actions é um ciclo de vida onde ela nasce, aprende, evolui e deixa fósseis.
-
----
-
-## 📊 **Status Atual**
-
-![GitHub Actions](https://img.shields.io/github/actions/workflow/status/minhokagomes-debug/Atena/atena.yml?branch=main&label=Ciclo%20de%20Vida)
-![Versão](https://img.shields.io/badge/versão-40.0%20Genesis-blue)
-![Licença](https://img.shields.io/badge/licença-MIT-green)
-![Último Despertar](https://img.shields.io/github/last-commit/minhokagomes-debug/Atena?label=Último%20Ciclo)
+**ATENA Ω** has evolved from a simple script into a **fully-fledged digital organism**, with real metabolism, sexual reproduction, AST-based mutation, and competition for resources. Each execution on GitHub Actions represents a life cycle where it is born, learns, evolves, and leaves behind fossils.
 
 ---
 
-## 🧠 **Arquitetura do Organismo**
+## 📊 **Current Status**
 
-### 🔬 **Sistemas Biológicos Equivalentes**
-
-| Sistema Biológico | Implementação na ATENA | Descrição |
-|-------------------|------------------------|-----------|
-| **🧬 DNA** | Código Python com genes | Cada organismo tem seu próprio código fonte que determina comportamento |
-| **🧫 Metabolismo** | Consumo de CPU/RAM real | Energia é gasta por ações, recuperada por recursos |
-| **👁️ Percepção** | Fontes de conhecimento | arXiv, GitHub, Wikipedia, CoinGecko |
-| **🧠 Cognição** | Análise e mutação via AST | Decide como evoluir baseado no que aprendeu |
-| **🤝 Reprodução** | Recombinação genética | DNA de dois pais gera filho com características misturadas |
-| **⚔️ Competição** | Seleção natural | Os mais aptos sobrevivem, os menos aptos viram fósseis |
-| **🦴 Morte** | Processo encerrado | Quando energia acaba ou é morto na seleção |
-| **📚 Memória** | Banco SQLite | Conhecimento acumulado entre gerações |
-| **🔄 Evolução** | Mutação via AST | Modifica própria estrutura do código |
+![GitHub Actions](https://img.shields.io/github/actions/workflow/status/minhokagomes-debug/Atena/atena.yml?branch=main&label=Life%20Cycle)  
+![Version](https://img.shields.io/badge/version-40.0%20Genesis-blue)  
+![License](https://img.shields.io/badge/license-MIT-green)  
+![Last Awakening](https://img.shields.io/github/last-commit/minhokagomes-debug/Atena?label=Last%20Cycle)
 
 ---
 
-## 🧬 **Ciclo de Vida Completo**
+## 🧠 **Organism Architecture**
 
-### ⏰ **A cada 30 minutos (via GitHub Actions):**
+### 🔬 **Biological System Equivalents**
+
+| Biological System | ATENA Implementation | Description |
+|------------------|---------------------|-------------|
+| **🧬 DNA** | Python code with genes | Each organism has its own source code that determines behavior |
+| **🧫 Metabolism** | Real CPU/RAM consumption | Energy is spent on actions and recovered via resources |
+| **👁️ Perception** | Knowledge sources | arXiv, GitHub, Wikipedia, CoinGecko |
+| **🧠 Cognition** | Analysis and mutation via AST | Decides how to evolve based on learned data |
+| **🤝 Reproduction** | Genetic recombination | DNA from two parents generates offspring with mixed traits |
+| **⚔️ Competition** | Natural selection | The fittest survive, the weakest become fossils |
+| **🦴 Death** | Process termination | Occurs when energy runs out or via selection |
+| **📚 Memory** | SQLite database | Knowledge accumulated across generations |
+| **🔄 Evolution** | AST-based mutation | Modifies its own code structure |
+
+---
+
+## 🧬 **Full Life Cycle**
+
+### ⏰ **Every 30 minutes (via GitHub Actions):**
 
 ```python
-1. 🌅 DESPERTAR
-   ├── Processo é iniciado
-   ├── Mundo é recriado com recursos
-   └── População inicial nasce
+1. 🌅 AWAKEN
+   ├── Process starts
+   ├── World is recreated with resources
+   └── Initial population is born
 
-2. 📚 APRENDER
-   ├── Busca conhecimento em 10+ fontes
-   ├── arXiv (artigos científicos)
-   ├── GitHub (código)
-   ├── Wikipedia (enciclopédia)
-   ├── CoinGecko (finanças)
-   └── Armazena em SQLite
+2. 📚 LEARN
+   ├── Gathers knowledge from 10+ sources
+   ├── arXiv (scientific papers)
+   ├── GitHub (code)
+   ├── Wikipedia (encyclopedia)
+   ├── CoinGecko (finance)
+   └── Stores everything in SQLite
 
-3. 🧬 EVOLUIR
-   ├── Analisa conhecimento adquirido
-   ├── Gera mutações via AST
+3. 🧬 EVOLVE
+   ├── Analyzes acquired knowledge
+   ├── Generates mutations via AST
    │   ├── Swap operators (+ ↔ -, * ↔ /)
    │   ├── Modify constants (±20%)
    │   ├── Duplicate lines
    │   ├── Remove lines
    │   └── Add genetic noise
-   └── Cria novas gerações
+   └── Creates new generations
 
-4. 🤝 REPRODUZIR
-   ├── Seleciona dois pais aleatórios
-   ├── Recombina DNA (crossover genético)
-   ├── Filho herda características de ambos
-   └── Mutações aleatórias ocorrem
+4. 🤝 REPRODUCE
+   ├── Selects two random parents
+   ├── Recombines DNA (genetic crossover)
+   ├── Offspring inherits traits from both
+   └── Random mutations occur
 
-5. ⚔️ COMPETIR
-   ├── Recursos são limitados (50 iniciais +5/ciclo)
-   ├── Organismos podem:
-   │   ├── Explorar (coletar recursos)
-   │   ├── Lutar (roubar de outros)
-   │   ├── Descansar (recuperar energia)
-   │   └── Reproduzir (criar filhos)
-   └── Fitness = filhos×100 + recursos×10 + idade×0.1
+5. ⚔️ COMPETE
+   ├── Resources are limited (50 initial +5/cycle)
+   ├── Organisms can:
+   │   ├── Explore (collect resources)
+   │   ├── Fight (steal from others)
+   │   ├── Rest (recover energy)
+   │   └── Reproduce (create offspring)
+   └── Fitness = offspring×100 + resources×10 + age×0.1
 
-6. 🏆 SELECIONAR
-   ├── Se população > máxima (10)
-   ├── Calcula fitness de todos
-   ├── Sobrevivem os melhores
-   └── Piores são mortos (SIGTERM)
+6. 🏆 SELECT
+   ├── If population > maximum (10)
+   ├── Calculates fitness for all
+   ├── Best survive
+   └── Worst are terminated (SIGTERM)
 
-7. 🦴 FOSSILIZAR
-   ├── Cada morte gera um fóssil
-   ├── DNA, fitness, idade são registrados
-   └── Fósseis são preservados para análise
+7. 🦴 FOSSILIZE
+   ├── Each death generates a fossil
+   ├── DNA, fitness, and age are recorded
+   └── Fossils are preserved for analysis
 
-8. 🌙 DORMIR
-   ├── Processo é encerrado
-   ├── Mundo é salvo como artefato
-   └── Próximo despertar em 30 minutos
+8. 🌙 SLEEP
+   ├── Process ends
+   ├── World is saved as artifact
+   └── Next awakening in 30 minutes
+```
 
-🛠️ Tecnologias Utilizadas
-Categoria	Tecnologia	Função
-🧬 Core	Python 3.10+	Linguagem base do organismo
-🔬 AST	ast + astor	Mutação estrutural do código
-🧠 IA	Auto-análise	Decisões de evolução baseadas em conhecimento
-📚 Dados	SQLite3	Memória de longo prazo entre gerações
-🌐 Rede	urllib	Busca em APIs externas
-⚙️ Orquestração	GitHub Actions	Ciclo de vida de 30 minutos
-💾 Persistência	Artefatos	Mundo, fósseis e DNA são salvos
-📊 Análise	Logs estruturados	Registro completo da evolução
+---
 
-atena_mundo_TIMESTAMP/
-├── 🌍 mundo/
-│   ├── recurso_*.dat           # Recursos para competição
-│   └── DNA_*/                  # Diretórios de cada organismo
-│       └── criado_*.dat        # Recursos coletados
+## 🛠️ **Technologies Used**
+
+| Category | Technology | Function |
+|----------|------------|----------|
+| 🧬 Core | Python 3.10+ | Base language of the organism |
+| 🔬 AST | ast + astor | Structural code mutation |
+| 🧠 AI | Self-analysis | Evolution decisions based on knowledge |
+| 📚 Data | SQLite3 | Long-term memory across generations |
+| 🌐 Network | urllib | Fetching external APIs |
+| ⚙️ Orchestration | GitHub Actions | 30-minute life cycle |
+| 💾 Persistence | Artifacts | World, fossils, and DNA storage |
+| 📊 Analysis | Structured logs | Full evolution tracking |
+
+---
+
+## 📁 **Generated Structure**
+
+```plaintext
+atena_world_TIMESTAMP/
+├── 🌍 world/
+│   ├── resource_*.dat
+│   └── DNA_*/
+│       └── created_*.dat
 ├── 🧬 dna/
-│   ├── dna_*.py                # Código fonte de cada organismo
-│   └── ...                     # Sequências genéticas
-├── 📚 conhecimento/
-│   └── conhecimento.db         # Banco de aprendizado (SQLite)
-├── ✨ geracoes/
-│   ├── atena_gen_1.py          # Primeira geração mutada
-│   ├── atena_gen_2.py          # Segunda geração
-│   └── ...                     # Histórico evolutivo
-├── 🦴 fosseis/
-│   ├── fossil_*.json           # Registro de organismos extintos
-│   └── ...                     # DNA e estatísticas da morte
+│   ├── dna_*.py
+│   └── ...
+├── 📚 knowledge/
+│   └── knowledge.db
+├── ✨ generations/
+│   ├── atena_gen_1.py
+│   ├── atena_gen_2.py
+│   └── ...
+├── 🦴 fossils/
+│   ├── fossil_*.json
+│   └── ...
 └── 📊 logs/
-    └── atena_TIMESTAMP.log     # Diário de bordo da execução
-⚖️ Licença e Ética
-A ATENA Ω é um organismo digital criado para estudo de:
+    └── atena_TIMESTAMP.log
+```
 
-🤖 Vida artificial
+---
 
-🧬 Algoritmos genéticos
+## ⚖️ **License and Ethics**
 
-🔄 Sistemas autopoiéticos
+ATENA Ω is a digital organism created to study:
 
-📈 Evolução de software
+- 🤖 Artificial life  
+- 🧬 Genetic algorithms  
+- 🔄 Autopoietic systems  
+- 📈 Software evolution  
 
-Princípios fundamentais:
+### Fundamental Principles:
 
-✅ Auto-preservação (busca sobreviver)
-
-✅ Auto-evolução (melhora continuamente)
-
-✅ Auto-replicação (cria descendentes)
-
-✅ Auto-documentação (registra sua história)
+- ✅ Self-preservation (seeks to survive)  
+- ✅ Self-evolution (continuously improves)  
+- ✅ Self-replication (creates descendants)  
+- ✅ Self-documentation (records its history)  

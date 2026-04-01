@@ -1,4 +1,4 @@
-name: 🧬 ATENA Ω - Evolução Divina v40.3 Genesis
+name: 🧬 ATENA Ω - Evolução Divina v40.4 Genesis
 
 on:
   schedule:
@@ -22,18 +22,21 @@ concurrency:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  # Garante que o Python enxergue a RAIZ e a pasta MODULES
   PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/modules"
-  # Mapeamento explícito das suas Secrets (Imagem 1000008312.png)
   XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
   NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
   ATENA_LM_ENABLED: "true"
+  # Define o tempo de execução sugerido para o script (5 minutos em segundos)
+  ATENA_MAX_RUNTIME: "300" 
 
 jobs:
   evoluir:
     name: 🧠 Evolução Neural + DNA Assimilation
     runs-on: ubuntu-latest
+    # Aumentado para 15 minutos para dar folga aos 5 min de execução real
+    timeout-minutes: 15 
+
     steps:
     - name: 📥 Checkout
       uses: actions/checkout@v4
@@ -59,13 +62,12 @@ jobs:
     - name: 🧠 Instalar IA Local (Torch & Faiss)
       if: env.ATENA_LM_ENABLED == 'true'
       run: |
-        # Instalando separadamente para evitar o erro da Imagem 1000008317.png
         pip install torch --index-url https://download.pytorch.org/whl/cpu
         pip install faiss-cpu
 
     - name: 🧹 Limpeza de Caracteres (Fix Syntax Error)
       run: |
-        # Remove o caractere U+2500 e outros que travam o services.py (Imagem 1000008310.png)
+        # Remove caracteres lixo que travam o services.py
         find . -name "*.py" -exec sed -i 's/[^\x00-\x7F]//g' {} +
 
     - name: 🧠 Restaurar Memória (Artifacts)
@@ -82,7 +84,7 @@ jobs:
 
     - name: 🔮 Executar ATENA Core
       run: |
-        # Roda o main.py com as variáveis de ambiente carregadas
+        # Executa com as chaves e o tempo estendido
         python main.py --auto --cycles ${{ github.event.inputs.generations || '10' }} --deep
 
     - name: 💾 Salvar Evolução
@@ -98,4 +100,4 @@ jobs:
 
     - name: ✅ Finalização
       if: always()
-      run: echo "Ciclo concluído."
+      run: echo "Ciclo concluído com tempo estendido."

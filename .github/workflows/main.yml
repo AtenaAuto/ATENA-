@@ -43,7 +43,6 @@ env:
   GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
   ALLOW_DEEP_SELF_MOD: ${{ github.event.inputs.deep_self_mod == 'true' && 'true' || 'false' }}
   ATENA_LM_ENABLED: ${{ github.event.inputs.lm_enabled != 'false' && 'true' || 'false' }}
-  # Configuração de Caminhos para o novo main.py
   PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/modules"
   ATENA_REFERENCE_DNA: "atena_evolution/reference_dna"
 
@@ -70,16 +69,17 @@ jobs:
       with:
         python-version: ${{ env.PYTHON_VERSION }}
 
-    - name: 🚀 Setup Bun (Runtime para DNA TypeScript)
-      uses: oven-sh/setup-bun@v1
+    - name: 🟢 Setup Node.js (Nativo do GitHub)
+      uses: actions/setup-node@v4
       with:
-        bun-version: latest
+        node-version: '20'
 
     - name: 📦 Instalar Dependências de Sistema
       run: |
         sudo apt-get update -qq
         sudo apt-get install -y sqlite3 jq tesseract-ocr
-        npm install -g tsx  # Executor rápido de TS para o Python chamar
+        # Usando NPM que é nativo e permitido
+        npm install -g tsx typescript
 
     - name: 📦 Instalar Dependências Python
       run: |

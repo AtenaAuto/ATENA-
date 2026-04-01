@@ -51,11 +51,40 @@ import re
 import importlib.util
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import (Dict, List, Any, Optional, Tuple, Set, Callable,Union, Type, Iterator, Iterable, Sequence)
+# Mantendo EXATAMENTE sua lista de typing para não quebrar as 6300 linhas
+from typing import (
+    Dict, List, Any, Optional, Tuple, Set, Callable, 
+    Union, Type, Iterator, Iterable, Sequence
+)
 from dataclasses import dataclass, field, asdict
 from collections import Counter, OrderedDict, defaultdict, deque
 from copy import deepcopy
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
+
+# --- Adicionado para conectar com as novas pastas do seu GitHub ---
+BASE_DIR = Path(__file__).parent
+DNA_DIR = BASE_DIR / "atena_evolution" / "reference_dna"
+MODULES_DIR = BASE_DIR / "modules"
+
+# Permite que o Python importe o que estiver dentro da pasta /modules
+if str(MODULES_DIR) not in sys.path:
+    sys.path.append(str(MODULES_DIR))
+
+# --- Bibliotecas opcionais com fallbacks ---
+try:
+    import radon.complexity as radon_cc
+    import radon.raw as radon_raw
+    HAS_RADON = True
+except ImportError:
+    HAS_RADON = False
+    radon_cc = radon_raw = None
+
+try:
+    from sentence_transformers import SentenceTransformer
+    HAS_TRANSFORMERS = True
+except ImportError:
+    HAS_TRANSFORMERS = False
+    
 
 # ── Bibliotecas opcionais com fallbacks seguros ──────────────────────
 try:

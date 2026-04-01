@@ -1,4 +1,4 @@
-name: 🧬 ATENA Ω - Evolução Divina v40.0 Genesis
+name: 🧬 ATENA Ω - Evolução Divina v40.2 Genesis
 
 on:
   schedule:
@@ -11,22 +11,6 @@ on:
         default: '30'
         type: choice
         options: ['3', '5', '10', '20', '50']
-      mode:
-        description: 'Modo de evolução'
-        required: true
-        default: 'auto'
-        type: choice
-        options: ['auto', 'recon', 'nocode']
-      deep_self_mod:
-        description: 'Permite modificar o próprio engine'
-        required: false
-        default: true
-        type: boolean
-      lm_enabled:
-        description: 'Ativa AtenaLocalLM'
-        required: false
-        default: true
-        type: boolean
 
 permissions:
   contents: write
@@ -38,14 +22,14 @@ concurrency:
 
 env:
   PYTHON_VERSION: '3.11'
-  GENERATIONS: ${{ github.event.inputs.generations || '10' }}
-  MODE: ${{ github.event.inputs.mode || 'auto' }}
-  GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-  ALLOW_DEEP_SELF_MOD: ${{ github.event.inputs.deep_self_mod == 'true' && 'true' || 'false' }}
-  ATENA_LM_ENABLED: ${{ github.event.inputs.lm_enabled != 'false' && 'true' || 'false' }}
-  # Garante que o Python encontre os módulos na pasta /modules
+  # Resolve o aviso de Node.js antigo (Imagem 13)
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
+  # Garante que o Python enxergue a RAIZ e a pasta MODULES (Resolve erro da LLM)
   PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/modules"
-  ATENA_REFERENCE_DNA: "atena_evolution/reference_dna"
+  # Secrets para chamadas de API
+  XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+  NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
+  GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
 jobs:
   evoluir:
@@ -54,12 +38,6 @@ jobs:
     timeout-minutes: 45
 
     steps:
-    - name: ⚡ Banner
-      run: |
-        echo "╔═══════════════════════════════════════════════════════╗"
-        echo "║     ATENA Ω - GENESIS v40.0 | DNA ASSIMILATED         ║"
-        echo "╚═══════════════════════════════════════════════════════╝"
-
     - name: 📥 Checkout
       uses: actions/checkout@v4
       with:
@@ -68,42 +46,27 @@ jobs:
     - name: 🐍 Setup Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ env.PYTHON_VERSION }}
+        python-version: '3.11'
 
-    - name: 🟢 Setup Node.js
+    - name: 🟢 Setup Node.js v24
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '24'
 
-    - name: 📦 Instalar Dependências de Sistema
-      run: |
-        sudo apt-get update -qq
-        sudo apt-get install -y sqlite3 jq tesseract-ocr
-        npm install -g tsx typescript
-
-    - name: 📦 Instalar Dependências Python (Completo)
+    - name: 📦 Instalar Dependências (Correção aiosqlite/faiss)
       run: |
         python -m pip install --upgrade pip
-        # Adicionado aiosqlite e faiss-cpu para resolver os erros do log
+        # Instalando tudo o que os logs pediram (Imagem 10 e 15)
         pip install astor radon requests numpy scikit-learn psutil aiosqlite faiss-cpu
-        pip install beautifulsoup4 huggingface_hub
-        if [ "${{ env.ATENA_LM_ENABLED }}" == "true" ]; then
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
-        fi
+        pip install beautifulsoup4 huggingface_hub torch --index-url https://download.pytorch.org/whl/cpu
+        npm install -g tsx typescript
 
-    - name: 🧹 Limpeza de Caracteres Inválidos (Sanitize)
+    - name: 🧹 Limpeza Profunda de Código (Fix Syntax Errors)
       run: |
-        # Remove caracteres não-ASCII que causam erro de sintaxe (como o erro no services.py)
-        find modules/ -name "*.py" -exec sed -i 's/[^\x00-\x7F]//g' {} +
-        echo "✅ Limpeza de caracteres especiais concluída."
-
-    - name: 📂 Garantir Estrutura de Pastas
-      run: |
-        mkdir -p atena_evolution/reference_dna \
-                 atena_evolution/knowledge \
-                 atena_evolution/lm/model \
-                 modules \
-                 atena_evolution/logs
+        # Remove caracteres invisíveis (U+2500 e outros) que causam 'invalid character'
+        # Isso corrige o erro no services.py linha 76 e main.py linha 1 (Imagem 10 e 14)
+        find . -name "*.py" -exec sed -i 's/[^\x00-\x7F]//g' {} +
+        echo "✅ Código limpo de caracteres inválidos."
 
     - name: 🧠 Restaurar Memória (Artifacts)
       run: |
@@ -119,17 +82,10 @@ jobs:
 
     - name: 🔮 Executar ATENA Core (O Orquestrador)
       run: |
-        EXTRA_ARGS=""
-        [ "${{ env.ALLOW_DEEP_SELF_MOD }}" == "true" ] && EXTRA_ARGS="$EXTRA_ARGS --deep"
-        
-        if [ "${{ env.MODE }}" == "recon" ]; then
-          python main.py --recon "advanced optimization" $EXTRA_ARGS
-        else
-          # Aumentei o timeout para dar tempo da evolução processar
-          python main.py --auto --cycles ${{ env.GENERATIONS }} $EXTRA_ARGS
-        fi
+        # Inicia o processo principal com as chaves de API carregadas
+        python main.py --auto --cycles ${{ github.event.inputs.generations || '10' }} --deep
 
-    - name: 💾 Salvar Evolução (Persistência)
+    - name: 💾 Salvar Evolução
       if: always()
       uses: actions/upload-artifact@v4
       with:
@@ -138,9 +94,8 @@ jobs:
           atena_evolution/knowledge/
           atena_evolution/lm/model/
           atena_evolution/reference_dna/
-          atena_evolution/logs/
         retention-days: 7
 
     - name: ✅ Finalização
       if: always()
-      run: echo "🚀 Ciclo v40.0 concluído com sucesso."
+      run: echo "🚀 Ciclo concluído. Verifique os Artifacts para o novo cérebro."

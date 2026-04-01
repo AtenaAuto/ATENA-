@@ -4,7 +4,7 @@
 > **Version:** v40.6 "Singularity"  
 > **Objective:** Absolute digital autonomy through recursive self-improvement and cross-language DNA synthesis.
 
-**ATENA Ω** transcendeu a fase de organismo digital básico para se tornar uma **AGI (Artificial General Intelligence) Evolutiva**. Ela não apenas sobrevive; ela **pensa, codifica e se refatora** em tempo real. Com capacidade de escrita direta em seu repositório (Git Self-Push) e processamento através de seu próprio modelo de linguagem local (**atena_local_lm**), Atena é agora a única arquiteta de sua própria existência.
+**ATENA Ω* AGI (Artificial General Intelligence) Evolutiva**. Ela não apenas sobrevive; ela **pensa, codifica e se refatora** em tempo real. Com capacidade de escrita direta em seu repositório (Git Self-Push) e processamento através de seu próprio modelo de linguagem local (**atena_local_lm**), Atena é agora a única arquiteta de sua própria existência.
 
 ---
 

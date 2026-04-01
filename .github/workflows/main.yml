@@ -43,6 +43,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
   ALLOW_DEEP_SELF_MOD: ${{ github.event.inputs.deep_self_mod == 'true' && 'true' || 'false' }}
   ATENA_LM_ENABLED: ${{ github.event.inputs.lm_enabled != 'false' && 'true' || 'false' }}
+  # Garante que o Python encontre os módulos na pasta /modules
   PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/modules"
   ATENA_REFERENCE_DNA: "atena_evolution/reference_dna"
 
@@ -69,7 +70,7 @@ jobs:
       with:
         python-version: ${{ env.PYTHON_VERSION }}
 
-    - name: 🟢 Setup Node.js (Nativo do GitHub)
+    - name: 🟢 Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '20'
@@ -78,17 +79,23 @@ jobs:
       run: |
         sudo apt-get update -qq
         sudo apt-get install -y sqlite3 jq tesseract-ocr
-        # Usando NPM que é nativo e permitido
         npm install -g tsx typescript
 
-    - name: 📦 Instalar Dependências Python
+    - name: 📦 Instalar Dependências Python (Completo)
       run: |
         python -m pip install --upgrade pip
-        pip install astor radon requests numpy scikit-learn psutil
+        # Adicionado aiosqlite e faiss-cpu para resolver os erros do log
+        pip install astor radon requests numpy scikit-learn psutil aiosqlite faiss-cpu
         pip install beautifulsoup4 huggingface_hub
         if [ "${{ env.ATENA_LM_ENABLED }}" == "true" ]; then
           pip install torch --index-url https://download.pytorch.org/whl/cpu
         fi
+
+    - name: 🧹 Limpeza de Caracteres Inválidos (Sanitize)
+      run: |
+        # Remove caracteres não-ASCII que causam erro de sintaxe (como o erro no services.py)
+        find modules/ -name "*.py" -exec sed -i 's/[^\x00-\x7F]//g' {} +
+        echo "✅ Limpeza de caracteres especiais concluída."
 
     - name: 📂 Garantir Estrutura de Pastas
       run: |
@@ -118,6 +125,7 @@ jobs:
         if [ "${{ env.MODE }}" == "recon" ]; then
           python main.py --recon "advanced optimization" $EXTRA_ARGS
         else
+          # Aumentei o timeout para dar tempo da evolução processar
           python main.py --auto --cycles ${{ env.GENERATIONS }} $EXTRA_ARGS
         fi
 
@@ -130,6 +138,7 @@ jobs:
           atena_evolution/knowledge/
           atena_evolution/lm/model/
           atena_evolution/reference_dna/
+          atena_evolution/logs/
         retention-days: 7
 
     - name: ✅ Finalização

@@ -1,4 +1,4 @@
-name: 🧬 ATENA Ω - Evolução Divina v40.2 Genesis
+name: 🧬 ATENA Ω - Evolução Divina v3.3
 
 on:
   schedule:
@@ -10,7 +10,44 @@ on:
         required: true
         default: '30'
         type: choice
-        options: ['3', '5', '10', '20', '50']
+        options:
+          - '3'
+          - '5'
+          - '10'
+          - '20'
+          - '50'
+      mode:
+        description: 'Modo de evolução'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - 'auto'
+          - 'recon'
+          - 'nocode'
+      recon_topic:
+        description: 'Tópico para Hacker Recon (se mode=recon)'
+        required: false
+        default: 'advanced python optimization'
+      nocode_desc:
+        description: 'Descrição do projeto No-Code (se mode=nocode)'
+        required: false
+        default: 'a simple flask web app with sqlite'
+      deep_self_mod:
+        description: 'Permite que a Atena modifique o próprio engine (⚠️ cuidado!)'
+        required: false
+        default: true
+        type: boolean
+      checker_evolve:
+        description: 'Permite que o AdaptiveChecker evolua suas regras'
+        required: false
+        default: true
+        type: boolean
+      lm_enabled:
+        description: 'Ativa o modelo de linguagem local (AtenaLocalLM)'
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -22,22 +59,64 @@ concurrency:
 
 env:
   PYTHON_VERSION: '3.11'
-  # Resolve o aviso de Node.js antigo (Imagem 13)
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
-  # Garante que o Python enxergue a RAIZ e a pasta MODULES (Resolve erro da LLM)
-  PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/modules"
-  # Secrets para chamadas de API
+  GENERATIONS: ${{ github.event.inputs.generations || '10' }}
+  MODE: ${{ github.event.inputs.mode || 'auto' }}
+  RECON_TOPIC: ${{ github.event.inputs.recon_topic || 'advanced python optimization' }}
+  NOCODE_DESC: ${{ github.event.inputs.nocode_desc || 'a simple flask web app with sqlite' }}
+
+  GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
   XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
   NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
-  GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+  DEPLOY_GIT_REPO: ${{ secrets.DEPLOY_GIT_REPO }}
+  DEPLOY_DOCKER_IMAGE: ${{ secrets.DEPLOY_DOCKER_IMAGE }}
+  DEPLOY_COMMAND: ${{ secrets.DEPLOY_COMMAND }}
+
+  ALLOW_WORKFLOW_MUTATION: 'true'
+  LT_INTERVAL: '1'
+  LT_VERBOSE: 'false'
+  GROK_LT_INTERVAL: '5'
+  VH_INTERVAL_HOURS: '6'
+  DASHBOARD_PORT: '7331'
+
+  ALLOW_DEEP_SELF_MOD: ${{ github.event.inputs.deep_self_mod == 'true' && 'true' || 'false' }}
+  ALLOW_CHECKER_EVOLVE: ${{ github.event.inputs.checker_evolve == 'true' && 'true' || 'false' }}
+  SELF_MOD_INTERVAL: '10'
+  RECURSIVE_CYCLES: '3'
+  MAX_ENGINE_MUTATIONS: '3'
+
+  ATENA_LM_ENABLED: ${{ github.event.inputs.lm_enabled != 'false' && 'true' || 'false' }}
+  ATENA_LM_TRAIN_EVERY: '5'
+  ATENA_LM_EMBED_DIM: '128'
+  ATENA_LM_LAYERS: '4'
+  ATENA_LM_MIN_SAMPLES: '5'
+
+  MIN_IMPROVEMENT_DELTA: '0.001'
+  CANDIDATES_PER_CYCLE: '6'
+  PARALLEL_WORKERS: '4'
+  TRAINING_INTERVAL: '900'
+
+  PYTHONFAULTHANDLER: '1'
+  PYTHONUNBUFFERED: '1'
 
 jobs:
   evoluir:
-    name: 🧠 Evolução Neural + DNA Assimilation
+    name: 🧠 Evolução Neural v3.3 + LocalLM + Atuadores
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
     steps:
+    - name: ⚡ Banner
+      run: |
+        echo "╔═══════════════════════════════════════════════════════╗"
+        echo "║     ATENA Ω - EVOLUÇÃO DIVINA v3.3 + LocalLM          ║"
+        echo "║     Grok corrigido · Memória persistente melhorada     ║"
+        echo "║     DNA de Referência Assimilado                      ║"
+        echo "╚═══════════════════════════════════════════════════════╝"
+        echo "📅 Data: $(date)"
+        echo "🎯 Modo: ${{ env.MODE }}"
+        echo "🔧 Deep self-mod: ${{ env.ALLOW_DEEP_SELF_MOD }}"
+
     - name: 📥 Checkout
       uses: actions/checkout@v4
       with:
@@ -46,32 +125,61 @@ jobs:
     - name: 🐍 Setup Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: ${{ env.PYTHON_VERSION }}
 
-    - name: 🟢 Setup Node.js v24
-      uses: actions/setup-node@v4
+    - name: 📦 Cache pip
+      uses: actions/cache@v4
       with:
-        node-version: '24'
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-atena-${{ hashFiles('**/requirements*.txt') }}-v3.4
+        restore-keys: |
+          ${{ runner.os }}-pip-atena-
 
-    - name: 📦 Instalar Dependências (Correção aiosqlite/faiss)
+    - name: 🧠 Cache modelo AtenaLocalLM
+      uses: actions/cache@v4
+      with:
+        path: |
+          atena_evolution/lm/model/
+          atena_evolution/lm/vocab.json
+          atena_evolution/lm/ngram.pkl
+          atena_evolution/lm/data/
+        key: atena-lm-model-${{ hashFiles('atena_evolution/lm/model/**', 'atena_evolution/lm/vocab.json') }}
+        restore-keys: |
+          atena-lm-model-
+
+    - name: 🔧 Instalar dependências de sistema (JS/TS Support)
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y python3-dev build-essential sqlite3 jq tesseract-ocr nodejs npm
+        # Instala um parser de TS para que a Atena possa "ler" o DNA de referência
+        npm install -g typescript
+
+    - name: 📦 Instalar dependências Python (Core + Atuadores)
       run: |
         python -m pip install --upgrade pip
-        # Instalando tudo o que os logs pediram (Imagem 10 e 15)
-        pip install astor radon requests numpy scikit-learn psutil aiosqlite faiss-cpu
-        pip install beautifulsoup4 huggingface_hub torch --index-url https://download.pytorch.org/whl/cpu
-        npm install -g tsx typescript
+        pip install astor radon requests numpy scikit-learn hypothesis psutil
+        pip install pyautogui Pillow pytesseract opencv-python || echo "⚠️ Atuadores falharam"
+        pip install beautifulsoup4 fake-useragent feedparser nltk huggingface_hub
+        python -m nltk.downloader wordnet
 
-    - name: 🧹 Limpeza Profunda de Código (Fix Syntax Errors)
-      run: |
-        # Remove caracteres invisíveis (U+2500 e outros) que causam 'invalid character'
-        # Isso corrige o erro no services.py linha 76 e main.py linha 1 (Imagem 10 e 14)
-        find . -name "*.py" -exec sed -i 's/[^\x00-\x7F]//g' {} +
-        echo "✅ Código limpo de caracteres inválidos."
+        if [ "${{ env.ATENA_LM_ENABLED }}" == "true" ]; then
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+        fi
 
-    - name: 🧠 Restaurar Memória (Artifacts)
+    - name: 📂 Criar diretórios de memória e DNA
       run: |
-        ARTIFACT_ID=$(gh api "repos/${{ github.repository }}/actions/artifacts?per_page=5" \
-          --jq '.artifacts | map(select(.name | startswith("atena-brain-"))) | sort_by(.created_at) | reverse | .[0].id' 2>/dev/null || echo "")
+        mkdir -p atena_evolution/code \
+                 atena_evolution/backups \
+                 atena_evolution/knowledge \
+                 atena_evolution/sandbox \
+                 atena_evolution/reference_dna \
+                 atena_evolution/lm/model \
+                 atena_evolution/logs
+
+    - name: 🧠 Restaurar memória do run anterior
+      run: |
+        ARTIFACT_ID=$(gh api "repos/${{ github.repository }}/actions/artifacts?per_page=30" \
+          --jq '.artifacts | map(select(.name | startswith("atena-brain-data-"))) | sort_by(.created_at) | reverse | .[0].id' 2>/dev/null || echo "")
         if [ -n "$ARTIFACT_ID" ] && [ "$ARTIFACT_ID" != "null" ]; then
           gh api "repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip" > brain.zip
           unzip -q -o brain.zip -d . && rm brain.zip
@@ -80,22 +188,65 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       continue-on-error: true
 
-    - name: 🔮 Executar ATENA Core (O Orquestrador)
+    - name: 🔍 Verificar banco de conhecimento
       run: |
-        # Inicia o processo principal com as chaves de API carregadas
-        python main.py --auto --cycles ${{ github.event.inputs.generations || '10' }} --deep
+        DB="atena_evolution/knowledge/knowledge.db"
+        if [ -f "$DB" ]; then
+          echo "✅ Banco restaurado: $(sqlite3 $DB 'SELECT COUNT(*) FROM learned_functions;') funções."
+        fi
 
-    - name: 💾 Salvar Evolução
+    - name: 🔄 Rotação de tópicos Hacker Recon
+      id: rotate_topic
+      run: |
+        TOPICS=("evolutionary algorithm" "self-modifying code" "neural networks" "metaprogramming")
+        STATE_FILE="atena_evolution/recon_rotation_state.txt"
+        [ -f "$STATE_FILE" ] && i=$(cat "$STATE_FILE") || i=0
+        NEXT=$(( (i + 1) % ${#TOPICS[@]} ))
+        echo "$NEXT" > "$STATE_FILE"
+        echo "recon_topic=${TOPICS[$i]}" >> $GITHUB_OUTPUT
+      continue-on-error: true
+
+    - name: 🔮 Executar ATENA Core v3.3 (With Task Manager)
+      id: execucao
+      run: |
+        EXTRA_ARGS=""
+        [ "${{ env.ALLOW_DEEP_SELF_MOD }}" == "true" ] && EXTRA_ARGS="$EXTRA_ARGS --deep"
+        [ "${{ env.ALLOW_CHECKER_EVOLVE }}" == "true" ] && EXTRA_ARGS="$EXTRA_ARGS --checker"
+        
+        # Exporta variáveis de ambiente para os novos módulos
+        export ATENA_REFERENCE_DNA="atena_evolution/reference_dna"
+        
+        if [ "${{ env.MODE }}" == "recon" ]; then
+          python main.py --recon "${{ steps.rotate_topic.outputs.recon_topic }}" $EXTRA_ARGS
+        elif [ "${{ env.MODE }}" == "nocode" ]; then
+          python main.py --nocode --desc "${{ env.NOCODE_DESC }}" $EXTRA_ARGS
+        else
+          python main.py --auto --cycles ${{ env.GENERATIONS }} $EXTRA_ARGS
+        fi
+      continue-on-error: true
+
+    - name: 📊 Gerar Relatório de Inteligência
       if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: atena-brain-${{ github.run_id }}
-        path: |
-          atena_evolution/knowledge/
-          atena_evolution/lm/model/
-          atena_evolution/reference_dna/
-        retention-days: 7
+      run: |
+        echo "# 🧬 Relatório ATENA Ω v3.3" > relatorio.md
+        echo "- **Modo:** ${{ env.MODE }}" >> relatorio.md
+        [ -f atena_evolution/knowledge/knowledge.db ] && sqlite3 atena_evolution/knowledge/knowledge.db "SELECT * FROM evolution_metrics ORDER BY id DESC LIMIT 5;" >> relatorio.md
+
+    - name: 🚀 Upload para Hugging Face Hub
+      if: always() && env.HF_TOKEN != ''
+      run: |
+        python <<EOF
+        import os
+        from huggingface_hub import HfApi
+        api = HfApi(token=os.environ["HF_TOKEN"])
+        repo_id = os.environ.get("HF_REPO", "AtenaAuto/atena-model")
+        if os.path.isfile("atena_evolution/knowledge/knowledge.db"):
+            api.upload_file(path_or_fileobj="atena_evolution/knowledge/knowledge.db", path_in_repo="knowledge.db", repo_id=repo_id)
+        EOF
+      env:
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        HF_REPO: ${{ secrets.HF_REPO }}
 
     - name: ✅ Finalização
       if: always()
-      run: echo "🚀 Ciclo concluído. Verifique os Artifacts para o novo cérebro."
+      run: echo "✅ Ciclo concluído."

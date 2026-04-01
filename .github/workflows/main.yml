@@ -1,4 +1,4 @@
-name: 🧬 ATENA Ω - Evolução Divina v40.2 Genesis
+name: 🧬 ATENA Ω - Evolução Divina v40.3 Genesis
 
 on:
   schedule:
@@ -21,22 +21,19 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PYTHON_VERSION: '3.11'
-  # Resolve o aviso de Node.js antigo (Imagem 13)
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
-  # Garante que o Python enxergue a RAIZ e a pasta MODULES (Resolve erro da LLM)
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Garante que o Python enxergue a RAIZ e a pasta MODULES
   PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/modules"
-  # Secrets para chamadas de API
+  # Mapeamento explícito das suas Secrets (Imagem 1000008312.png)
   XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
   NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  ATENA_LM_ENABLED: "true"
 
 jobs:
   evoluir:
     name: 🧠 Evolução Neural + DNA Assimilation
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-
     steps:
     - name: 📥 Checkout
       uses: actions/checkout@v4
@@ -53,20 +50,23 @@ jobs:
       with:
         node-version: '24'
 
-    - name: 📦 Instalar Dependências (Correção aiosqlite/faiss)
+    - name: 📦 Instalar Dependências Core
       run: |
         python -m pip install --upgrade pip
-        # Instalando tudo o que os logs pediram (Imagem 10 e 15)
-        pip install astor radon requests numpy scikit-learn psutil aiosqlite faiss-cpu
-        pip install beautifulsoup4 huggingface_hub torch --index-url https://download.pytorch.org/whl/cpu
+        pip install astor radon requests numpy scikit-learn psutil aiosqlite beautifulsoup4 huggingface_hub
         npm install -g tsx typescript
 
-    - name: 🧹 Limpeza Profunda de Código (Fix Syntax Errors)
+    - name: 🧠 Instalar IA Local (Torch & Faiss)
+      if: env.ATENA_LM_ENABLED == 'true'
       run: |
-        # Remove caracteres invisíveis (U+2500 e outros) que causam 'invalid character'
-        # Isso corrige o erro no services.py linha 76 e main.py linha 1 (Imagem 10 e 14)
+        # Instalando separadamente para evitar o erro da Imagem 1000008317.png
+        pip install torch --index-url https://download.pytorch.org/whl/cpu
+        pip install faiss-cpu
+
+    - name: 🧹 Limpeza de Caracteres (Fix Syntax Error)
+      run: |
+        # Remove o caractere U+2500 e outros que travam o services.py (Imagem 1000008310.png)
         find . -name "*.py" -exec sed -i 's/[^\x00-\x7F]//g' {} +
-        echo "✅ Código limpo de caracteres inválidos."
 
     - name: 🧠 Restaurar Memória (Artifacts)
       run: |
@@ -80,9 +80,9 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       continue-on-error: true
 
-    - name: 🔮 Executar ATENA Core (O Orquestrador)
+    - name: 🔮 Executar ATENA Core
       run: |
-        # Inicia o processo principal com as chaves de API carregadas
+        # Roda o main.py com as variáveis de ambiente carregadas
         python main.py --auto --cycles ${{ github.event.inputs.generations || '10' }} --deep
 
     - name: 💾 Salvar Evolução
@@ -98,4 +98,4 @@ jobs:
 
     - name: ✅ Finalização
       if: always()
-      run: echo "🚀 Ciclo concluído. Verifique os Artifacts para o novo cérebro."
+      run: echo "Ciclo concluído."

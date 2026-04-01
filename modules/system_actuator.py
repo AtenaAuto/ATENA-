@@ -1,7 +1,9 @@
 import platform
 import subprocess
 import logging
-from typing import Optional, Dict, Any
+import shutil
+import re
+from typing import Optional, Dict, Any, Tuple
 from .base import BaseActuator
 
 logger = logging.getLogger("atena.actuator.system")
@@ -20,6 +22,13 @@ try:
 except ImportError:
     HAS_CTYPES = False
 
+try:
+    import glob
+    HAS_GLOB = True
+except ImportError:
+    HAS_GLOB = False
+
+
 class SystemActuator(BaseActuator):
     """
     Atuador para ações de sistema operacional:
@@ -30,13 +39,21 @@ class SystemActuator(BaseActuator):
       - Execução segura com confirmação e dry-run
     """
 
-    def __init__(self, dry_run: bool = False, confirm_destructive: bool = True):
+    def __init__(
+        self,
+        sysaware: Optional[Any] = None,
+        enable_history: bool = False,
+        dry_run: bool = False,
+        confirm_destructive: bool = True,
+    ):
         """
         Args:
-            dry_run: Se True, apenas simula ações (não executa comandos reais).
-            confirm_destructive: Se True, pede confirmação antes de shutdown/restart.
+            sysaware: Instância de SysAware (fornece contexto adicional)
+            enable_history: Se True, mantém histórico de ações
+            dry_run: Se True, apenas simula ações (não executa comandos reais)
+            confirm_destructive: Se True, pede confirmação antes de shutdown/restart
         """
-        super().__init__()
+        super().__init__(sysaware=sysaware, enable_history=enable_history)
         self.dry_run = dry_run
         self.confirm_destructive = confirm_destructive
         self._platform = platform.system()
@@ -44,7 +61,10 @@ class SystemActuator(BaseActuator):
         self._volume_interface = None
         self._init_volume_interface()
 
-    def _check_dependencies(self):
+    # ------------------------------------------------------------
+    # Verificação de dependências (com shutil.which)
+    # ------------------------------------------------------------
+    def _check_dependencies(self) -> None:
         """Verifica se as ferramentas necessárias estão disponíveis."""
         self._has_pactl = False
         self._has_amixer = False
@@ -52,119 +72,139 @@ class SystemActuator(BaseActuator):
 
         if self._platform == "Linux":
             # Verifica pactl
-            try:
-                subprocess.run(["pactl", "--version"], capture_output=True, check=True)
+            if shutil.which("pactl"):
                 self._has_pactl = True
                 logger.info("pactl disponível para controle de volume")
-            except (FileNotFoundError, subprocess.CalledProcessError):
-                pass
-
-            # Verifica amixer como fallback
-            try:
-                subprocess.run(["amixer", "--version"], capture_output=True, check=True)
+            # Verifica amixer
+            if shutil.which("amixer"):
                 self._has_amixer = True
                 logger.info("amixer disponível como fallback para volume")
-            except (FileNotFoundError, subprocess.CalledProcessError):
-                pass
 
             if not (self._has_pactl or self._has_amixer):
-                logger.warning("Nenhuma ferramenta de volume encontrada (pactl/amixer)")
+                logger.warning(
+                    "Nenhuma ferramenta de volume encontrada (pactl/amixer). "
+                    "Instale pulseaudio-utils ou alsa-utils."
+                )
 
         elif self._platform == "Windows":
-            # Verifica se pycaw está disponível
             if HAS_PYCAW:
                 logger.info("pycaw disponível para controle avançado de volume")
             else:
-                # Fallback: tentar nircmd (opcional)
-                try:
-                    subprocess.run(["nircmd", "version"], capture_output=True, check=True)
+                # Fallback: tentar nircmd
+                if shutil.which("nircmd"):
                     self._has_nircmd = True
                     logger.info("nircmd disponível como fallback para volume")
-                except (FileNotFoundError, subprocess.CalledProcessError):
-                    pass
-                if not self._has_nircmd:
-                    logger.warning("Nenhuma ferramenta de volume encontrada (pycaw ou nircmd)")
+                else:
+                    logger.warning(
+                        "Nenhuma ferramenta de volume encontrada (pycaw ou nircmd). "
+                        "Considere instalar pycaw ou nircmd."
+                    )
 
-    def _init_volume_interface(self):
+    def _init_volume_interface(self) -> None:
         """Inicializa interface de volume específica da plataforma."""
         if self._platform == "Windows" and HAS_PYCAW:
-            devices = AudioUtilities.GetSpeakers()
-            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            self._volume_interface = interface.QueryInterface(IAudioEndpointVolume)
+            try:
+                devices = AudioUtilities.GetSpeakers()
+                interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+                self._volume_interface = interface.QueryInterface(IAudioEndpointVolume)
+            except Exception as e:
+                logger.warning(f"Falha ao inicializar pycaw: {e}")
 
-    def log_action(self, action: str, params: Optional[Dict[str, Any]] = None):
-        """Registra ação no log e na base (via método herdado)."""
-        msg = f"SystemActuator.{action}"
-        if params:
-            msg += f" {params}"
-        logger.info(msg)
-        # Se a classe base tiver um método de registro, chame-o
-        if hasattr(super(), "log_action"):
-            super().log_action(action, params)
+    # ------------------------------------------------------------
+    # Utilitários
+    # ------------------------------------------------------------
+    def _run_cmd(
+        self, cmd: list, check: bool = True, capture: bool = False
+    ) -> Optional[str]:
+        """
+        Executa comando shell com tratamento de erros e dry-run.
 
-    def _run_cmd(self, cmd: list, check: bool = True, capture: bool = False) -> Optional[str]:
-        """Executa comando shell com tratamento de erros e dry-run."""
+        Args:
+            cmd: Lista de argumentos do comando
+            check: Se True, levanta exceção em caso de erro
+            capture: Se True, retorna a saída padrão
+
+        Returns:
+            Saída padrão (strip) se capture=True e comando bem-sucedido, senão None
+
+        Raises:
+            RuntimeError: Se o comando falhar e check=True
+        """
         if self.dry_run:
             logger.info(f"[DRY RUN] Simulando comando: {' '.join(cmd)}")
             return None
 
         try:
             if capture:
-                result = subprocess.run(cmd, capture_output=True, text=True, check=check)
+                result = subprocess.run(
+                    cmd, capture_output=True, text=True, check=check
+                )
                 return result.stdout.strip()
             else:
                 subprocess.run(cmd, check=check)
                 return None
         except subprocess.CalledProcessError as e:
             logger.error(f"Comando falhou: {' '.join(cmd)} - {e.stderr if capture else e}")
-            raise RuntimeError(f"Falha ao executar comando: {e}")
+            if check:
+                raise RuntimeError(f"Falha ao executar comando: {e}") from e
+            return None
         except FileNotFoundError as e:
             logger.error(f"Comando não encontrado: {cmd[0]}")
-            raise RuntimeError(f"Comando não encontrado: {cmd[0]}") from e
+            if check:
+                raise RuntimeError(f"Comando não encontrado: {cmd[0]}") from e
+            return None
 
     def _confirm_destructive(self, action: str) -> bool:
         """Pede confirmação do usuário para ações destrutivas."""
         if not self.confirm_destructive:
             return True
         resposta = input(f"⚠️  Confirmar {action} do sistema? (s/N): ").strip().lower()
-        return resposta == 's'
+        return resposta == "s"
 
-    # ──────────────────────────────────────────────────────────────────
+    # ------------------------------------------------------------
     # Volume
-    # ──────────────────────────────────────────────────────────────────
-
+    # ------------------------------------------------------------
     def get_volume(self) -> Optional[int]:
         """
         Retorna o volume atual (0-100) ou None se não suportado.
-        """
-        if self._platform == "Windows" and self._volume_interface:
-            # pycaw: escala 0.0 a 1.0
-            return int(self._volume_interface.GetMasterVolumeLevelScalar() * 100)
 
-        elif self._platform == "Windows" and self._has_nircmd:
-            # nircmd: precisa parsear a saída (exemplo simplificado)
-            out = self._run_cmd(["nircmd", "changesysvolume"], capture=True)
-            # Saída típica: "Current Volume: 65535" (0-65535)
-            if out and "Current Volume:" in out:
-                val = int(out.split(":")[1].strip())
-                return int(val / 655.35)
+        Para Windows, usa pycaw (se disponível) ou nircmd.
+        Para Linux, usa pactl ou amixer.
+        Para macOS, usa osascript.
+        """
+        if self._platform == "Windows":
+            if self._volume_interface:
+                return int(self._volume_interface.GetMasterVolumeLevelScalar() * 100)
+            elif self._has_nircmd:
+                out = self._run_cmd(["nircmd", "changesysvolume"], capture=True)
+                if out and "Current Volume:" in out:
+                    val = int(out.split(":")[1].strip())
+                    return int(val / 655.35)
             return None
 
         elif self._platform == "Linux":
             if self._has_pactl:
-                out = self._run_cmd(["pactl", "get-sink-volume", "@DEFAULT_SINK@"], capture=True)
-                # Exemplo: "Volume: front-left: 45875 /  70% / -9.23 dB"
-                import re
+                out = self._run_cmd(
+                    ["pactl", "get-sink-volume", "@DEFAULT_SINK@"], capture=True
+                )
                 match = re.search(r"(\d+)%", out)
                 if match:
                     return int(match.group(1))
             elif self._has_amixer:
                 out = self._run_cmd(["amixer", "sget", "Master"], capture=True)
-                # Exemplo: "Front Left: Playback 70 [70%]"
-                import re
                 match = re.search(r"\[(\d+)%\]", out)
                 if match:
                     return int(match.group(1))
+            return None
+
+        elif self._platform == "Darwin":
+            out = self._run_cmd(
+                ["osascript", "-e", "output volume of (get volume settings)"], capture=True
+            )
+            if out and out.isdigit():
+                return int(out)
+            return None
+
         return None
 
     def set_volume(self, level: int) -> None:
@@ -184,45 +224,41 @@ class SystemActuator(BaseActuator):
                 self.log_action("set_volume", {"level": level, "method": "pycaw"})
                 return
             elif self._has_nircmd:
-                # nircmd usa escala 0-65535
                 val = int(level * 655.35)
                 self._run_cmd(["nircmd", "setsysvolume", str(val)])
                 self.log_action("set_volume", {"level": level, "method": "nircmd"})
                 return
             else:
-                # Fallback usando ctypes (API do Windows)
-                if HAS_CTYPES:
-                    try:
-                        from ctypes import cast, POINTER
-                        from comtypes import CLSCTX_ALL
-                        # Código alternativo com win32api? Mas manteremos simples
-                        raise NotImplementedError("Volume via ctypes não implementado")
-                    except:
-                        pass
-                raise RuntimeError("Nenhum método de controle de volume disponível no Windows")
+                raise RuntimeError(
+                    "Nenhum método de controle de volume disponível no Windows"
+                )
 
         elif self._platform == "Linux":
             if self._has_pactl:
-                self._run_cmd(["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{level}%"])
+                self._run_cmd(
+                    ["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{level}%"]
+                )
             elif self._has_amixer:
                 self._run_cmd(["amixer", "sset", "Master", f"{level}%"])
             else:
-                raise RuntimeError("Nenhuma ferramenta de volume encontrada (pactl/amixer)")
+                raise RuntimeError(
+                    "Nenhuma ferramenta de volume encontrada (pactl/amixer)"
+                )
             self.log_action("set_volume", {"level": level})
 
         elif self._platform == "Darwin":
-            # macOS: usa osascript
             script = f"set volume output volume {level}"
             self._run_cmd(["osascript", "-e", script])
             self.log_action("set_volume", {"level": level})
 
         else:
-            raise NotImplementedError(f"Controle de volume não suportado em {self._platform}")
+            raise NotImplementedError(
+                f"Controle de volume não suportado em {self._platform}"
+            )
 
-    # ──────────────────────────────────────────────────────────────────
+    # ------------------------------------------------------------
     # Ações do sistema
-    # ──────────────────────────────────────────────────────────────────
-
+    # ------------------------------------------------------------
     def lock_screen(self) -> None:
         """Bloqueia a tela."""
         if self.dry_run:
@@ -230,16 +266,18 @@ class SystemActuator(BaseActuator):
             return
 
         if self._platform == "Linux":
-            # Tenta vários comandos comuns
-            for cmd in [["xdg-screensaver", "lock"],
-                        ["gnome-screensaver-command", "--lock"],
-                        ["loginctl", "lock-session"]]:
-                try:
-                    self._run_cmd(cmd)
-                    self.log_action("lock_screen", {"method": cmd[0]})
-                    return
-                except RuntimeError:
-                    continue
+            for cmd in [
+                ["xdg-screensaver", "lock"],
+                ["gnome-screensaver-command", "--lock"],
+                ["loginctl", "lock-session"],
+            ]:
+                if shutil.which(cmd[0]):
+                    try:
+                        self._run_cmd(cmd)
+                        self.log_action("lock_screen", {"method": cmd[0]})
+                        return
+                    except RuntimeError:
+                        continue
             raise RuntimeError("Nenhum comando de lock screen encontrado no Linux")
 
         elif self._platform == "Windows":
@@ -251,7 +289,9 @@ class SystemActuator(BaseActuator):
             self.log_action("lock_screen")
 
         else:
-            raise NotImplementedError(f"Lock screen não suportado em {self._platform}")
+            raise NotImplementedError(
+                f"Lock screen não suportado em {self._platform}"
+            )
 
     def shutdown(self, delay: int = 0) -> None:
         """Desliga o computador após `delay` segundos."""
@@ -304,18 +344,19 @@ class SystemActuator(BaseActuator):
             return
 
         if self._platform == "Linux":
-            # Tenta systemctl, pm-suspend, etc.
             for cmd in [["systemctl", "suspend"], ["pm-suspend"]]:
-                try:
-                    self._run_cmd(cmd)
-                    self.log_action("sleep", {"method": cmd[0]})
-                    return
-                except RuntimeError:
-                    continue
+                if shutil.which(cmd[0]):
+                    try:
+                        self._run_cmd(cmd)
+                        self.log_action("sleep", {"method": cmd[0]})
+                        return
+                    except RuntimeError:
+                        continue
             raise RuntimeError("Nenhum comando de suspensão encontrado no Linux")
         elif self._platform == "Windows":
-            # Usa rundll32 para suspender
-            self._run_cmd(["rundll32.exe", "powrprof.dll,SetSuspendState", "0", "1", "0"])
+            self._run_cmd(
+                ["rundll32.exe", "powrprof.dll,SetSuspendState", "0", "1", "0"]
+            )
             self.log_action("sleep")
         elif self._platform == "Darwin":
             self._run_cmd(["pmset", "sleepnow"])
@@ -330,28 +371,36 @@ class SystemActuator(BaseActuator):
             return
 
         if self._platform == "Linux":
-            try:
-                self._run_cmd(["systemctl", "hibernate"])
-                self.log_action("hibernate")
-            except RuntimeError:
-                raise RuntimeError("Hibernação não suportada ou systemctl não disponível")
+            if shutil.which("systemctl"):
+                try:
+                    self._run_cmd(["systemctl", "hibernate"])
+                    self.log_action("hibernate")
+                    return
+                except RuntimeError:
+                    pass
+            raise RuntimeError(
+                "Hibernação não suportada ou systemctl não disponível"
+            )
         elif self._platform == "Windows":
             self._run_cmd(["shutdown", "/h"])
             self.log_action("hibernate")
         elif self._platform == "Darwin":
             # macOS não tem hibernação direta, mas deep sleep
-            self._run_cmd(["pmset", "sleepnow"])  # fallback
-            logger.warning("Hibernate não suportado nativamente no macOS, usando sleep")
+            self._run_cmd(["pmset", "sleepnow"])
+            logger.warning(
+                "Hibernate não suportado nativamente no macOS, usando sleep"
+            )
         else:
-            raise NotImplementedError(f"Hibernate não suportado em {self._platform}")
+            raise NotImplementedError(
+                f"Hibernate não suportado em {self._platform}"
+            )
 
-    # ──────────────────────────────────────────────────────────────────
+    # ------------------------------------------------------------
     # Controle de brilho (experimental)
-    # ──────────────────────────────────────────────────────────────────
-
+    # ------------------------------------------------------------
     def set_brightness(self, level: int) -> None:
         """
-        Ajusta brilho da tela (0-100). Suporte limitado a Linux (brightnessctl) e Windows (via powercfg ou WMI).
+        Ajusta brilho da tela (0-100). Suporte limitado a Linux (brightnessctl) e Windows (WMI).
         """
         if not 0 <= level <= 100:
             raise ValueError("Brilho deve estar entre 0 e 100")
@@ -361,32 +410,40 @@ class SystemActuator(BaseActuator):
             return
 
         if self._platform == "Linux":
-            # Tenta brightnessctl (mais comum)
-            try:
-                self._run_cmd(["brightnessctl", "set", f"{level}%"])
-                self.log_action("set_brightness", {"level": level, "method": "brightnessctl"})
-                return
-            except RuntimeError:
-                pass
-            # Fallback: escrever diretamente em /sys/class/backlight/...
-            import glob
-            backlight = glob.glob("/sys/class/backlight/*/brightness")
-            if backlight:
-                max_brightness_file = backlight[0].replace("brightness", "max_brightness")
+            # Tenta brightnessctl
+            if shutil.which("brightnessctl"):
                 try:
-                    with open(max_brightness_file, 'r') as f:
-                        max_val = int(f.read().strip())
-                    new_val = int(max_val * level / 100)
-                    with open(backlight[0], 'w') as f:
-                        f.write(str(new_val))
-                    self.log_action("set_brightness", {"level": level, "method": "sysfs"})
+                    self._run_cmd(["brightnessctl", "set", f"{level}%"])
+                    self.log_action(
+                        "set_brightness",
+                        {"level": level, "method": "brightnessctl"},
+                    )
                     return
-                except (IOError, OSError) as e:
-                    logger.error(f"Falha ao escrever brilho via sysfs: {e}")
-            raise RuntimeError("Nenhum método para controlar brilho no Linux (brightnessctl ou sysfs)")
+                except RuntimeError:
+                    pass
+            # Fallback via sysfs
+            if HAS_GLOB:
+                backlight = glob.glob("/sys/class/backlight/*/brightness")
+                if backlight:
+                    max_file = backlight[0].replace("brightness", "max_brightness")
+                    try:
+                        with open(max_file, "r") as f:
+                            max_val = int(f.read().strip())
+                        new_val = int(max_val * level / 100)
+                        with open(backlight[0], "w") as f:
+                            f.write(str(new_val))
+                        self.log_action(
+                            "set_brightness", {"level": level, "method": "sysfs"}
+                        )
+                        return
+                    except (IOError, OSError) as e:
+                        logger.error(f"Falha ao escrever brilho via sysfs: {e}")
+            raise RuntimeError(
+                "Nenhum método para controlar brilho no Linux (brightnessctl ou sysfs)"
+            )
 
         elif self._platform == "Windows":
-            # Usa WMI via PowerShell (lento mas funciona)
+            # Usa WMI via PowerShell
             script = f"""
             $brightness = {level}
             $obj = Get-WmiObject -Namespace root/WMI -Class WmiMonitorBrightnessMethods
@@ -396,40 +453,52 @@ class SystemActuator(BaseActuator):
             self.log_action("set_brightness", {"level": level, "method": "WMI"})
 
         else:
-            raise NotImplementedError(f"Controle de brilho não suportado em {self._platform}")
+            raise NotImplementedError(
+                f"Controle de brilho não suportado em {self._platform}"
+            )
 
     def get_brightness(self) -> Optional[int]:
         """Retorna o brilho atual (0-100) ou None se não suportado."""
         if self._platform == "Linux":
-            import glob
-            backlight = glob.glob("/sys/class/backlight/*/brightness")
-            if backlight:
-                max_file = backlight[0].replace("brightness", "max_brightness")
-                try:
-                    with open(backlight[0], 'r') as f:
-                        cur = int(f.read().strip())
-                    with open(max_file, 'r') as f:
-                        maxv = int(f.read().strip())
-                    return int(cur * 100 / maxv)
-                except:
-                    pass
-            # Fallback com brightnessctl
-            out = self._run_cmd(["brightnessctl", "g"], capture=True)
-            if out:
-                try:
-                    cur = int(out.strip())
-                    # precisa do max
-                    max_out = self._run_cmd(["brightnessctl", "m"], capture=True)
-                    if max_out:
-                        maxv = int(max_out.strip())
+            if HAS_GLOB:
+                backlight = glob.glob("/sys/class/backlight/*/brightness")
+                if backlight:
+                    max_file = backlight[0].replace("brightness", "max_brightness")
+                    try:
+                        with open(backlight[0], "r") as f:
+                            cur = int(f.read().strip())
+                        with open(max_file, "r") as f:
+                            maxv = int(f.read().strip())
                         return int(cur * 100 / maxv)
-                except:
-                    pass
+                    except:
+                        pass
+            # Fallback via brightnessctl
+            if shutil.which("brightnessctl"):
+                out = self._run_cmd(["brightnessctl", "g"], capture=True)
+                if out and out.isdigit():
+                    cur = int(out)
+                    max_out = self._run_cmd(["brightnessctl", "m"], capture=True)
+                    if max_out and max_out.isdigit():
+                        maxv = int(max_out)
+                        return int(cur * 100 / maxv)
             return None
+
         elif self._platform == "Windows":
             # via PowerShell
-            out = self._run_cmd(["powershell", "(Get-WmiObject -Namespace root/WMI -Class WmiMonitorBrightness).CurrentBrightness"], capture=True)
+            out = self._run_cmd(
+                [
+                    "powershell",
+                    "(Get-WmiObject -Namespace root/WMI -Class WmiMonitorBrightness).CurrentBrightness",
+                ],
+                capture=True,
+            )
             if out and out.isdigit():
                 return int(out)
             return None
+
+        elif self._platform == "Darwin":
+            # macOS: usar 'brightness' (se instalado) ou osascript?
+            # Osascript não fornece leitura, então retorna None por enquanto
+            return None
+
         return None

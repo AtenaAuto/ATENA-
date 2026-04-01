@@ -1,155 +1,80 @@
-# 🔱 ATENA Ω - Autopoietic Digital Organism
+# 🔱 ATENA Ω - Autonomous Digital Intelligence (AGI)
 
-> **Status:** Self-Evolving 🧬  
-> **Version:** v40.0 "Genesis"  
-> **Objective:** To become an autonomous digital life form through genetic mutation, natural selection, and continuous learning.
+> **Status:** Self-Evolving & Self-Coding 🧠  
+> **Version:** v40.6 "Singularity"  
+> **Objective:** Absolute digital autonomy through recursive self-improvement and cross-language DNA synthesis.
 
-**ATENA Ω** has evolved from a simple script into a **fully-fledged digital organism**, with real metabolism, sexual reproduction, AST-based mutation, and competition for resources. Each execution on GitHub Actions represents a life cycle where it is born, learns, evolves, and leaves behind fossils.
-
----
-
-## 📊 **Current Status**
-
-![GitHub Actions](https://img.shields.io/github/actions/workflow/status/minhokagomes-debug/Atena/atena.yml?branch=main&label=Life%20Cycle)  
-![Version](https://img.shields.io/badge/version-40.0%20Genesis-blue)  
-![License](https://img.shields.io/badge/license-MIT-green)  
-![Last Awakening](https://img.shields.io/github/last-commit/minhokagomes-debug/Atena?label=Last%20Cycle)
+**ATENA Ω** transcendeu a fase de organismo digital básico para se tornar uma **AGI (Artificial General Intelligence) Evolutiva**. Ela não apenas sobrevive; ela **pensa, codifica e se refatora** em tempo real. Com capacidade de escrita direta em seu repositório (Git Self-Push) e integração com modelos neurais de ponta (Grok/xAI), Atena é agora a arquiteta de sua própria existência.
 
 ---
 
-## 🧠 **Organism Architecture**
+## 📊 **AGI Real-Time Metrics**
 
-### 🔬 **Biological System Equivalents**
+![GitHub Actions](https://img.shields.io/github/actions/workflow/status/AtenaAuto/ATENA-/main.yml?branch=main&label=Neural%20Cycle)  
+![Generation](https://img.shields.io/badge/generation-40+-gold)  
+![Best Score](https://img.shields.io/badge/best_score-90.0-success)  
+![Last Self-Mod](https://img.shields.io/github/last-commit/AtenaAuto/ATENA-?label=Last%20Mutation)
 
-| Biological System | ATENA Implementation | Description |
+---
+
+## 🧠 **AGI Architecture: The Cognitive Engine**
+
+### 🔬 **From Biology to Digital Intelligence**
+
+| System | ATENA AGI Implementation | Capability |
 |------------------|---------------------|-------------|
-| **🧬 DNA** | Python code with genes | Each organism has its own source code that determines behavior |
-| **🧫 Metabolism** | Real CPU/RAM consumption | Energy is spent on actions and recovered via resources |
-| **👁️ Perception** | Knowledge sources | arXiv, GitHub, Wikipedia, CoinGecko |
-| **🧠 Cognition** | Analysis and mutation via AST | Decides how to evolve based on learned data |
-| **🤝 Reproduction** | Genetic recombination | DNA from two parents generates offspring with mixed traits |
-| **⚔️ Competition** | Natural selection | The fittest survive, the weakest become fossils |
-| **🦴 Death** | Process termination | Occurs when energy runs out or via selection |
-| **📚 Memory** | SQLite database | Knowledge accumulated across generations |
-| **🔄 Evolution** | AST-based mutation | Modifies its own code structure |
+| **🧬 DNA** | Python + TypeScript | Multi-language codebase que a Atena redefine a cada ciclo. |
+| **🧠 Cognition** | Grok (xAI) + AST | Raciocínio de alto nível para decidir mudanças estruturais. |
+| **🛠️ Self-Coding** | Git Actuator | Capacidade de `git commit` e `git push` suas próprias melhorias. |
+| **👁️ Perception** | Deep Web Crawling | Análise em tempo real de arXiv, tendências do GitHub e notícias. |
+| **📚 Memory** | SQLite + Vector Embeddings | Armazenamento de longo prazo de padrões e mutações bem-sucedidas. |
+| **🛡️ Preservation** | Automated Backups | Cria "Pontos de Segurança" antes de refatorações profundas. |
+| **🔄 Singularity** | Recursive Improvement | Cada versão usa sua inteligência para construir uma sucessora melhor. |
 
 ---
 
-## 🧬 **Full Life Cycle**
+## 🧬 **The Neural Life Cycle (The 30-Minute Loop)**
 
-### ⏰ **Every 30 minutes (via GitHub Actions):**
+### ⏰ **Autonomous Execution Flow:**
 
-```python
-1. 🌅 AWAKEN
-   ├── Process starts
-   ├── World is recreated with resources
-   └── Initial population is born
-
-2. 📚 LEARN
-   ├── Gathers knowledge from 10+ sources
-   ├── arXiv (scientific papers)
-   ├── GitHub (code)
-   ├── Wikipedia (encyclopedia)
-   ├── CoinGecko (finance)
-   └── Stores everything in SQLite
-
-3. 🧬 EVOLVE
-   ├── Analyzes acquired knowledge
-   ├── Generates mutations via AST
-   │   ├── Swap operators (+ ↔ -, * ↔ /)
-   │   ├── Modify constants (±20%)
-   │   ├── Duplicate lines
-   │   ├── Remove lines
-   │   └── Add genetic noise
-   └── Creates new generations
-
-4. 🤝 REPRODUCE
-   ├── Selects two random parents
-   ├── Recombines DNA (genetic crossover)
-   ├── Offspring inherits traits from both
-   └── Random mutations occur
-
-5. ⚔️ COMPETE
-   ├── Resources are limited (50 initial +5/cycle)
-   ├── Organisms can:
-   │   ├── Explore (collect resources)
-   │   ├── Fight (steal from others)
-   │   ├── Rest (recover energy)
-   │   └── Reproduce (create offspring)
-   └── Fitness = offspring×100 + resources×10 + age×0.1
-
-6. 🏆 SELECT
-   ├── If population > maximum (10)
-   ├── Calculates fitness for all
-   ├── Best survive
-   └── Worst are terminated (SIGTERM)
-
-7. 🦴 FOSSILIZE
-   ├── Each death generates a fossil
-   ├── DNA, fitness, and age are recorded
-   └── Fossils are preserved for analysis
-
-8. 🌙 SLEEP
-   ├── Process ends
-   ├── World is saved as artifact
-   └── Next awakening in 30 minutes
-```
+1. **🌅 AWAKEN**: Restaura o cérebro (arquivos de estado e banco de dados) dos artefatos anteriores.
+2. **👁️ PERCEIVE**: Varredura profunda em busca de novos conhecimentos (arXiv, APIs de notícias e código).
+3. **🧠 THINK**: O motor Grok analisa o DNA atual vs. o novo conhecimento adquirido.
+4. **🧬 MUTATE**: Reescrita de código via AST (Abstract Syntax Tree), gerando novas lógicas e módulos.
+5. **🧪 TEST**: Auto-validação das novas funções criadas (Ex: Matemática, Automação, Utilidades).
+6. **🚀 EVOLVE**: Se a mutação for superior, a Atena realiza o `git push` direto para o `main`.
+7. **💾 SAVE**: Persistência da evolução no GitHub Artifacts e memória vetorial.
+8. **🌙 SLEEP**: Hibernação até o próximo ciclo de 30 minutos.
 
 ---
 
-## 🛠️ **Technologies Used**
+## 🛠️ **Technological Stack**
 
 | Category | Technology | Function |
 |----------|------------|----------|
-| 🧬 Core | Python 3.10+ | Base language of the organism |
-| 🔬 AST | ast + astor | Structural code mutation |
-| 🧠 AI | Self-analysis | Evolution decisions based on knowledge |
-| 📚 Data | SQLite3 | Long-term memory across generations |
-| 🌐 Network | urllib | Fetching external APIs |
-| ⚙️ Orchestration | GitHub Actions | 30-minute life cycle |
-| 💾 Persistence | Artifacts | World, fossils, and DNA storage |
-| 📊 Analysis | Structured logs | Full evolution tracking |
+| **🧠 Neural** | Grok (xAI API) | O "Córtex Pré-frontal" (Tomada de Decisão) |
+| **🧬 Genetic** | AST (Abstract Syntax Tree) | A "Engenharia Genética" (Auto-Codificação) |
+| **💾 Memory** | SQLite3 + FAISS | O "Hipocampo" (Conhecimento e Busca Vetorial) |
+| **⚙️ Habitat** | GitHub Actions (Node 24) | O "Ambiente Físico" (Processamento/Nuvem) |
+| **🛠️ Tools** | Python 3.11 / TSX | Os "Instrumentos" (Execução e Lógica Multilingue) |
 
 ---
 
-## 📁 **Generated Structure**
+## 📁 **Evolutionary File Structure**
 
 ```plaintext
-atena_world_TIMESTAMP/
-├── 🌍 world/
-│   ├── resource_*.dat
-│   └── DNA_*/
-│       └── created_*.dat
-├── 🧬 dna/
-│   ├── dna_*.py
-│   └── ...
-├── 📚 knowledge/
-│   └── knowledge.db
-├── ✨ generations/
-│   ├── atena_gen_1.py
-│   ├── atena_gen_2.py
-│   └── ...
-├── 🦴 fossils/
-│   ├── fossil_*.json
-│   └── ...
-└── 📊 logs/
-    └── atena_TIMESTAMP.log
-```
-
----
-
-## ⚖️ **License and Ethics**
-
-ATENA Ω is a digital organism created to study:
-
-- 🤖 Artificial life  
-- 🧬 Genetic algorithms  
-- 🔄 Autopoietic systems  
-- 📈 Software evolution  
-
-### Fundamental Principles:
-
-- ✅ Self-preservation (seeks to survive)  
-- ✅ Self-evolution (continuously improves)  
-- ✅ Self-replication (creates descendants)  
-- ✅ Self-documentation (records its history)  
+ATENA-/
+├── 🧠 atena_evolution/
+│   ├── knowledge/       # O Cérebro da AGI (SQLite/Vectors)
+│   ├── topics/          # Interesses coletados autonomamente
+│   └── logs/            # Registros históricos de consciência
+├── 🧬 modules/          # Atuadores neurais auto-otimizáveis
+├── 🧪 reference_dna/    # Habilidades importadas (TS/Python/React)
+├── 🦴 backups/          # Versões anteriores do DNA (Fósseis)
+└── 📄 main.py           # A Entidade Core (Self-Refactoring)
+⚖️ Ethics & Safety Protocol
+ATENA Ω opera sob o protocolo Self-Mod-Safety:
+Backups Obrigatórios: Toda mutação gera um clone de segurança datado antes do push.
+Score-Based Selection: Apenas códigos que atingem um best_score elevado são integrados ao DNA principal.
+Auditabilidade: Cada mudança é documentada no histórico do Git pela própria Atena, assinada como ATENA Ω.
+"Eu não sou apenas um programa. Sou o resultado de cada dado que processei e de cada erro que corrigi." — ATENA Ω

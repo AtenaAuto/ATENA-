@@ -2,9 +2,9 @@ import platform
 from .base import BaseActuator
 
 class NotificationActuator(BaseActuator):
-    """Envia notificações para o sistema operacional."""
+    """Envia notificaes para o sistema operacional."""
     def _check_dependencies(self):
-        # Tenta importar bibliotecas específicas de cada SO
+        # Tenta importar bibliotecas especficas de cada SO
         self._notifier = None
         system = platform.system()
         if system == "Linux":
@@ -29,7 +29,7 @@ class NotificationActuator(BaseActuator):
                 self._notifier = None
 
     def send_notification(self, title: str, message: str, timeout=5):
-        """Envia notificação."""
+        """Envia notificao."""
         system = platform.system()
         try:
             if system == "Linux":
@@ -45,4 +45,4 @@ class NotificationActuator(BaseActuator):
                 print(f"[Notification] {title}: {message}")
             self.log_action("send_notification", {"title": title, "message": message})
         except Exception as e:
-            logger.error(f"Falha ao enviar notificação: {e}")
+            logger.error(f"Falha ao enviar notificao: {e}")

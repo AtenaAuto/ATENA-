@@ -4,18 +4,18 @@ from pathlib import Path
 from .base import BaseActuator
 
 class FileActuator(BaseActuator):
-    """Manipulação de arquivos e diretórios."""
+    """Manipulao de arquivos e diretrios."""
     def __init__(self, sysaware=None, safe_mode=True):
         self.safe_mode = safe_mode
         self._protected_paths = {Path.home(), Path("/"), Path("/etc"), Path("/usr")} if safe_mode else set()
         super().__init__(sysaware)
 
     def _check_dependencies(self):
-        # Sem dependências externas
+        # Sem dependncias externas
         pass
 
     def _is_safe_path(self, path: Path) -> bool:
-        """Verifica se o caminho é seguro para manipulação."""
+        """Verifica se o caminho  seguro para manipulao."""
         if not self.safe_mode:
             return True
         path = Path(path).resolve()
@@ -25,7 +25,7 @@ class FileActuator(BaseActuator):
         return True
 
     def read_file(self, filepath: str) -> str:
-        """Lê conteúdo de um arquivo."""
+        """L contedo de um arquivo."""
         path = Path(filepath).resolve()
         if not self._is_safe_path(path):
             raise PermissionError(f"Caminho protegido: {path}")
@@ -59,7 +59,7 @@ class FileActuator(BaseActuator):
         self.log_action("delete_file", {"path": str(path)})
 
     def create_directory(self, path: str):
-        """Cria diretório (incluindo pais)."""
+        """Cria diretrio (incluindo pais)."""
         path = Path(path).resolve()
         if not self._is_safe_path(path):
             raise PermissionError(f"Caminho protegido: {path}")

@@ -12,11 +12,11 @@ logger = logging.getLogger("atena.actuator.process")
 class ProcessActuator(BaseActuator):
     """
     Atuador para gerenciamento de processos do sistema:
-      - Execução de comandos com timeout e captura de saída
-      - Informações detalhadas de processos (CPU, memória, cmdline)
+      - Execuo de comandos com timeout e captura de sada
+      - Informaes detalhadas de processos (CPU, memria, cmdline)
       - Encerramento seguro (terminate/kill)
       - Busca por nome/PID
-      - Espera por término de processo
+      - Espera por trmino de processo
       - Listagem de processos com filtros
     """
 
@@ -31,16 +31,16 @@ class ProcessActuator(BaseActuator):
         self._check_dependencies()
 
     def _check_dependencies(self):
-        """Verifica se psutil está disponível."""
+        """Verifica se psutil est disponvel."""
         if not hasattr(psutil, "__version__"):
-            raise ImportError("psutil não está instalado. Execute: pip install psutil")
+            raise ImportError("psutil no est instalado. Execute: pip install psutil")
         logger.info("ProcessActuator inicializado com psutil %s", psutil.__version__)
 
     def log_action(self, action: str, params: Optional[Dict[str, Any]] = None):
-        """Registra ação com contexto."""
+        """Registra ao com contexto."""
         msg = f"ProcessActuator.{action}"
         if params:
-            # Remove dados sensíveis como comandos completos se necessário
+            # Remove dados sensveis como comandos completos se necessrio
             safe_params = {k: v for k, v in (params or {}).items() if k != "command"}
             msg += f" {safe_params}"
         logger.info(msg)
@@ -48,16 +48,16 @@ class ProcessActuator(BaseActuator):
             super().log_action(action, params)
 
     def _is_command_allowed(self, command: Union[str, List[str]]) -> bool:
-        """Verifica se o comando está na whitelist (se configurada)."""
+        """Verifica se o comando est na whitelist (se configurada)."""
         if self.command_whitelist is None:
             return True
         cmd_str = command if isinstance(command, str) else command[0]
         base_cmd = Path(cmd_str).name
         return base_cmd in self.command_whitelist
 
-    # ──────────────────────────────────────────────────────────────────
-    # Execução de comandos
-    # ──────────────────────────────────────────────────────────────────
+    # 
+    # Execuo de comandos
+    # 
 
     def run_command(
         self,
@@ -74,22 +74,22 @@ class ProcessActuator(BaseActuator):
 
         Args:
             command: Lista de argumentos ou string (se shell=True).
-            shell: Se True, usa shell (cuidado: riscos de segurança).
-            timeout: Tempo máximo em segundos.
+            shell: Se True, usa shell (cuidado: riscos de segurana).
+            timeout: Tempo mximo em segundos.
             input_data: String enviada para stdin do processo.
-            env: Dicionário de variáveis de ambiente.
-            cwd: Diretório de trabalho.
-            kill_on_timeout: Se True, mata o processo após timeout (caso contrário, apenas cancela a espera).
+            env: Dicionrio de variveis de ambiente.
+            cwd: Diretrio de trabalho.
+            kill_on_timeout: Se True, mata o processo aps timeout (caso contrrio, apenas cancela a espera).
 
         Returns:
             (stdout, stderr, returncode)
         """
         if not self._is_command_allowed(command):
-            raise PermissionError(f"Comando não autorizado pela whitelist: {command}")
+            raise PermissionError(f"Comando no autorizado pela whitelist: {command}")
 
         # Aviso sobre shell inseguro
         if shell and isinstance(command, str):
-            logger.warning("Uso de shell=True com comando string: %s - risco de injeção", command)
+            logger.warning("Uso de shell=True com comando string: %s - risco de injeo", command)
 
         try:
             result = subprocess.run(
@@ -117,26 +117,26 @@ class ProcessActuator(BaseActuator):
 
         except FileNotFoundError as e:
             self.log_action("run_command_fnf", {"command": command})
-            raise RuntimeError(f"Comando não encontrado: {command}") from e
+            raise RuntimeError(f"Comando no encontrado: {command}") from e
 
         except PermissionError as e:
             self.log_action("run_command_permission", {"command": command})
-            raise RuntimeError(f"Permissão negada para executar: {command}") from e
+            raise RuntimeError(f"Permisso negada para executar: {command}") from e
 
-    # ──────────────────────────────────────────────────────────────────
-    # Informações de processo
-    # ──────────────────────────────────────────────────────────────────
+    # 
+    # Informaes de processo
+    # 
 
     def get_process_info(self, pid: int) -> Optional[Dict[str, Any]]:
         """
-        Obtém informações detalhadas de um processo pelo PID.
+        Obtm informaes detalhadas de um processo pelo PID.
 
         Returns:
-            Dicionário com campos ou None se processo não existir.
+            Dicionrio com campos ou None se processo no existir.
         """
         try:
             p = psutil.Process(pid)
-            with p.oneshot():  # Otimização para múltiplas chamadas
+            with p.oneshot():  # Otimizao para mltiplas chamadas
                 info = {
                     "pid": pid,
                     "name": p.name(),
@@ -153,7 +153,7 @@ class ProcessActuator(BaseActuator):
                 }
             return info
         except psutil.NoSuchProcess:
-            logger.debug(f"Processo {pid} não encontrado")
+            logger.debug(f"Processo {pid} no encontrado")
             return None
         except (psutil.AccessDenied, psutil.ZombieProcess) as e:
             logger.warning(f"Sem acesso ao processo {pid}: {e}")
@@ -161,11 +161,11 @@ class ProcessActuator(BaseActuator):
 
     def get_process_by_name(self, name: str, partial: bool = False) -> List[Dict[str, Any]]:
         """
-        Retorna informações de todos os processos com determinado nome.
+        Retorna informaes de todos os processos com determinado nome.
 
         Args:
-            name: Nome do executável (ex: "python", "chrome.exe").
-            partial: Se True, faz correspondência parcial (substring).
+            name: Nome do executvel (ex: "python", "chrome.exe").
+            partial: Se True, faz correspondncia parcial (substring).
         """
         results = []
         for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
@@ -184,7 +184,7 @@ class ProcessActuator(BaseActuator):
         return results
 
     def is_process_running(self, pid: int) -> bool:
-        """Verifica se um processo com o PID está ativo."""
+        """Verifica se um processo com o PID est ativo."""
         return psutil.pid_exists(pid)
 
     def list_processes(
@@ -198,8 +198,8 @@ class ProcessActuator(BaseActuator):
 
         Args:
             filter_by: Filtro por nome (substring, case-insensitive).
-            sort_by: Campo para ordenação ("pid", "name", "cpu_percent", "memory_percent").
-            limit: Número máximo de processos retornados.
+            sort_by: Campo para ordenao ("pid", "name", "cpu_percent", "memory_percent").
+            limit: Nmero mximo de processos retornados.
         """
         processes = []
         for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent']):
@@ -212,7 +212,7 @@ class ProcessActuator(BaseActuator):
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
 
-        # Ordenação
+        # Ordenao
         if sort_by in ["pid", "cpu_percent", "memory_percent"]:
             processes.sort(key=lambda x: x.get(sort_by, 0))
         elif sort_by == "name":
@@ -225,7 +225,7 @@ class ProcessActuator(BaseActuator):
         return processes
 
     def get_all_processes_info(self) -> List[Dict[str, Any]]:
-        """Retorna informações de todos os processos (pode ser pesado)."""
+        """Retorna informaes de todos os processos (pode ser pesado)."""
         infos = []
         for pid in psutil.pids():
             info = self.get_process_info(pid)
@@ -233,9 +233,9 @@ class ProcessActuator(BaseActuator):
                 infos.append(info)
         return infos
 
-    # ──────────────────────────────────────────────────────────────────
+    # 
     # Controle de processos
-    # ──────────────────────────────────────────────────────────────────
+    # 
 
     def kill_process(self, pid: int, force: bool = False, graceful_timeout: float = 5.0) -> bool:
         """
@@ -243,37 +243,37 @@ class ProcessActuator(BaseActuator):
 
         Args:
             pid: ID do processo.
-            force: Se True, usa `kill()` (SIGKILL); caso contrário, `terminate()` (SIGTERM).
-            graceful_timeout: Se force=False, aguarda esse tempo antes de forçar kill.
+            force: Se True, usa `kill()` (SIGKILL); caso contrrio, `terminate()` (SIGTERM).
+            graceful_timeout: Se force=False, aguarda esse tempo antes de forar kill.
 
         Returns:
-            True se o processo foi encerrado ou já não existia; False em erro.
+            True se o processo foi encerrado ou j no existia; False em erro.
         """
         try:
             p = psutil.Process(pid)
             if not p.is_running():
-                logger.debug(f"Processo {pid} já não está em execução")
+                logger.debug(f"Processo {pid} j no est em execuo")
                 return True
 
             if force:
-                logger.info(f"Forçando kill do processo {pid}")
+                logger.info(f"Forando kill do processo {pid}")
                 p.kill()
             else:
                 logger.info(f"Encerrando processo {pid} com SIGTERM")
                 p.terminate()
-                # Aguarda término gracioso
+                # Aguarda trmino gracioso
                 gone, alive = psutil.wait_procs([p], timeout=graceful_timeout)
                 if alive:
-                    logger.warning(f"Processo {pid} não respondeu, forçando kill")
+                    logger.warning(f"Processo {pid} no respondeu, forando kill")
                     p.kill()
             self.log_action("kill_process", {"pid": pid, "force": force})
             return True
 
         except psutil.NoSuchProcess:
-            logger.debug(f"Processo {pid} não existe mais")
+            logger.debug(f"Processo {pid} no existe mais")
             return True
         except (psutil.AccessDenied, PermissionError) as e:
-            logger.error(f"Sem permissão para encerrar processo {pid}: {e}")
+            logger.error(f"Sem permisso para encerrar processo {pid}: {e}")
             return False
 
     def kill_process_by_name(self, name: str, force: bool = False) -> int:
@@ -281,7 +281,7 @@ class ProcessActuator(BaseActuator):
         Encerra todos os processos com o nome dado.
 
         Returns:
-            Número de processos encerrados.
+            Nmero de processos encerrados.
         """
         killed = 0
         for proc in psutil.process_iter(['pid', 'name']):
@@ -296,10 +296,10 @@ class ProcessActuator(BaseActuator):
 
     def wait_for_process(self, pid: int, timeout: float = 30.0, poll_interval: float = 0.5) -> bool:
         """
-        Aguarda até que o processo termine.
+        Aguarda at que o processo termine.
 
         Returns:
-            True se o processo terminou dentro do timeout, False caso contrário.
+            True se o processo terminou dentro do timeout, False caso contrrio.
         """
         start = time.time()
         while time.time() - start < timeout:
@@ -310,7 +310,7 @@ class ProcessActuator(BaseActuator):
 
     def wait_for_process_by_name(self, name: str, timeout: float = 30.0) -> bool:
         """
-        Aguarda até que nenhum processo com o nome dado esteja em execução.
+        Aguarda at que nenhum processo com o nome dado esteja em execuo.
         """
         start = time.time()
         while time.time() - start < timeout:
@@ -320,17 +320,17 @@ class ProcessActuator(BaseActuator):
             time.sleep(0.5)
         return False
 
-    # ──────────────────────────────────────────────────────────────────
-    # Utilitários
-    # ──────────────────────────────────────────────────────────────────
+    # 
+    # Utilitrios
+    # 
 
     def get_current_process_info(self) -> Dict[str, Any]:
-        """Retorna informações do próprio processo Atena."""
+        """Retorna informaes do prprio processo Atena."""
         import os
         return self.get_process_info(os.getpid())
 
     def get_parent_process_info(self) -> Optional[Dict[str, Any]]:
-        """Retorna informações do processo pai."""
+        """Retorna informaes do processo pai."""
         try:
             parent_pid = psutil.Process().ppid()
             return self.get_process_info(parent_pid)

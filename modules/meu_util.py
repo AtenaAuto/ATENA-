@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Módulo de utilidades básicas com boas práticas.
+Mdulo de utilidades bsicas com boas prticas.
 """
 
 import logging
 from typing import Union, Optional
 
-# Configuração de logging
+# Configurao de logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s - %(message)s"
@@ -17,43 +17,43 @@ logger = logging.getLogger(__name__)
 
 def saudacao(nome: Optional[str] = None) -> str:
     """
-    Retorna uma saudação personalizada.
+    Retorna uma saudao personalizada.
 
     Args:
-        nome (str, opcional): Nome da pessoa a ser saudada. Se não fornecido,
-                              usa uma saudação genérica.
+        nome (str, opcional): Nome da pessoa a ser saudada. Se no fornecido,
+                              usa uma saudao genrica.
 
     Returns:
-        str: Mensagem de saudação.
+        str: Mensagem de saudao.
 
     Example:
         >>> saudacao("Maria")
-        'Olá, Maria! Bem-vindo(a) ao módulo.'
+        'Ol, Maria! Bem-vindo(a) ao mdulo.'
         >>> saudacao()
-        'Olá! Seja bem-vindo(a) ao módulo.'
+        'Ol! Seja bem-vindo(a) ao mdulo.'
     """
     if nome:
-        msg = f"Olá, {nome}! Bem-vindo(a) ao módulo."
+        msg = f"Ol, {nome}! Bem-vindo(a) ao mdulo."
     else:
-        msg = "Olá! Seja bem-vindo(a) ao módulo."
+        msg = "Ol! Seja bem-vindo(a) ao mdulo."
     
-    logger.info(f"Saudação gerada para: {nome or 'anônimo'}")
+    logger.info(f"Saudao gerada para: {nome or 'annimo'}")
     return msg
 
 
 def soma(a: Union[int, float], b: Union[int, float]) -> Union[int, float]:
     """
-    Calcula a soma de dois números.
+    Calcula a soma de dois nmeros.
 
     Args:
-        a (int, float): Primeiro número.
-        b (int, float): Segundo número.
+        a (int, float): Primeiro nmero.
+        b (int, float): Segundo nmero.
 
     Returns:
         int ou float: Resultado da soma.
 
     Raises:
-        TypeError: Se algum dos argumentos não for numérico.
+        TypeError: Se algum dos argumentos no for numrico.
 
     Example:
         >>> soma(3, 5)
@@ -62,40 +62,40 @@ def soma(a: Union[int, float], b: Union[int, float]) -> Union[int, float]:
         4.0
     """
     if not isinstance(a, (int, float)) or not isinstance(b, (int, float)):
-        raise TypeError(f"Ambos os argumentos devem ser números. Recebidos: {type(a)}, {type(b)}")
+        raise TypeError(f"Ambos os argumentos devem ser nmeros. Recebidos: {type(a)}, {type(b)}")
     
     resultado = a + b
     logger.debug(f"Soma: {a} + {b} = {resultado}")
     return resultado
 
 
-# ──────────────────────────────────────────────────────────────────────
-# Opção com classe (para projetos maiores)
-# ──────────────────────────────────────────────────────────────────────
+# 
+# Opo com classe (para projetos maiores)
+# 
 
 class Calculadora:
-    """Classe utilitária para operações matemáticas básicas."""
+    """Classe utilitria para operaes matemticas bsicas."""
 
     @staticmethod
     def somar(a: Union[int, float], b: Union[int, float]) -> Union[int, float]:
-        """Soma dois números."""
+        """Soma dois nmeros."""
         return soma(a, b)
 
     @staticmethod
     def saudacao(nome: Optional[str] = None) -> str:
-        """Gera uma saudação."""
+        """Gera uma saudao."""
         return saudacao(nome)
 
 
-# ──────────────────────────────────────────────────────────────────────
-# Exemplo de uso (executado apenas quando o script é rodado diretamente)
-# ──────────────────────────────────────────────────────────────────────
+# 
+# Exemplo de uso (executado apenas quando o script  rodado diretamente)
+# 
 
 if __name__ == "__main__":
     import doctest
     doctest.testmod()  # Verifica os exemplos das docstrings
     
-    print(saudacao("Usuário"))
+    print(saudacao("Usurio"))
     print(f"3 + 5 = {soma(3, 5)}")
     
     # Usando a classe

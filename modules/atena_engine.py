@@ -1,4 +1,4 @@
-# atena_engine.py (integração com TaskManager)
+# atena_engine.py (integrao com TaskManager)
 
 from task_manager import (
     TaskManager, TaskType, TaskStatus,
@@ -7,11 +7,11 @@ from task_manager import (
 
 class AtenaCore:
     def __init__(self):
-        # ... código existente ...
+        # ... cdigo existente ...
         self.task_manager = TaskManager()
     
     async def evolve_one_cycle(self) -> Dict:
-        """Ciclo de evolução como tarefa"""
+        """Ciclo de evoluo como tarefa"""
         
         # Criar tarefa
         task_id = await self.task_manager.create_task(
@@ -32,10 +32,10 @@ class AtenaCore:
             task_info = await self.task_manager.get_task_info(task_id)
             
             if task_info['status'] == TaskStatus.COMPLETED.value:
-                logger.info("[AtenaCore] ✅ Ciclo completado com sucesso")
+                logger.info("[AtenaCore]  Ciclo completado com sucesso")
                 return {"success": True, "task_id": task_id}
             else:
-                logger.error("[AtenaCore] ❌ Ciclo falhou")
+                logger.error("[AtenaCore]  Ciclo falhou")
                 return {
                     "success": False,
                     "task_id": task_id,
@@ -47,17 +47,17 @@ class AtenaCore:
             return {"success": False, "error": str(e)}
     
     async def run_autonomous(self, generations: int):
-        """Executa múltiplas gerações com TaskManager"""
+        """Executa mltiplas geraes com TaskManager"""
         
         for gen in range(generations):
             self.generation = gen + 1
             
-            # Cada geração é uma tarefa
+            # Cada gerao  uma tarefa
             result = await self.evolve_one_cycle()
             
             if not result["success"]:
-                logger.warning(f"Gerração {gen+1} falhou, retrying...")
-                # O retry é automático via TaskManager!
+                logger.warning(f"Gerrao {gen+1} falhou, retrying...")
+                # O retry  automtico via TaskManager!
             
             # Status
             self.task_manager.print_status()

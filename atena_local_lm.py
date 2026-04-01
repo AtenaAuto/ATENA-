@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-╔════════════════════════════════════════════════════════════════════════════╗
-║              ATENA LOCAL LM PRO v4.1 — FULLY INTEGRATED                    ║
-║                                                                            ║
-║  Features integradas: LoRA, RAG, Ensemble, Beam Search, Augmentation,     ║
-║  Distillation, Prompt Engineering, Smart Cache, TensorBoard,              ║
-║  Advanced Evaluation, Complexity Analysis                                 ║
-╚════════════════════════════════════════════════════════════════════════════╝
+
+              ATENA LOCAL LM PRO v4.1  FULLY INTEGRATED                    
+                                                                            
+  Features integradas: LoRA, RAG, Ensemble, Beam Search, Augmentation,     
+  Distillation, Prompt Engineering, Smart Cache, TensorBoard,              
+  Advanced Evaluation, Complexity Analysis                                 
+
 """
 
 import os
@@ -34,16 +34,16 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from contextlib import contextmanager
 
-# Configuração de logging
+# Configurao de logging
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s"
+    format="%(asctime)s [%(levelname)s] %(name)s  %(message)s"
 )
 logger = logging.getLogger("atena.lm.pro")
 
-# ═══════════════════════════════════════════════════════════════════════════
-# DETECÇÃO DE BACKENDS (mantido igual)
-# ═══════════════════════════════════════════════════════════════════════════
+# 
+# DETECO DE BACKENDS (mantido igual)
+# 
 
 try:
     import torch
@@ -52,28 +52,28 @@ try:
     from torch.utils.data import Dataset, DataLoader
     HAS_TORCH = True
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    logger.info(f"[AtenaLM] PyTorch ✅ — device: {DEVICE}")
+    logger.info(f"[AtenaLM] PyTorch   device: {DEVICE}")
 except ImportError:
     HAS_TORCH = False
     DEVICE = None
-    logger.warning("[AtenaLM] PyTorch ❌ — fallback para n-grama")
+    logger.warning("[AtenaLM] PyTorch   fallback para n-grama")
 
 try:
     from transformers import (
         GPT2LMHeadModel, GPT2Tokenizer, AutoModelForCausalLM, AutoTokenizer
     )
     HAS_TRANSFORMERS = True
-    logger.info("[AtenaLM] HuggingFace Transformers ✅")
+    logger.info("[AtenaLM] HuggingFace Transformers ")
 except ImportError:
     HAS_TRANSFORMERS = False
 
 try:
     import faiss
     HAS_FAISS = True
-    logger.info("[AtenaLM] FAISS ✅")
+    logger.info("[AtenaLM] FAISS ")
 except ImportError:
     HAS_FAISS = False
-    logger.warning("[AtenaLM] FAISS ❌ — RAG desabilitado")
+    logger.warning("[AtenaLM] FAISS   RAG desabilitado")
 
 try:
     import numpy as np
@@ -88,13 +88,13 @@ try:
 except ImportError:
     HAS_TENSORBOARD = False
 
-# ═══════════════════════════════════════════════════════════════════════════
-# CONFIGURAÇÃO (mantida, com pequenas adições)
-# ═══════════════════════════════════════════════════════════════════════════
+# 
+# CONFIGURAO (mantida, com pequenas adies)
+# 
 
 @dataclass
 class AtenaLMConfigPro:
-    """Configuração PRO com suporte a todas as features."""
+    """Configurao PRO com suporte a todas as features."""
     base_dir: Path = Path("./atena_evolution/lm_pro")
     model_strategy: str = "auto"
 
@@ -129,7 +129,7 @@ class AtenaLMConfigPro:
     early_stopping_patience: int = 5
     early_stopping_metric: str = "loss"
 
-    # Geração
+    # Gerao
     temperature: float = 0.85
     top_p: float = 0.95
     top_k: int = 100
@@ -152,7 +152,7 @@ class AtenaLMConfigPro:
     ensemble_models: List[str] = field(default_factory=lambda: ["transformer", "ngram"])
     ensemble_weights: Dict[str, float] = field(default_factory=lambda: {"transformer": 0.7, "ngram": 0.3})
 
-    # Quantização
+    # Quantizao
     quantize: bool = False
     quantize_dynamic: bool = True
 
@@ -219,9 +219,9 @@ class AtenaLMConfigPro:
             return "rag" if HAS_FAISS else "tiny"
         return "ngram"
 
-# ═══════════════════════════════════════════════════════════════════════════
-# CLASSES AUXILIARES (avançadas) – mantidas ou ajustadas
-# ═══════════════════════════════════════════════════════════════════════════
+# 
+# CLASSES AUXILIARES (avanadas)  mantidas ou ajustadas
+# 
 
 # SmartCache (mantido)
 class SmartCache:
@@ -607,7 +607,7 @@ class RAGRetriever:
             self._embedder = SentenceTransformer('all-MiniLM-L6-v2')
             logger.info("Embedder carregado (sentence-transformers)")
         except ImportError:
-            logger.warning("sentence-transformers não disponível; usando fallback hash")
+            logger.warning("sentence-transformers no disponvel; usando fallback hash")
             self._embedder = None
 
     def _init_index(self):
@@ -624,7 +624,7 @@ class RAGRetriever:
         if self._embedder:
             return self._embedder.encode(texts, show_progress_bar=False)
         else:
-            # Fallback: vetores aleatórios
+            # Fallback: vetores aleatrios
             if HAS_NUMPY:
                 return np.random.rand(len(texts), self.embed_dim).astype('float32')
             else:
@@ -700,7 +700,7 @@ def apply_lora(model: nn.Module, rank: int = 16, alpha: float = 32.0) -> nn.Modu
     return model
 
 def quantize_model(model: nn.Module) -> nn.Module:
-    """Quantização dinâmica para CPU."""
+    """Quantizao dinmica para CPU."""
     if not HAS_TORCH or DEVICE.type != 'cpu':
         return model
     try:
@@ -709,7 +709,7 @@ def quantize_model(model: nn.Module) -> nn.Module:
         )
         logger.info("Modelo quantizado para int8 (CPU)")
     except Exception as e:
-        logger.warning(f"Quantização falhou: {e}")
+        logger.warning(f"Quantizao falhou: {e}")
     return model
 
 # DiverseBeamSearchGenerator (implementado)
@@ -736,7 +736,7 @@ class DiverseBeamSearchGenerator:
         for step in range(max_new_tokens):
             new_beams = []
             for seq, score in beams:
-                # Trunca para contexto máximo
+                # Trunca para contexto mximo
                 input_ids = seq[-self.cfg.max_seq_len:]
                 idx = torch.tensor([input_ids], device=DEVICE)
                 logits, _ = model(idx)
@@ -754,14 +754,14 @@ class DiverseBeamSearchGenerator:
                         new_score = score - math.log(max(probs[next_idx].item(), 1e-10))
                         # Penalidade de diversidade
                         if diversity_penalty > 0:
-                            # Conta quantas vezes o token já apareceu no grupo
+                            # Conta quantas vezes o token j apareceu no grupo
                             group_tokens = [t for s, t in new_beams if s % num_groups == g]
                             if next_tok in group_tokens:
                                 new_score += diversity_penalty * math.log(1 + group_tokens.count(next_tok))
                         new_seq = seq + [next_tok]
                         new_beams.append((new_seq, new_score))
 
-            # Mantém top-k beams
+            # Mantm top-k beams
             beams = sorted(new_beams, key=lambda x: x[1])[:num_beams]
             # Verifica se todos terminaram
             if all(seq[-1] == tokenizer.EOS_ID for seq, _ in beams):
@@ -797,9 +797,9 @@ class ModelEnsemble:
         best = max(results.items(), key=lambda x: self.weights.get(x[0], 0))
         return best[1]
 
-# ═══════════════════════════════════════════════════════════════════════════
+# 
 # GERADOR PRO (com beam search)
-# ═══════════════════════════════════════════════════════════════════════════
+# 
 
 class AtenaLMGeneratorPro:
     """Gerador com beam search e diverse decoding."""
@@ -814,7 +814,7 @@ class AtenaLMGeneratorPro:
             self._beam_generator = DiverseBeamSearchGenerator(model, tokenizer, cfg)
 
     def generate_function(self, hint: str = "", category: str = "new_function") -> Optional[str]:
-        """Gera código com beam search se disponível."""
+        """Gera cdigo com beam search se disponvel."""
         prompt = hint if hint else self._get_prompt(category)
         if HAS_TORCH and self._beam_generator:
             generated = self._generate_with_beam(prompt)
@@ -845,7 +845,7 @@ class AtenaLMGeneratorPro:
             out_ids = self._beam_generator.generate(ids)
             return self.tokenizer.decode(out_ids)
         except Exception as e:
-            logger.debug(f"Erro na geração com beam: {e}")
+            logger.debug(f"Erro na gerao com beam: {e}")
             return None
 
     def _generate_simple(self, prompt: str) -> Optional[str]:
@@ -864,7 +864,7 @@ class AtenaLMGeneratorPro:
             )
             return self.tokenizer.decode(out[0].tolist())
         except Exception as e:
-            logger.debug(f"Erro na geração simples: {e}")
+            logger.debug(f"Erro na gerao simples: {e}")
             return None
 
     def _post_process(self, text: str) -> str:
@@ -904,9 +904,9 @@ class AtenaLMGeneratorPro:
     def stats(self) -> Dict:
         return {"generated": self._gen_count, "success_rate": round(self.success_rate(), 3)}
 
-# ═══════════════════════════════════════════════════════════════════════════
+# 
 # ORQUESTRADOR PRO (integrado)
-# ═══════════════════════════════════════════════════════════════════════════
+# 
 
 class AtenaLMOrchestratorPro:
     """
@@ -937,7 +937,7 @@ class AtenaLMOrchestratorPro:
         self._init_components()
         self._init_models()
 
-        logger.info("✅ AtenaLM PRO v4.1 inicializado")
+        logger.info(" AtenaLM PRO v4.1 inicializado")
         self._print_banner()
 
     def _init_components(self):
@@ -957,7 +957,7 @@ class AtenaLMOrchestratorPro:
             rows = conn.execute("SELECT code FROM learned_functions WHERE code IS NOT NULL LIMIT 500").fetchall()
             if rows:
                 self.rag.add_documents([r[0] for r in rows])
-                logger.info(f"RAG populado com {len(rows)} funções")
+                logger.info(f"RAG populado com {len(rows)} funes")
         except Exception as e:
             logger.warning(f"Erro ao carregar dados RAG: {e}")
 
@@ -987,7 +987,7 @@ class AtenaLMOrchestratorPro:
         # Dataset
         self.dataset = AtenaLMDataset(self.cfg, self.core.kb.conn if self.core else None)
 
-        # Trainer (com distillation se disponível)
+        # Trainer (com distillation se disponvel)
         if HAS_TORCH and isinstance(self.model, AtenaTinyTransformer):
             self.trainer = AtenaLMTrainerPro(self.cfg, self.tokenizer, self.model, self.dataset)
             if self.cfg.use_distillation and HAS_TRANSFORMERS:
@@ -998,7 +998,7 @@ class AtenaLMOrchestratorPro:
         # Gerador com beam search
         self.generator = AtenaLMGeneratorPro(self.cfg, self.tokenizer, self.model)
 
-        # Self-eval e mutações (compatibilidade)
+        # Self-eval e mutaes (compatibilidade)
         self.self_eval = AtenaLMSelfEval()
         self.plugin = AtenaLMMutationPlugin(self.generator, self.self_eval, self.dataset)
         self.api_collector = AtenaLMAPIDataCollector(
@@ -1019,7 +1019,7 @@ class AtenaLMOrchestratorPro:
             if models:
                 self.ensemble = ModelEnsemble(models, self.cfg.ensemble_weights)
 
-        # Variáveis de estado
+        # Variveis de estado
         self._train_cycle = 0
         self._cycle_count = 0
 
@@ -1075,7 +1075,7 @@ class AtenaLMOrchestratorPro:
         if generated:
             score, _ = self.evaluator.evaluate(generated)
             if score < 0.3:
-                logger.warning(f"Geração com score baixo ({score:.2f}) descartada")
+                logger.warning(f"Gerao com score baixo ({score:.2f}) descartada")
                 return None
             self.cache.set(cache_key, generated)
         return generated
@@ -1093,7 +1093,7 @@ class AtenaLMOrchestratorPro:
 
         if self._cycle_count % self.cfg.train_every_n_cycles == 0:
             self._train_cycle += 1
-            logger.info(f"\n[AtenaLM] Treino #{self._train_cycle} (geração {generation})")
+            logger.info(f"\n[AtenaLM] Treino #{self._train_cycle} (gerao {generation})")
             self.dataset.collect_from_kb(limit=200)
             self.dataset.collect_from_evolution(limit=100)
             if self.cfg.use_augmentation:
@@ -1137,20 +1137,20 @@ class AtenaLMOrchestratorPro:
 
     def _print_banner(self):
         banner = """
-╔════════════════════════════════════════════════════════════════════════╗
-║  🚀 ATENA LOCAL LM PRO v4.1 — FULLY INTEGRATED                         ║
-║                                                                        ║
-║  ✨ Features: LoRA · RAG · Ensemble · Beam Search · Augmentation      ║
-║  ✨ Distillation · Prompt Engineering · TensorBoard · Smart Cache      ║
-║  ✨ Advanced Evaluation · Complexity Analysis · Security Checks        ║
-╚════════════════════════════════════════════════════════════════════════╝
+
+   ATENA LOCAL LM PRO v4.1  FULLY INTEGRATED                         
+                                                                        
+   Features: LoRA  RAG  Ensemble  Beam Search  Augmentation      
+   Distillation  Prompt Engineering  TensorBoard  Smart Cache      
+   Advanced Evaluation  Complexity Analysis  Security Checks        
+
         """
         logger.info(banner)
 
     def print_status(self):
         status = self.get_status()
         logger.info("="*60)
-        logger.info(" ATENA LOCAL LM PRO — STATUS")
+        logger.info(" ATENA LOCAL LM PRO  STATUS")
         logger.info("="*60)
         for k, v in status.items():
             logger.info(f"  {k:20s}: {v}")
@@ -1166,15 +1166,15 @@ class AtenaLMOrchestratorPro:
                     return self.plugin.mutate(code, mtype)
                 return _orig(code, mtype)
             eng.mutate = _patched
-            logger.info(f"Integrado {len(self.plugin.mutation_types)} mutações LM")
+            logger.info(f"Integrado {len(self.plugin.mutation_types)} mutaes LM")
 
     def evaluate_code(self, code: str) -> Tuple[float, Dict]:
         return self.evaluator.evaluate(code)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+# 
 # TRAINER PRO (com distillation e warmup)
-# ═══════════════════════════════════════════════════════════════════════════
+# 
 
 class AtenaLMTrainerPro:
     def __init__(self, cfg: AtenaLMConfigPro, tokenizer, model, dataset):
@@ -1248,7 +1248,7 @@ class AtenaLMTrainerPro:
             else:
                 no_improve += 1
                 if no_improve >= self.cfg.early_stopping_patience:
-                    logger.info(f"Early stopping após {epoch+1} epochs")
+                    logger.info(f"Early stopping aps {epoch+1} epochs")
                     break
 
         final_loss = losses[-1] if losses else 0.0
@@ -1260,22 +1260,22 @@ class AtenaLMTrainerPro:
 
     def train_with_distillation(self, teacher, cycle: int) -> Dict:
         """Treino com knowledge distillation (requer teacher)."""
-        # Simplificado: para uma implementação completa, seria necessário
+        # Simplificado: para uma implementao completa, seria necessrio
         # modificar o loop para calcular distillation loss.
-        # Esta é apenas uma stub; idealmente deve-se criar um DistillationTrainer.
-        logger.info("Distillation ainda não implementado completamente")
+        # Esta  apenas uma stub; idealmente deve-se criar um DistillationTrainer.
+        logger.info("Distillation ainda no implementado completamente")
         return self.train(cycle)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+# 
 # WRAPPER DE COMPATIBILIDADE (para substituir o antigo)
-# ═══════════════════════════════════════════════════════════════════════════
+# 
 
 def patch_atena_core_pro(core) -> AtenaLMOrchestratorPro:
     lm = AtenaLMOrchestratorPro(core)
     lm.integrate_with_mutation_engine()
     core.local_lm = lm
-    # Substitui o método on_cycle_end do core se existir
+    # Substitui o mtodo on_cycle_end do core se existir
     if hasattr(core, 'evolve_one_cycle'):
         _orig_evolve = core.evolve_one_cycle
         def _patched_evolve():
@@ -1291,9 +1291,9 @@ def patch_atena_core_pro(core) -> AtenaLMOrchestratorPro:
     return lm
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+# 
 # DEMO STANDALONE
-# ═══════════════════════════════════════════════════════════════════════════
+# 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -1302,7 +1302,7 @@ if __name__ == "__main__":
     lm = AtenaLMOrchestratorPro(config=cfg)
     lm.print_status()
 
-    # Teste de geração
+    # Teste de gerao
     code = lm.generate(hint="def quick_sort", category="algorithm")
     if code:
         print("\n--- Generated code ---\n", code)

@@ -1,19 +1,19 @@
 # modules/voice_enhanced.py
 """
-┌─────────────────────────────────────────────────────────────────────┐
-│         ATENA VOICE ENHANCED v2.0                                   │
-│  Síntese de fala, reconhecimento de voz, interpretação de comandos   │
-│                                                                     │
-│  Features:                                                          │
-│   • Múltiplas engines TTS (pyttsx3, gTTS, fallback)                 │
-│   • Reconhecimento de voz com fallback para texto                   │
-│   • NLU simples para interpretação de intenção                      │
-│   • Comandos inteligentes da Atena                                  │
-│   • Cache de vozes e preferências                                   │
-│   • Métricas e logging estruturado                                  │
-│   • Persistência de estado                                          │
-│   • Integração com AtenaCore                                        │
-└─────────────────────────────────────────────────────────────────────┘
+
+         ATENA VOICE ENHANCED v2.0                                   
+  Sntese de fala, reconhecimento de voz, interpretao de comandos   
+                                                                     
+  Features:                                                          
+    Mltiplas engines TTS (pyttsx3, gTTS, fallback)                 
+    Reconhecimento de voz com fallback para texto                   
+    NLU simples para interpretao de inteno                      
+    Comandos inteligentes da Atena                                  
+    Cache de vozes e preferncias                                   
+    Mtricas e logging estruturado                                  
+    Persistncia de estado                                          
+    Integrao com AtenaCore                                        
+
 """
 
 import os
@@ -32,7 +32,7 @@ import hashlib
 
 logger = logging.getLogger("atena.voice")
 
-# ── Detecção de backends ──────────────────────────────────────────
+#  Deteco de backends 
 
 try:
     import pyttsx3
@@ -59,15 +59,15 @@ except ImportError:
     HAS_GOOGLE_CLOUD_TTS = False
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# CONFIGURAÇÃO
-# ═══════════════════════════════════════════════════════════════════════
+# 
+# CONFIGURAO
+# 
 
 @dataclass
 class VoiceConfig:
-    """Configurações do módulo de voz"""
+    """Configuraes do mdulo de voz"""
     
-    # Diretório
+    # Diretrio
     base_dir: Path = Path("./atena_evolution/voice")
     
     # TTS (Text-to-Speech)
@@ -89,7 +89,7 @@ class VoiceConfig:
     
     # Comportamento
     auto_speak: bool = True  # fala respostas automaticamente
-    voice_feedback: bool = True  # feedback de ações via voz
+    voice_feedback: bool = True  # feedback de aes via voz
     verbose: bool = False  # logs detalhados
     
     # Cache
@@ -101,12 +101,12 @@ class VoiceConfig:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
 
-# ═══════════════════════════════════════════════════════════════════════
+# 
 # ENGINE TTS (Text-to-Speech) COM FALLBACKS
-# ═══════════════════════════════════════════════════════════════════════
+# 
 
 class TTSEngine:
-    """Gerencia síntese de fala com múltiplos backends"""
+    """Gerencia sntese de fala com mltiplos backends"""
     
     def __init__(self, cfg: VoiceConfig):
         self.cfg = cfg
@@ -116,7 +116,7 @@ class TTSEngine:
         self._init_engine()
     
     def _init_engine(self):
-        """Inicializa a melhor engine disponível"""
+        """Inicializa a melhor engine disponvel"""
         strategies = self._get_strategies()
         
         for engine_type, init_fn in strategies:
@@ -130,11 +130,11 @@ class TTSEngine:
             except Exception as e:
                 logger.debug(f"[Voice TTS] {engine_type} falhou: {e}")
         
-        logger.warning("[Voice TTS] Nenhuma engine TTS disponível — usando fallback texto")
+        logger.warning("[Voice TTS] Nenhuma engine TTS disponvel  usando fallback texto")
         self._engine_type = "text_only"
     
     def _get_strategies(self) -> List[Tuple[str, Callable]]:
-        """Retorna estratégias de TTS em ordem de preferência"""
+        """Retorna estratgias de TTS em ordem de preferncia"""
         if self.cfg.tts_engine == "auto":
             return [
                 ("pyttsx3", self._init_pyttsx3),
@@ -143,7 +143,7 @@ class TTSEngine:
                 ("espeak", self._init_espeak),
             ]
         else:
-            # Usa engine específica
+            # Usa engine especfica
             strategies = {
                 "pyttsx3": self._init_pyttsx3,
                 "gtts": self._init_gtts,
@@ -160,7 +160,7 @@ class TTSEngine:
         engine = pyttsx3.init()
         engine.setProperty('rate', self.cfg.tts_rate)
         engine.setProperty('volume', self.cfg.tts_volume)
-        # Tenta usar voz portuguesa se disponível
+        # Tenta usar voz portuguesa se disponvel
         voices = engine.getProperty('voices')
         for voice in voices:
             if 'portuguese' in voice.languages or 'pt' in voice.id.lower():
@@ -172,7 +172,7 @@ class TTSEngine:
         """Inicializa gTTS (online, qualidade alta)"""
         if not HAS_GTTS:
             return None
-        # gTTS é chamado por demanda, não precisa init
+        # gTTS  chamado por demanda, no precisa init
         return "gtts"
     
     def _init_google_cloud(self):
@@ -208,10 +208,10 @@ class TTSEngine:
             if cached:
                 return self._play_audio(cached, wait)
         
-        # Síntese
+        # Sntese
         audio_data = self._synthesize(text)
         if not audio_data:
-            logger.warning(f"[Voice TTS] Síntese falhou: {text[:50]}")
+            logger.warning(f"[Voice TTS] Sntese falhou: {text[:50]}")
             return False
         
         # Cache
@@ -222,7 +222,7 @@ class TTSEngine:
         return self._play_audio(audio_data, wait)
     
     def _synthesize(self, text: str) -> Optional[bytes]:
-        """Sintetiza texto em áudio"""
+        """Sintetiza texto em udio"""
         try:
             if self._engine_type == "pyttsx3":
                 import tempfile
@@ -263,11 +263,11 @@ class TTSEngine:
             
             return None
         except Exception as e:
-            logger.warning(f"[Voice TTS] Síntese error: {e}")
+            logger.warning(f"[Voice TTS] Sntese error: {e}")
             return None
     
     def _play_audio(self, audio_data: bytes, wait: bool = False) -> bool:
-        """Reproduz áudio"""
+        """Reproduz udio"""
         try:
             import tempfile
             import subprocess
@@ -292,7 +292,7 @@ class TTSEngine:
         return False
     
     def _get_cached(self, key: str) -> Optional[bytes]:
-        """Retorna áudio em cache"""
+        """Retorna udio em cache"""
         cache_file = self.cfg.cache_dir / f"{key}.wav"
         if cache_file.exists():
             try:
@@ -302,7 +302,7 @@ class TTSEngine:
         return None
     
     def _cache_audio(self, key: str, audio_data: bytes):
-        """Salva áudio em cache"""
+        """Salva udio em cache"""
         try:
             cache_file = self.cfg.cache_dir / f"{key}.wav"
             cache_file.write_bytes(audio_data)
@@ -310,7 +310,7 @@ class TTSEngine:
             logger.debug(f"[Voice TTS] Cache error: {e}")
     
     def get_available_voices(self) -> List[Dict]:
-        """Lista vozes disponíveis"""
+        """Lista vozes disponveis"""
         if self._engine_type == "pyttsx3":
             return [
                 {"id": v.id, "name": v.name, "lang": v.languages}
@@ -319,9 +319,9 @@ class TTSEngine:
         return []
 
 
-# ═══════════════════════════════════════════════════════════════════════
+# 
 # ENGINE ASR (Automatic Speech Recognition)
-# ═══════════════════════════════════════════════════════════════════════
+# 
 
 class ASREngine:
     """Gerencia reconhecimento de voz"""
@@ -335,7 +335,7 @@ class ASREngine:
     def _init_recognizer(self):
         """Inicializa o reconhecedor de voz"""
         if not HAS_SR:
-            logger.warning("[Voice ASR] speech_recognition não disponível")
+            logger.warning("[Voice ASR] speech_recognition no disponvel")
             return
         
         try:
@@ -351,7 +351,7 @@ class ASREngine:
         Returns: texto reconhecido ou None
         """
         if not self._recognizer:
-            logger.warning("[Voice ASR] Recognizer não inicializado")
+            logger.warning("[Voice ASR] Recognizer no inicializado")
             return None
         
         timeout = timeout or self.cfg.asr_timeout
@@ -375,10 +375,10 @@ class ASREngine:
             logger.debug("[Voice ASR] Timeout ao ouvir")
             return None
         except Exception as e:
-            logger.warning(f"[Voice ASR] Erro ao capturar áudio: {e}")
+            logger.warning(f"[Voice ASR] Erro ao capturar udio: {e}")
             return None
         
-        # Tenta reconhecer com múltiplas APIs
+        # Tenta reconhecer com mltiplas APIs
         text = self._recognize_audio(audio)
         
         if text:
@@ -388,12 +388,12 @@ class ASREngine:
             })
             logger.info(f"[Voice ASR] Reconhecido: {text}")
         else:
-            logger.debug("[Voice ASR] Não foi possível reconhecer")
+            logger.debug("[Voice ASR] No foi possvel reconhecer")
         
         return text
     
     def _recognize_audio(self, audio) -> Optional[str]:
-        """Tenta reconhecer áudio com múltiplas APIs"""
+        """Tenta reconhecer udio com mltiplas APIs"""
         apis = [
             ("Google", self._recognize_google),
             ("Bing", self._recognize_bing),
@@ -437,23 +437,23 @@ class ASREngine:
             return None
     
     def get_history(self, n: int = 10) -> List[Dict]:
-        """Retorna histórico de reconhecimentos"""
+        """Retorna histrico de reconhecimentos"""
         return list(self._recognition_history)[-n:]
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# NLU (Natural Language Understanding) — Interpretação de Intenção
-# ═══════════════════════════════════════════════════════════════════════
+# 
+# NLU (Natural Language Understanding)  Interpretao de Inteno
+# 
 
 class CommandInterpreter:
-    """Interpreta comandos de voz e mapeia para ações"""
+    """Interpreta comandos de voz e mapeia para aes"""
     
-    # Mapa de intenções e padrões
+    # Mapa de intenes e padres
     INTENTS = {
         "evolve": {
             "patterns": [
-                r"evoluir?\b", r"mutate?\b", r"gerar? código\b",
-                r"melhor", r"próximo ciclo", r"continuar",
+                r"evoluir?\b", r"mutate?\b", r"gerar? cdigo\b",
+                r"melhor", r"prximo ciclo", r"continuar",
             ],
             "action": "evolve",
             "params": {},
@@ -461,7 +461,7 @@ class CommandInterpreter:
         "status": {
             "patterns": [
                 r"status\b", r"como vai\b", r"estado\b",
-                r"pontuação\b", r"score\b", r"geração",
+                r"pontuao\b", r"score\b", r"gerao",
             ],
             "action": "status",
             "params": {},
@@ -485,14 +485,14 @@ class CommandInterpreter:
         "resume": {
             "patterns": [
                 r"resumir?\b", r"continuar\b", r"resume",
-                r"start", r"começar",
+                r"start", r"comear",
             ],
             "action": "resume",
             "params": {},
         },
         "info": {
             "patterns": [
-                r"informação\b", r"info\b", r"qual\b",
+                r"informao\b", r"info\b", r"qual\b",
                 r"o que\b", r"diga", r"conte",
             ],
             "action": "info",
@@ -524,8 +524,8 @@ class CommandInterpreter:
     
     def interpret(self, text: str) -> Tuple[Optional[str], float]:
         """
-        Interpreta texto e retorna (intenção, confiança).
-        Retorna (None, 0.0) se não conseguir interpretar.
+        Interpreta texto e retorna (inteno, confiana).
+        Retorna (None, 0.0) se no conseguir interpretar.
         """
         if not text or len(text.strip()) < 2:
             return None, 0.0
@@ -559,31 +559,31 @@ class CommandInterpreter:
         return best_intent, confidence
     
     def get_history(self, n: int = 10) -> List[Dict]:
-        """Retorna histórico de interpretações"""
+        """Retorna histrico de interpretaes"""
         return list(self._intent_history)[-n:]
     
     def get_help_text(self) -> str:
         """Retorna texto de ajuda com comandos"""
-        lines = ["Comandos disponíveis:"]
+        lines = ["Comandos disponveis:"]
         for intent, spec in self.INTENTS.items():
             examples = ", ".join(spec["patterns"][:2])
-            lines.append(f"  • {intent.upper()}: {examples}")
+            lines.append(f"   {intent.upper()}: {examples}")
         return "\n".join(lines)
 
 
-# ═══════════════════════════════════════════════════════════════════════
+# 
 # ORQUESTRADOR PRINCIPAL
-# ═══════════════════════════════════════════════════════════════════════
+# 
 
 class AtenaVoiceEnhanced:
     """
-    Módulo de voz integrado com Atena.
+    Mdulo de voz integrado com Atena.
     
     Uso:
         voice = AtenaVoiceEnhanced()
         
         # Fala
-        voice.speak("Olá mundo")
+        voice.speak("Ol mundo")
         
         # Ouve
         cmd = voice.listen()
@@ -627,29 +627,29 @@ class AtenaVoiceEnhanced:
         return success
     
     def listen(self, timeout: Optional[int] = None) -> Optional[str]:
-        """Ouve um comando do usuário"""
+        """Ouve um comando do usurio"""
         text = self.asr.listen(timeout=timeout)
         if text:
             self._metrics["commands_recognized"] += 1
         return text
     
     def interpret(self, text: str) -> Optional[str]:
-        """Interpreta um comando e retorna a intenção"""
+        """Interpreta um comando e retorna a inteno"""
         if not text:
             return None
         
         intent, confidence = self.interpreter.interpret(text)
         
         if intent:
-            logger.info(f"[Voice] Intenção: {intent} ({confidence:.0%})")
+            logger.info(f"[Voice] Inteno: {intent} ({confidence:.0%})")
             return intent
         
         return None
     
     def execute_command(self, intent: str, core=None) -> bool:
         """
-        Executa um comando baseado na intenção.
-        Se core é fornecido, pode executar ações na Atena.
+        Executa um comando baseado na inteno.
+        Se core  fornecido, pode executar aes na Atena.
         """
         core = core or self.core
         
@@ -665,7 +665,7 @@ class AtenaVoiceEnhanced:
                 return True
             
             elif intent == "status" and core:
-                status = f"Geração {core.generation}, score {core.best_score:.2f}"
+                status = f"Gerao {core.generation}, score {core.best_score:.2f}"
                 self.speak(status, wait=False)
                 self._metrics["commands_executed"] += 1
                 return True
@@ -690,7 +690,7 @@ class AtenaVoiceEnhanced:
                 return True
             
             else:
-                self.speak(f"Comando {intent} não implementado", wait=False)
+                self.speak(f"Comando {intent} no implementado", wait=False)
                 self._metrics["commands_failed"] += 1
                 return False
         
@@ -718,38 +718,38 @@ class AtenaVoiceEnhanced:
                 if intent:
                     self.execute_command(intent, core)
                 else:
-                    self.speak("Não entendi. Tente 'help'", wait=False)
+                    self.speak("No entendi. Tente 'help'", wait=False)
         
         except KeyboardInterrupt:
             self.speak("Encerrando", wait=True)
             logger.info("[Voice] Interativo encerrado")
     
     def get_metrics(self) -> Dict:
-        """Retorna métricas de uso"""
+        """Retorna mtricas de uso"""
         return dict(self._metrics)
     
     def print_status(self):
-        """Imprime status do módulo"""
-        logger.info("\n" + "═"*60)
-        logger.info("  🎤 ATENA VOICE — STATUS")
-        logger.info("═"*60)
+        """Imprime status do mdulo"""
+        logger.info("\n" + ""*60)
+        logger.info("   ATENA VOICE  STATUS")
+        logger.info(""*60)
         logger.info(f"  TTS Engine  : {self.tts._engine_type}")
         logger.info(f"  ASR Engine  : {self.asr._recognizer is not None}")
         logger.info(f"  NLU Enabled : {self.cfg.nlu_enabled}")
         logger.info(f"  Comandos    : {self._metrics['commands_recognized']} reconhecidos, "
                     f"{self._metrics['commands_executed']} executados")
-        logger.info(f"  Histórico ASR: {len(self.asr.get_history())} items")
-        logger.info(f"  Histórico NLU: {len(self.interpreter.get_history())} items")
-        logger.info("═"*60)
+        logger.info(f"  Histrico ASR: {len(self.asr.get_history())} items")
+        logger.info(f"  Histrico NLU: {len(self.interpreter.get_history())} items")
+        logger.info(""*60)
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# INTEGRAÇÃO COM ATENA CORE
-# ═══════════════════════════════════════════════════════════════════════
+# 
+# INTEGRAO COM ATENA CORE
+# 
 
 def integrate_voice_with_core(core, cfg: Optional[VoiceConfig] = None):
     """
-    Integra o módulo de voz com AtenaCore.
+    Integra o mdulo de voz com AtenaCore.
     
     Uso em AtenaCore.__init__:
         from modules.voice_enhanced import integrate_voice_with_core
@@ -764,19 +764,19 @@ def integrate_voice_with_core(core, cfg: Optional[VoiceConfig] = None):
     return voice
 
 
-# ═══════════════════════════════════════════════════════════════════════
+# 
 # DEMO STANDALONE
-# ═══════════════════════════════════════════════════════════════════════
+# 
 
 if __name__ == "__main__":
     import argparse
     
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(name)s — %(message)s"
+        format="%(asctime)s [%(levelname)s] %(name)s  %(message)s"
     )
     
-    parser = argparse.ArgumentParser(description="Atena Voice Enhanced — Demo")
+    parser = argparse.ArgumentParser(description="Atena Voice Enhanced  Demo")
     parser.add_argument("--speak", type=str, default="", help="Falar um texto")
     parser.add_argument("--listen", action="store_true", help="Ouvir um comando")
     parser.add_argument("--interactive", action="store_true", help="Modo interativo")
@@ -795,7 +795,7 @@ if __name__ == "__main__":
         if cmd:
             intent, conf = voice.interpreter.interpret(cmd)
             print(f"Reconhecido: {cmd}")
-            print(f"Intenção: {intent} ({conf:.0%})")
+            print(f"Inteno: {intent} ({conf:.0%})")
     
     elif args.interactive:
         voice.interactive_loop()
@@ -804,11 +804,11 @@ if __name__ == "__main__":
         voice.print_status()
     
     else:
-        # Demo padrão
-        voice.speak("Olá, sou Atena com voz!", wait=True)
+        # Demo padro
+        voice.speak("Ol, sou Atena com voz!", wait=True)
         voice.speak("Fale um comando", wait=False)
         cmd = voice.listen()
         if cmd:
-            print(f"Você disse: {cmd}")
+            print(f"Voc disse: {cmd}")
             intent = voice.interpret(cmd)
-            print(f"Intenção: {intent}")
+            print(f"Inteno: {intent}")

@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-┌─────────────────────────────────────────────────────────────────────┐
-│         ATENA AUTOMATION ACTUATOR v2.2                              │
-│  Automação de teclado/mouse com segurança, OCR, macros e histórico  │
-│                                                                     │
-│  Melhorias nesta versão:                                            │
-│   • Tratamento granular de exceções                                 │
-│   • Suporte a backends adicionais (X11, Windows API)                │
-│   • Cache OCR com LRU e TTL configurável                            │
-│   • Graceful shutdown dos threads                                   │
-│   • Validação de parâmetros com type hints reforçados               │
-│   • Integração via eventos com AtenaCore                            │
-│   • Novo comando 'paste' para colar texto via área de transferência │
-│   • Testes unitários de exemplo (separados)                         │
-└─────────────────────────────────────────────────────────────────────┘
+
+         ATENA AUTOMATION ACTUATOR v2.2                              
+  Automao de teclado/mouse com segurana, OCR, macros e histrico  
+                                                                     
+  Melhorias nesta verso:                                            
+    Tratamento granular de excees                                 
+    Suporte a backends adicionais (X11, Windows API)                
+    Cache OCR com LRU e TTL configurvel                            
+    Graceful shutdown dos threads                                   
+    Validao de parmetros com type hints reforados               
+    Integrao via eventos com AtenaCore                            
+    Novo comando 'paste' para colar texto via rea de transferncia 
+    Testes unitrios de exemplo (separados)                         
+
 """
 
 import os
@@ -42,23 +42,23 @@ import tempfile
 
 logger = logging.getLogger("atena.automation")
 
-# ── Detecção de backends com fallbacks progressivos ──────────────────
+#  Deteco de backends com fallbacks progressivos 
 
-# Backend padrão: PyAutoGUI (mais fácil)
+# Backend padro: PyAutoGUI (mais fcil)
 try:
     import pyautogui
     HAS_PYAUTOGUI = True
 except ImportError:
     HAS_PYAUTOGUI = False
 
-# Backend com eventos (pynput) – mais leve, mas sem movimento suave
+# Backend com eventos (pynput)  mais leve, mas sem movimento suave
 try:
     from pynput import mouse, keyboard
     HAS_PYNPUT = True
 except ImportError:
     HAS_PYNPUT = False
 
-# Backend para Windows via ctypes (sem dependências externas)
+# Backend para Windows via ctypes (sem dependncias externas)
 try:
     import ctypes
     from ctypes import wintypes
@@ -88,19 +88,19 @@ try:
 except ImportError:
     HAS_CV2 = False
 
-# Área de transferência (clipboard)
+# rea de transferncia (clipboard)
 try:
     import pyperclip
     HAS_PYPERCLIP = True
 except ImportError:
     HAS_PYPERCLIP = False
 
-# ═══════════════════════════════════════════════════════════════════════
-# CONFIGURAÇÃO E TIPOS
-# ═══════════════════════════════════════════════════════════════════════
+# 
+# CONFIGURAO E TIPOS
+# 
 
 class ActionType(Enum):
-    """Tipos de ação de automação"""
+    """Tipos de ao de automao"""
     MOVE_MOUSE = "move_mouse"
     CLICK = "click"
     DOUBLE_CLICK = "double_click"
@@ -121,7 +121,7 @@ class ActionType(Enum):
 
 @dataclass
 class Action:
-    """Uma ação a ser executada, com suporte a Future para retorno síncrono"""
+    """Uma ao a ser executada, com suporte a Future para retorno sncrono"""
     type: ActionType
     params: Dict[str, Any]
     priority: int = 0
@@ -142,7 +142,7 @@ class Action:
 
 @dataclass
 class AutomationConfig:
-    """Configurações de automação (expandidas)"""
+    """Configuraes de automao (expandidas)"""
     backend: str = "auto"               # auto, pyautogui, pynput, winapi, x11
     safety_enabled: bool = True
     safety_corner: Tuple[int, int] = (0, 0)
@@ -172,12 +172,12 @@ class AutomationConfig:
         self.screenshot_dir.mkdir(parents=True, exist_ok=True)
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# BACKEND ABSTRATO E IMPLEMENTAÇÕES
-# ═══════════════════════════════════════════════════════════════════════
+# 
+# BACKEND ABSTRATO E IMPLEMENTAES
+# 
 
 class AutomationBackend:
-    """Interface abstrata para backends de automação"""
+    """Interface abstrata para backends de automao"""
     def move_mouse(self, x: int, y: int, duration: float = 0.2): ...
     def click(self, x: int, y: int, button: str = "left", clicks: int = 1): ...
     def type_text(self, text: str, interval: float = 0.05): ...
@@ -190,11 +190,11 @@ class AutomationBackend:
     def paste_text(self, text: str): ...   # novo
 
 # --------------------------------------------------------------
-# Implementação PyAutoGUI
+# Implementao PyAutoGUI
 class PyAutoGUIBackend(AutomationBackend):
     def __init__(self, cfg: AutomationConfig):
         if not HAS_PYAUTOGUI:
-            raise ImportError("pyautogui não instalado")
+            raise ImportError("pyautogui no instalado")
         self.cfg = cfg
         pyautogui.FAILSAFE = True
         pyautogui.PAUSE = cfg.action_delay
@@ -225,14 +225,14 @@ class PyAutoGUIBackend(AutomationBackend):
             # Atalho para colar (Ctrl+V)
             self.key_combo('ctrl', 'v')
         else:
-            raise RuntimeError("pyperclip não instalado, não é possível colar via backend")
+            raise RuntimeError("pyperclip no instalado, no  possvel colar via backend")
 
 # --------------------------------------------------------------
-# Implementação PyNput
+# Implementao PyNput
 class PyNputBackend(AutomationBackend):
     def __init__(self, cfg: AutomationConfig):
         if not HAS_PYNPUT:
-            raise ImportError("pynput não instalado")
+            raise ImportError("pynput no instalado")
         self.cfg = cfg
         self.mouse = mouse.Controller()
         self.keyboard = keyboard.Controller()
@@ -307,15 +307,15 @@ class PyNputBackend(AutomationBackend):
             pyperclip.copy(text)
             self.key_combo('ctrl', 'v')
         else:
-            raise RuntimeError("pyperclip não instalado")
+            raise RuntimeError("pyperclip no instalado")
 
 # --------------------------------------------------------------
-# Implementação Windows API (nativa)
+# Implementao Windows API (nativa)
 class WinAPIBackend(AutomationBackend):
-    """Backend usando ctypes e Windows API (sem dependências externas)"""
+    """Backend usando ctypes e Windows API (sem dependncias externas)"""
     def __init__(self, cfg: AutomationConfig):
         if not HAS_WINAPI:
-            raise ImportError("ctypes/winapi não disponível")
+            raise ImportError("ctypes/winapi no disponvel")
         self.cfg = cfg
         self.user32 = ctypes.windll.user32
         self.kernel32 = ctypes.windll.kernel32
@@ -323,36 +323,36 @@ class WinAPIBackend(AutomationBackend):
     def move_mouse(self, x: int, y: int, duration: float = 0.2):
         # Move mouse sem suavidade (API SetCursorPos)
         self.user32.SetCursorPos(x, y)
-        # Se quiser suavidade, seria necessário implementar interpolação manual
+        # Se quiser suavidade, seria necessrio implementar interpolao manual
         # (ignoramos duration por simplicidade)
     def click(self, x: int, y: int, button: str = "left", clicks: int = 1):
         self.move_mouse(x, y, 0)
-        # Simular mouse click usando SendInput (não implementado aqui)
+        # Simular mouse click usando SendInput (no implementado aqui)
         # Para simplificar, use pyautogui ou pynput para o click
-        raise NotImplementedError("Click via WinAPI não implementado, use pyautogui/pynput")
-    # outros métodos similares...
+        raise NotImplementedError("Click via WinAPI no implementado, use pyautogui/pynput")
+    # outros mtodos similares...
     def get_mouse_position(self) -> Tuple[int, int]:
         pt = wintypes.POINT()
         self.user32.GetCursorPos(ctypes.byref(pt))
         return (pt.x, pt.y)
-    # (muitos métodos faltam, mas é um esboço)
+    # (muitos mtodos faltam, mas  um esboo)
 
 # --------------------------------------------------------------
-# Implementação X11 (Linux)
+# Implementao X11 (Linux)
 class X11Backend(AutomationBackend):
     def __init__(self, cfg: AutomationConfig):
         if not HAS_XLIB:
-            raise ImportError("Xlib não instalado")
+            raise ImportError("Xlib no instalado")
         self.disp = display.Display()
         self.screen = self.disp.screen()
         self.root = self.screen.root
     def get_mouse_position(self) -> Tuple[int, int]:
         pointer = self.root.query_pointer()
         return (pointer.root_x, pointer.root_y)
-    # ... implementações restantes
+    # ... implementaes restantes
 
 # --------------------------------------------------------------
-# Fábrica de backends
+# Fbrica de backends
 def create_backend(cfg: AutomationConfig) -> AutomationBackend:
     if cfg.backend == "auto":
         if HAS_PYAUTOGUI:
@@ -364,7 +364,7 @@ def create_backend(cfg: AutomationConfig) -> AutomationBackend:
         elif HAS_XLIB:
             return X11Backend(cfg)
         else:
-            raise RuntimeError("Nenhum backend de automação disponível")
+            raise RuntimeError("Nenhum backend de automao disponvel")
     elif cfg.backend == "pyautogui":
         return PyAutoGUIBackend(cfg)
     elif cfg.backend == "pynput":
@@ -376,9 +376,9 @@ def create_backend(cfg: AutomationConfig) -> AutomationBackend:
     else:
         raise ValueError(f"Backend desconhecido: {cfg.backend}")
 
-# ═══════════════════════════════════════════════════════════════════════
+# 
 # MOTOR OCR COM CACHE LRU E TTL
-# ═══════════════════════════════════════════════════════════════════════
+# 
 
 class OCREngine:
     def __init__(self, cfg: AutomationConfig):
@@ -399,7 +399,7 @@ class OCREngine:
 
     def find_text(self, text: str, region: Optional[Tuple] = None) -> Optional[Tuple[int, int]]:
         if not HAS_OCR:
-            logger.warning("OCR não disponível")
+            logger.warning("OCR no disponvel")
             return None
 
         key = self._get_cache_key(text, region)
@@ -453,13 +453,13 @@ class OCREngine:
             img = ImageGrab.grab(bbox=region)
             return pytesseract.image_to_string(img, lang=self.cfg.ocr_language)
         except Exception as e:
-            logger.warning(f"Erro extração OCR: {e}")
+            logger.warning(f"Erro extrao OCR: {e}")
             return ""
 
     def find_image(self, image_path: Union[str, Path], region: Optional[Tuple] = None,
                    threshold: float = 0.8) -> Optional[Tuple[int, int]]:
         if not HAS_CV2:
-            logger.warning("OpenCV não disponível")
+            logger.warning("OpenCV no disponvel")
             return None
         try:
             screen = np.array(ImageGrab.grab(bbox=region))
@@ -475,9 +475,9 @@ class OCREngine:
             logger.warning(f"Erro match template: {e}")
         return None
 
-# ═══════════════════════════════════════════════════════════════════════
-# HISTÓRICO THREAD-SAFE (melhorado)
-# ═══════════════════════════════════════════════════════════════════════
+# 
+# HISTRICO THREAD-SAFE (melhorado)
+# 
 
 class ActionHistory:
     def __init__(self, cfg: AutomationConfig):
@@ -553,9 +553,9 @@ class ActionHistory:
         with self._lock:
             self.conn.close()
 
-# ═══════════════════════════════════════════════════════════════════════
-# FILA DE AÇÕES COM SUPORTE A SHUTDOWN
-# ═══════════════════════════════════════════════════════════════════════
+# 
+# FILA DE AES COM SUPORTE A SHUTDOWN
+# 
 
 class ActionQueue:
     def __init__(self):
@@ -589,7 +589,7 @@ class ActionQueue:
         self._paused.clear()
 
     def wait_if_paused(self):
-        """Bloqueia até que não esteja pausado ou shutdown"""
+        """Bloqueia at que no esteja pausado ou shutdown"""
         while self._paused.is_set() and not self._shutdown.is_set():
             self._paused.wait(0.1)
 
@@ -604,9 +604,9 @@ class ActionQueue:
         self._shutdown.set()
         self._paused.set()   # libera qualquer wait
 
-# ═══════════════════════════════════════════════════════════════════════
-# EXECUTOR DE AÇÕES (com validação adicional)
-# ═══════════════════════════════════════════════════════════════════════
+# 
+# EXECUTOR DE AES (com validao adicional)
+# 
 
 class ActionExecutor:
     def __init__(self, backend: AutomationBackend, cfg: AutomationConfig,
@@ -632,12 +632,12 @@ class ActionExecutor:
                 if action.future and not action.future.done():
                     action.future.set_result(result)
 
-                logger.info(f"[Executor] ✅ {action.type.value} concluído em {duration:.2f}s")
+                logger.info(f"[Executor]  {action.type.value} concludo em {duration:.2f}s")
                 return True, None
 
             except Exception as e:
                 last_error = str(e)
-                logger.warning(f"[Executor] ❌ Tentativa {attempt+1}/{action.retries}: {e}")
+                logger.warning(f"[Executor]  Tentativa {attempt+1}/{action.retries}: {e}")
                 if attempt < action.retries - 1:
                     time.sleep(min(delay, self.cfg.retry_max_delay))
                     delay *= self.cfg.retry_backoff
@@ -683,13 +683,13 @@ class ActionExecutor:
         elif action.type == ActionType.FIND_AND_CLICK:
             pos = self.ocr.find_text(p['text'], region=p.get('region'))
             if not pos:
-                raise RuntimeError(f"Texto não encontrado: {p['text']}")
+                raise RuntimeError(f"Texto no encontrado: {p['text']}")
             self.backend.click(pos[0], pos[1])
 
         elif action.type == ActionType.VERIFY_TEXT:
             text = self.ocr.extract_text(region=p.get('region'))
             if p['text'].lower() not in text.lower():
-                raise RuntimeError(f"Texto não verificado: {p['text']}")
+                raise RuntimeError(f"Texto no verificado: {p['text']}")
 
         elif action.type == ActionType.SCROLL:
             self.backend.scroll(p['x'], p['y'], amount=p['amount'])
@@ -700,14 +700,14 @@ class ActionExecutor:
 
         elif action.type == ActionType.HOVER:
             self.backend.move_mouse(p['x'], p['y'], duration=p.get('duration', 0.2))
-            # hover não executa click
+            # hover no executa click
 
         elif action.type == ActionType.EXECUTE_CMD:
             import subprocess
             subprocess.run(p['cmd'], shell=True, check=False)
 
         elif action.type == ActionType.HOTKEY_STOP:
-            logger.info("[Executor] Hotkey stop acionado (ação manual)")
+            logger.info("[Executor] Hotkey stop acionado (ao manual)")
 
         elif action.type == ActionType.CONDITIONAL:
             if p.get('condition', False):
@@ -715,11 +715,11 @@ class ActionExecutor:
                     sub_action = Action(type=ActionType(sub['type']), params=sub['params'])
                     self.execute(sub_action)
         else:
-            raise ValueError(f"Tipo de ação desconhecido: {action.type}")
+            raise ValueError(f"Tipo de ao desconhecido: {action.type}")
 
-# ═══════════════════════════════════════════════════════════════════════
-# MACRO RECORDER (com gravação de paste)
-# ═══════════════════════════════════════════════════════════════════════
+# 
+# MACRO RECORDER (com gravao de paste)
+# 
 
 class MacroRecorder:
     def __init__(self, cfg: AutomationConfig):
@@ -732,11 +732,11 @@ class MacroRecorder:
         self._recording = True
         self._actions = []
         self._last_action_time = time.time()
-        logger.info("[Macro] Gravação iniciada")
+        logger.info("[Macro] Gravao iniciada")
 
     def stop(self) -> List[Action]:
         self._recording = False
-        logger.info(f"[Macro] Gravação parada - {len(self._actions)} ações")
+        logger.info(f"[Macro] Gravao parada - {len(self._actions)} aes")
         return list(self._actions)
 
     def record_action(self, action: Action):
@@ -779,15 +779,15 @@ class MacroRecorder:
                     created_at=a.get('created_at'),
                 )
                 actions.append(action)
-            logger.info(f"[Macro] Carregado de {filename} - {len(actions)} ações")
+            logger.info(f"[Macro] Carregado de {filename} - {len(actions)} aes")
             return actions
         except Exception as e:
             logger.error(f"[Macro] Erro ao carregar: {e}")
             return []
 
-# ═══════════════════════════════════════════════════════════════════════
+# 
 # ORQUESTRADOR PRINCIPAL (com shutdown seguro)
-# ═══════════════════════════════════════════════════════════════════════
+# 
 
 class AutomationActuatorEnhanced:
     def __init__(self, cfg: Optional[AutomationConfig] = None):
@@ -837,7 +837,7 @@ class AutomationActuatorEnhanced:
                     if (x < self.cfg.safety_corner_radius and
                         y < self.cfg.safety_corner_radius):
                         if not self._safety_triggered:
-                            logger.warning("[Safety] Canto quente acionado — parando")
+                            logger.warning("[Safety] Canto quente acionado  parando")
                             self.queue.clear()
                             self._safety_triggered = True
                     else:
@@ -862,9 +862,9 @@ class AutomationActuatorEnhanced:
             if self._executor_thread and self._executor_thread.is_alive():
                 self._executor_thread.join(timeout=self.cfg.shutdown_timeout)
             self.history.shutdown()
-            logger.info("[Automation] Shutdown concluído")
+            logger.info("[Automation] Shutdown concludo")
 
-    # ── API Pública (idêntica, com adição do método paste) ─────────────
+    #  API Pblica (idntica, com adio do mtodo paste) 
     def _add_action(self, action: Action, sync: bool = False) -> Optional[Any]:
         if sync:
             action.future = Future()
@@ -873,7 +873,7 @@ class AutomationActuatorEnhanced:
             try:
                 return action.future.result(timeout=action.timeout)
             except TimeoutError:
-                raise TimeoutError(f"Ação {action.type.value} excedeu timeout {action.timeout}s")
+                raise TimeoutError(f"Ao {action.type.value} excedeu timeout {action.timeout}s")
         return None
 
     def click(self, x: int, y: int, button: str = "left", priority: int = 0, sync: bool = False):
@@ -954,19 +954,19 @@ class AutomationActuatorEnhanced:
         self.queue.clear()
 
     def print_status(self):
-        logger.info("\n" + "═"*60)
-        logger.info("  🤖 AUTOMATION ACTUATOR — STATUS")
-        logger.info("═"*60)
+        logger.info("\n" + ""*60)
+        logger.info("   AUTOMATION ACTUATOR  STATUS")
+        logger.info(""*60)
         logger.info(f"  Backend: {self.cfg.backend}")
-        logger.info(f"  Fila: {self.queue._queue.qsize()} ações")
+        logger.info(f"  Fila: {self.queue._queue.qsize()} aes")
         logger.info(f"  Pausado: {self.queue._paused.is_set()}")
         logger.info(f"  Safety: {self.cfg.safety_enabled} (canto: {self.cfg.safety_corner})")
         logger.info(f"  OCR: {self.cfg.ocr_enabled}")
-        logger.info("═"*60)
+        logger.info(""*60)
 
-# ═══════════════════════════════════════════════════════════════════════
-# INTEGRAÇÃO COM ATENA CORE (via eventos)
-# ═══════════════════════════════════════════════════════════════════════
+# 
+# INTEGRAO COM ATENA CORE (via eventos)
+# 
 
 def integrate_automation_with_core(core, cfg: Optional[AutomationConfig] = None):
     actuator = AutomationActuatorEnhanced(cfg=cfg)
@@ -978,9 +978,9 @@ def integrate_automation_with_core(core, cfg: Optional[AutomationConfig] = None)
     logger.info("[Automation] Integrado com AtenaCore")
     return actuator
 
-# ═══════════════════════════════════════════════════════════════════════
+# 
 # DEMO STANDALONE
-# ═══════════════════════════════════════════════════════════════════════
+# 
 
 if __name__ == "__main__":
     import argparse
@@ -1034,7 +1034,7 @@ if __name__ == "__main__":
                 elif cmd == "resume":
                     actuator.resume()
                 else:
-                    print("Comando não reconhecido")
+                    print("Comando no reconhecido")
             except KeyboardInterrupt:
                 break
         actuator.shutdown()

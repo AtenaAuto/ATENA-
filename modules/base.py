@@ -10,9 +10,9 @@ logger = logging.getLogger("atena.actuators")
 
 def track_action(action_name: Optional[str] = None):
     """
-    Decorator que registra automaticamente a execução de um método da classe BaseActuator.
-    Registra o nome da ação, parâmetros, tempo de execução e exceções.
-    O método deve estar em uma classe que tenha o método `log_action`.
+    Decorator que registra automaticamente a execuo de um mtodo da classe BaseActuator.
+    Registra o nome da ao, parmetros, tempo de execuo e excees.
+    O mtodo deve estar em uma classe que tenha o mtodo `log_action`.
     """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
@@ -22,7 +22,7 @@ def track_action(action_name: Optional[str] = None):
             try:
                 result = func(self, *args, **kwargs)
                 duration = time.time() - start
-                # Chama o método da instância corretamente
+                # Chama o mtodo da instncia corretamente
                 self.log_action(
                     act_name,
                     {
@@ -55,17 +55,17 @@ def track_action(action_name: Optional[str] = None):
 
 class BaseActuator(ABC):
     """
-    Classe base abstrata para todos os atuadores da ATENA Ω.
+    Classe base abstrata para todos os atuadores da ATENA .
 
     Fornece funcionalidades comuns:
-        - Verificação de dependências (abstrato)
+        - Verificao de dependncias (abstrato)
         - Logging estruturado com contexto
-        - Rastreamento de ações (tempo, sucesso/erro)
-        - Configuração opcional de histórico
+        - Rastreamento de aes (tempo, sucesso/erro)
+        - Configurao opcional de histrico
 
     Atributos:
-        sysaware: Instância de SysAware (para acesso a contexto do sistema, opcional)
-        history: Lista opcional para armazenar histórico de ações (se ativado)
+        sysaware: Instncia de SysAware (para acesso a contexto do sistema, opcional)
+        history: Lista opcional para armazenar histrico de aes (se ativado)
     """
 
     def __init__(self, sysaware: Optional[Any] = None, enable_history: bool = False):
@@ -73,8 +73,8 @@ class BaseActuator(ABC):
         Inicializa o atuador.
 
         Args:
-            sysaware: Instância de SysAware (fornece contexto adicional, ex: sistema operacional, configurações)
-            enable_history: Se True, mantém um histórico interno das ações executadas.
+            sysaware: Instncia de SysAware (fornece contexto adicional, ex: sistema operacional, configuraes)
+            enable_history: Se True, mantm um histrico interno das aes executadas.
         """
         self.sysaware = sysaware
         self.enable_history = enable_history
@@ -87,14 +87,14 @@ class BaseActuator(ABC):
     @abstractmethod
     def _check_dependencies(self) -> None:
         """
-        Verifica se as dependências necessárias para o atuador estão disponíveis.
+        Verifica se as dependncias necessrias para o atuador esto disponveis.
 
         Deve ser implementado por cada subclasse.
-        Exemplo: verificar se bibliotecas (psutil, pyautogui) ou comandos (pactl) estão presentes.
+        Exemplo: verificar se bibliotecas (psutil, pyautogui) ou comandos (pactl) esto presentes.
 
         Raises:
-            ImportError: Se alguma biblioteca obrigatória não estiver instalada.
-            RuntimeError: Se alguma ferramenta de sistema não for encontrada.
+            ImportError: Se alguma biblioteca obrigatria no estiver instalada.
+            RuntimeError: Se alguma ferramenta de sistema no for encontrada.
         """
         pass
 
@@ -105,12 +105,12 @@ class BaseActuator(ABC):
         level: int = logging.INFO,
     ) -> None:
         """
-        Registra uma ação realizada pelo atuador com contexto estruturado.
+        Registra uma ao realizada pelo atuador com contexto estruturado.
 
         Args:
-            action: Nome da ação (ex: "click", "set_volume", "kill_process").
-            details: Dicionário com detalhes adicionais (parâmetros, resultados, etc.).
-            level: Nível de log (logging.INFO, WARNING, ERROR, etc.).
+            action: Nome da ao (ex: "click", "set_volume", "kill_process").
+            details: Dicionrio com detalhes adicionais (parmetros, resultados, etc.).
+            level: Nvel de log (logging.INFO, WARNING, ERROR, etc.).
         """
         msg = f"[{self.__class__.__name__}] {action}"
         if details:
@@ -119,7 +119,7 @@ class BaseActuator(ABC):
 
         logger.log(level, msg)
 
-        # Se histórico estiver ativado, armazena a ação
+        # Se histrico estiver ativado, armazena a ao
         if self.enable_history and self._action_history is not None:
             self._action_history.append(
                 {
@@ -130,15 +130,15 @@ class BaseActuator(ABC):
                     "level": logging.getLevelName(level),
                 }
             )
-            # Limita histórico a 1000 itens para evitar vazamento de memória
+            # Limita histrico a 1000 itens para evitar vazamento de memria
             if len(self._action_history) > 1000:
                 self._action_history.pop(0)
 
     def _sanitize_details(self, details: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Remove ou mascara informações sensíveis dos detalhes antes de logar.
+        Remove ou mascara informaes sensveis dos detalhes antes de logar.
 
-        Pode ser sobrescrito por subclasses para regras específicas.
+        Pode ser sobrescrito por subclasses para regras especficas.
         """
         sensitive_keys = {"password", "token", "secret", "command"}
         safe = {}
@@ -153,17 +153,17 @@ class BaseActuator(ABC):
 
     def get_action_history(self, limit: Optional[int] = None) -> list:
         """
-        Retorna o histórico de ações (se enable_history=True).
+        Retorna o histrico de aes (se enable_history=True).
 
         Args:
-            limit: Número máximo de ações retornadas (mais recentes).
+            limit: Nmero mximo de aes retornadas (mais recentes).
 
         Returns:
-            Lista de dicionários com as ações registradas.
+            Lista de dicionrios com as aes registradas.
         """
         if not self.enable_history:
             logger.warning(
-                f"{self.__class__.__name__}: histórico não está habilitado."
+                f"{self.__class__.__name__}: histrico no est habilitado."
             )
             return []
         if limit:
@@ -174,7 +174,7 @@ class BaseActuator(ABC):
         self, action: str, error: Exception, details: Optional[Dict] = None
     ) -> None:
         """
-        Registra um erro ocorrido durante uma ação, com detalhes da exceção.
+        Registra um erro ocorrido durante uma ao, com detalhes da exceo.
         """
         error_details = {"error_type": type(error).__name__, "error_msg": str(error)}
         if details:
@@ -184,20 +184,20 @@ class BaseActuator(ABC):
     @track_action()  # Usa o decorator corrigido
     def execute(self, action: str, **kwargs) -> Any:
         """
-        Método genérico para executar uma ação no atuador.
+        Mtodo genrico para executar uma ao no atuador.
 
-        Por padrão, levanta NotImplementedError. Subclasses podem implementar
-        um dispatcher para ações comuns.
+        Por padro, levanta NotImplementedError. Subclasses podem implementar
+        um dispatcher para aes comuns.
 
         Args:
-            action: Nome da ação a executar.
-            **kwargs: Parâmetros específicos da ação.
+            action: Nome da ao a executar.
+            **kwargs: Parmetros especficos da ao.
 
         Returns:
-            Resultado da ação.
+            Resultado da ao.
         """
         raise NotImplementedError(
-            f"{self.__class__.__name__} não implementa o método execute() genérico."
+            f"{self.__class__.__name__} no implementa o mtodo execute() genrico."
         )
 
     def __repr__(self) -> str:

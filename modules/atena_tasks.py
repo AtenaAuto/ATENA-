@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-┌─────────────────────────────────────────────────────────────────────┐
-│         TASK MANAGER v2.1 — Python                                  │
-│  Sistema de gerenciamento de tarefas polimorfo com retry automático  │
-│                                                                     │
-│  Melhorias nesta versão:                                            │
-│   • Persistência SQLite (tarefas sobrevivem reinicializações)       │
-│   • Worker em background que processa a fila continuamente          │
-│   • Execução condicional baseada em dependências                    │
-│   • Métricas avançadas (CPU, memória, I/O) via psutil               │
-│   • Cancelamento/graceful shutdown                                  │
-│   • Jitter no backoff para evitar tempestade de retry               │
-│   • Logging estruturado por tarefa                                  │
-└─────────────────────────────────────────────────────────────────────┘
+
+         TASK MANAGER v2.1  Python                                  
+  Sistema de gerenciamento de tarefas polimorfo com retry automtico  
+                                                                     
+  Melhorias nesta verso:                                            
+    Persistncia SQLite (tarefas sobrevivem reinicializaes)       
+    Worker em background que processa a fila continuamente          
+    Execuo condicional baseada em dependncias                    
+    Mtricas avanadas (CPU, memria, I/O) via psutil               
+    Cancelamento/graceful shutdown                                  
+    Jitter no backoff para evitar tempestade de retry               
+    Logging estruturado por tarefa                                  
+
 """
 
 import os
@@ -36,9 +36,9 @@ import aiosqlite
 
 logger = logging.getLogger("atena.task_manager")
 
-# ═══════════════════════════════════════════════════════════════════════
+# 
 # ENUMS E TIPOS
-# ═══════════════════════════════════════════════════════════════════════
+# 
 
 class TaskType(str, Enum):
     LOCAL_BASH = "local_bash"
@@ -96,9 +96,9 @@ def get_task_output_path(task_id: str) -> Path:
     return task_dir / f"{task_id}.log"
 
 
-# ═══════════════════════════════════════════════════════════════════════
+# 
 # DATACLASSES
-# ═══════════════════════════════════════════════════════════════════════
+# 
 
 @dataclass
 class TaskMetrics:
@@ -162,9 +162,9 @@ class TaskStateBase:
         return cls(**data)
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# PERSISTÊNCIA SQLITE (assíncrona)
-# ═══════════════════════════════════════════════════════════════════════
+# 
+# PERSISTNCIA SQLITE (assncrona)
+# 
 
 class TaskDB:
     def __init__(self, db_path: Path = Path("./atena_evolution/tasks.db")):
@@ -277,9 +277,9 @@ class TaskDB:
         await self._conn.commit()
 
 
-# ═══════════════════════════════════════════════════════════════════════
+# 
 # ABSTRACT TASK CLASS
-# ═══════════════════════════════════════════════════════════════════════
+# 
 
 class Task(ABC):
     def __init__(self, name: str, task_type: TaskType):
@@ -304,9 +304,9 @@ class Task(ABC):
         return TaskMetrics()
 
 
-# ═══════════════════════════════════════════════════════════════════════
+# 
 # TASK CONTEXT
-# ═══════════════════════════════════════════════════════════════════════
+# 
 
 @dataclass
 class TaskContext:
@@ -315,9 +315,9 @@ class TaskContext:
     set_app_state: Callable[[Callable], None]
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# TASK QUEUE (prioridade + dependências)
-# ═══════════════════════════════════════════════════════════════════════
+# 
+# TASK QUEUE (prioridade + dependncias)
+# 
 
 class TaskQueue:
     def __init__(self):
@@ -328,7 +328,7 @@ class TaskQueue:
     async def enqueue(self, task: TaskStateBase) -> None:
         async with self._lock:
             self._tasks[task.id] = task
-        # Se não depende de ninguém, coloca na fila de prontos
+        # Se no depende de ningum, coloca na fila de prontos
         if not task.depends_on or self._all_deps_completed(task):
             await self._ready.put(task.id)
 
@@ -379,9 +379,9 @@ class TaskQueue:
                     del self._tasks[task_id]
 
 
-# ═══════════════════════════════════════════════════════════════════════
+# 
 # TASK EXECUTOR (com retry e jitter)
-# ═══════════════════════════════════════════════════════════════════════
+# 
 
 class TaskExecutor:
     def __init__(self, queue: TaskQueue):
@@ -399,20 +399,20 @@ class TaskExecutor:
 
         while task.retry_count <= task.max_retries:
             try:
-                logger.info(f"[Executor] 🚀 Executando {task.id}")
+                logger.info(f"[Executor]  Executando {task.id}")
                 await asyncio.wait_for(
                     task_impl.spawn(task.id, context),
                     timeout=task.timeout / 1000.0
                 )
                 # Sucesso
                 await self._update_status(task.id, TaskStatus.COMPLETED, db)
-                logger.info(f"[Executor] ✅ {task.id} completada")
+                logger.info(f"[Executor]  {task.id} completada")
                 return
 
             except asyncio.TimeoutError:
                 task.retry_count += 1
                 task.last_error = "Task timeout"
-                logger.warning(f"[Executor] ⏱️ Timeout {task.id} (tentativa {task.retry_count})")
+                logger.warning(f"[Executor]  Timeout {task.id} (tentativa {task.retry_count})")
 
                 if task.retry_count <= task.max_retries:
                     await self._schedule_retry(task, db)
@@ -423,7 +423,7 @@ class TaskExecutor:
                 task.retry_count += 1
                 task.last_error = str(e)
                 task.error_stack = traceback.format_exc()
-                logger.error(f"[Executor] ❌ Erro {task.id}: {e}")
+                logger.error(f"[Executor]  Erro {task.id}: {e}")
 
                 if task.retry_count <= task.max_retries:
                     await self._schedule_retry(task, db)
@@ -432,10 +432,10 @@ class TaskExecutor:
                     raise
 
     async def _schedule_retry(self, task: TaskStateBase, db: TaskDB) -> None:
-        # Backoff exponencial com jitter (1s, 2s, 4s, ... máx 30s)
+        # Backoff exponencial com jitter (1s, 2s, 4s, ... mx 30s)
         base_delay = 1.0 * (2 ** (task.retry_count - 1))
         delay = min(base_delay, 30.0)
-        # Jitter de ±10%
+        # Jitter de 10%
         delay = delay * random.uniform(0.9, 1.1)
 
         retry_after = time.time() + delay
@@ -446,7 +446,7 @@ class TaskExecutor:
             extra={"retry_after": retry_after}
         )
         logger.info(
-            f"[Executor] 🔄 Retry {task.retry_count}/{task.max_retries} "
+            f"[Executor]  Retry {task.retry_count}/{task.max_retries} "
             f"para {task.id} em {delay:.1f}s"
         )
         await asyncio.sleep(delay)
@@ -469,9 +469,9 @@ class TaskExecutor:
             await db.save_task(task)
 
 
-# ═══════════════════════════════════════════════════════════════════════
+# 
 # TASK MANAGER (orquestrador principal)
-# ═══════════════════════════════════════════════════════════════════════
+# 
 
 class TaskManager:
     def __init__(self, db_path: Optional[Path] = None):
@@ -507,16 +507,16 @@ class TaskManager:
             if not task:
                 continue
 
-            # Verifica se é hora do retry
+            # Verifica se  hora do retry
             if task.status == TaskStatus.RETRYING and task.retry_after:
                 if time.time() < task.retry_after:
-                    # Ainda não é hora, re-coloca na fila mais tarde
+                    # Ainda no  hora, re-coloca na fila mais tarde
                     asyncio.create_task(self._delay_requeue(task_id, task.retry_after - time.time()))
                     continue
 
             impl = self.tasks_impl.get(task.type)
             if not impl:
-                logger.error(f"[TaskManager] Sem implementação para {task.type}")
+                logger.error(f"[TaskManager] Sem implementao para {task.type}")
                 await self._fail_task(task, "No task implementation")
                 continue
 
@@ -530,12 +530,12 @@ class TaskManager:
             except Exception as e:
                 logger.error(f"[TaskManager] Falha final em {task.id}: {e}")
             finally:
-                # Atualiza métricas finais
+                # Atualiza mtricas finais
                 await self._update_task_metrics(task.id, impl)
 
     async def _delay_requeue(self, task_id: str, delay: float):
         await asyncio.sleep(max(0, delay))
-        # Se a tarefa ainda existe e está retry, coloca de volta na fila
+        # Se a tarefa ainda existe e est retry, coloca de volta na fila
         task = await self.queue.get_by_id(task_id)
         if task and task.status == TaskStatus.RETRYING:
             await self.queue._ready.put(task_id)
@@ -586,11 +586,11 @@ class TaskManager:
         )
         await self.db.save_task(task)
         await self.queue.enqueue(task)
-        logger.info(f"[TaskManager] 📝 Tarefa criada: {task_id} ({task_type.value})")
+        logger.info(f"[TaskManager]  Tarefa criada: {task_id} ({task_type.value})")
         return task_id
 
     async def kill_task(self, task_id: str) -> None:
-        """Interrompe uma tarefa em execução."""
+        """Interrompe uma tarefa em execuo."""
         task = await self.queue.get_by_id(task_id)
         if not task:
             return
@@ -661,20 +661,20 @@ class TaskManager:
     def print_status(self):
         import asyncio
         tasks = asyncio.run(self.queue.get_all())
-        print("\n" + "═" * 60)
-        print("  📋 TASK MANAGER — STATUS")
-        print("═" * 60)
+        print("\n" + "" * 60)
+        print("   TASK MANAGER  STATUS")
+        print("" * 60)
         print(f"  Total de tarefas: {len(tasks)}")
         for status in TaskStatus:
             count = sum(1 for t in tasks if t.status == status)
             if count > 0:
                 print(f"    {status.value:.<20} {count:>3d}")
-        print("═" * 60 + "\n")
+        print("" * 60 + "\n")
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# EXEMPLO DE IMPLEMENTAÇÃO DE TAREFA
-# ═══════════════════════════════════════════════════════════════════════
+# 
+# EXEMPLO DE IMPLEMENTAO DE TAREFA
+# 
 
 class LocalBashTask(Task):
     def __init__(self):
@@ -683,7 +683,7 @@ class LocalBashTask(Task):
     async def spawn(self, task_id: str, context: TaskContext) -> None:
         # Simula trabalho
         await asyncio.sleep(2)
-        # Poderia escrever no arquivo de saída
+        # Poderia escrever no arquivo de sada
         output_file = get_task_output_path(task_id)
         with open(output_file, "a") as f:
             f.write(f"{datetime.now().isoformat()} - Executado\n")
@@ -693,9 +693,9 @@ class LocalBashTask(Task):
         logger.info(f"[LocalBash] Matando {task_id}")
 
 
-# ═══════════════════════════════════════════════════════════════════════
+# 
 # EXEMPLO DE USO
-# ═══════════════════════════════════════════════════════════════════════
+# 
 
 async def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -714,7 +714,7 @@ async def main():
     )
     task2 = await manager.create_task(
         TaskType.LOCAL_BASH,
-        "Compilar código",
+        "Compilar cdigo",
         priority=5,
         timeout=10000,
     )
@@ -724,7 +724,7 @@ async def main():
 
     # Consulta tarefas
     all_tasks = await manager.get_all_tasks()
-    print("\n--- Tarefas após execução ---")
+    print("\n--- Tarefas aps execuo ---")
     for t in all_tasks:
         print(f"{t['id']}: {t['status']}")
 

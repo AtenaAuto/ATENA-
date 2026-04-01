@@ -31,12 +31,12 @@ except ImportError:
 
 class SystemActuator(BaseActuator):
     """
-    Atuador para ações de sistema operacional:
+    Atuador para aes de sistema operacional:
       - Controle de volume (get/set)
       - Bloqueio de tela
       - Shutdown / restart / sleep / hibernate
       - Controle de brilho (experimental)
-      - Execução segura com confirmação e dry-run
+      - Execuo segura com confirmao e dry-run
     """
 
     def __init__(
@@ -48,10 +48,10 @@ class SystemActuator(BaseActuator):
     ):
         """
         Args:
-            sysaware: Instância de SysAware (fornece contexto adicional)
-            enable_history: Se True, mantém histórico de ações
-            dry_run: Se True, apenas simula ações (não executa comandos reais)
-            confirm_destructive: Se True, pede confirmação antes de shutdown/restart
+            sysaware: Instncia de SysAware (fornece contexto adicional)
+            enable_history: Se True, mantm histrico de aes
+            dry_run: Se True, apenas simula aes (no executa comandos reais)
+            confirm_destructive: Se True, pede confirmao antes de shutdown/restart
         """
         super().__init__(sysaware=sysaware, enable_history=enable_history)
         self.dry_run = dry_run
@@ -62,10 +62,10 @@ class SystemActuator(BaseActuator):
         self._init_volume_interface()
 
     # ------------------------------------------------------------
-    # Verificação de dependências (com shutil.which)
+    # Verificao de dependncias (com shutil.which)
     # ------------------------------------------------------------
     def _check_dependencies(self) -> None:
-        """Verifica se as ferramentas necessárias estão disponíveis."""
+        """Verifica se as ferramentas necessrias esto disponveis."""
         self._has_pactl = False
         self._has_amixer = False
         self._has_nircmd = False
@@ -74,11 +74,11 @@ class SystemActuator(BaseActuator):
             # Verifica pactl
             if shutil.which("pactl"):
                 self._has_pactl = True
-                logger.info("pactl disponível para controle de volume")
+                logger.info("pactl disponvel para controle de volume")
             # Verifica amixer
             if shutil.which("amixer"):
                 self._has_amixer = True
-                logger.info("amixer disponível como fallback para volume")
+                logger.info("amixer disponvel como fallback para volume")
 
             if not (self._has_pactl or self._has_amixer):
                 logger.warning(
@@ -88,12 +88,12 @@ class SystemActuator(BaseActuator):
 
         elif self._platform == "Windows":
             if HAS_PYCAW:
-                logger.info("pycaw disponível para controle avançado de volume")
+                logger.info("pycaw disponvel para controle avanado de volume")
             else:
                 # Fallback: tentar nircmd
                 if shutil.which("nircmd"):
                     self._has_nircmd = True
-                    logger.info("nircmd disponível como fallback para volume")
+                    logger.info("nircmd disponvel como fallback para volume")
                 else:
                     logger.warning(
                         "Nenhuma ferramenta de volume encontrada (pycaw ou nircmd). "
@@ -101,7 +101,7 @@ class SystemActuator(BaseActuator):
                     )
 
     def _init_volume_interface(self) -> None:
-        """Inicializa interface de volume específica da plataforma."""
+        """Inicializa interface de volume especfica da plataforma."""
         if self._platform == "Windows" and HAS_PYCAW:
             try:
                 devices = AudioUtilities.GetSpeakers()
@@ -111,7 +111,7 @@ class SystemActuator(BaseActuator):
                 logger.warning(f"Falha ao inicializar pycaw: {e}")
 
     # ------------------------------------------------------------
-    # Utilitários
+    # Utilitrios
     # ------------------------------------------------------------
     def _run_cmd(
         self, cmd: list, check: bool = True, capture: bool = False
@@ -121,11 +121,11 @@ class SystemActuator(BaseActuator):
 
         Args:
             cmd: Lista de argumentos do comando
-            check: Se True, levanta exceção em caso de erro
-            capture: Se True, retorna a saída padrão
+            check: Se True, levanta exceo em caso de erro
+            capture: Se True, retorna a sada padro
 
         Returns:
-            Saída padrão (strip) se capture=True e comando bem-sucedido, senão None
+            Sada padro (strip) se capture=True e comando bem-sucedido, seno None
 
         Raises:
             RuntimeError: Se o comando falhar e check=True
@@ -149,16 +149,16 @@ class SystemActuator(BaseActuator):
                 raise RuntimeError(f"Falha ao executar comando: {e}") from e
             return None
         except FileNotFoundError as e:
-            logger.error(f"Comando não encontrado: {cmd[0]}")
+            logger.error(f"Comando no encontrado: {cmd[0]}")
             if check:
-                raise RuntimeError(f"Comando não encontrado: {cmd[0]}") from e
+                raise RuntimeError(f"Comando no encontrado: {cmd[0]}") from e
             return None
 
     def _confirm_destructive(self, action: str) -> bool:
-        """Pede confirmação do usuário para ações destrutivas."""
+        """Pede confirmao do usurio para aes destrutivas."""
         if not self.confirm_destructive:
             return True
-        resposta = input(f"⚠️  Confirmar {action} do sistema? (s/N): ").strip().lower()
+        resposta = input(f"  Confirmar {action} do sistema? (s/N): ").strip().lower()
         return resposta == "s"
 
     # ------------------------------------------------------------
@@ -166,9 +166,9 @@ class SystemActuator(BaseActuator):
     # ------------------------------------------------------------
     def get_volume(self) -> Optional[int]:
         """
-        Retorna o volume atual (0-100) ou None se não suportado.
+        Retorna o volume atual (0-100) ou None se no suportado.
 
-        Para Windows, usa pycaw (se disponível) ou nircmd.
+        Para Windows, usa pycaw (se disponvel) ou nircmd.
         Para Linux, usa pactl ou amixer.
         Para macOS, usa osascript.
         """
@@ -209,7 +209,7 @@ class SystemActuator(BaseActuator):
 
     def set_volume(self, level: int) -> None:
         """
-        Ajusta volume (0-100). Lança exceção se não for possível.
+        Ajusta volume (0-100). Lana exceo se no for possvel.
         """
         if not 0 <= level <= 100:
             raise ValueError("Volume deve estar entre 0 e 100")
@@ -230,7 +230,7 @@ class SystemActuator(BaseActuator):
                 return
             else:
                 raise RuntimeError(
-                    "Nenhum método de controle de volume disponível no Windows"
+                    "Nenhum mtodo de controle de volume disponvel no Windows"
                 )
 
         elif self._platform == "Linux":
@@ -253,11 +253,11 @@ class SystemActuator(BaseActuator):
 
         else:
             raise NotImplementedError(
-                f"Controle de volume não suportado em {self._platform}"
+                f"Controle de volume no suportado em {self._platform}"
             )
 
     # ------------------------------------------------------------
-    # Ações do sistema
+    # Aes do sistema
     # ------------------------------------------------------------
     def lock_screen(self) -> None:
         """Bloqueia a tela."""
@@ -290,11 +290,11 @@ class SystemActuator(BaseActuator):
 
         else:
             raise NotImplementedError(
-                f"Lock screen não suportado em {self._platform}"
+                f"Lock screen no suportado em {self._platform}"
             )
 
     def shutdown(self, delay: int = 0) -> None:
-        """Desliga o computador após `delay` segundos."""
+        """Desliga o computador aps `delay` segundos."""
         if not self._confirm_destructive("shutdown"):
             self.log_action("shutdown_cancelled", {"delay": delay})
             return
@@ -310,13 +310,13 @@ class SystemActuator(BaseActuator):
         elif self._platform == "Darwin":
             cmd = ["sudo", "shutdown", "-h", f"+{delay}" if delay else "now"]
         else:
-            raise NotImplementedError(f"Shutdown não suportado em {self._platform}")
+            raise NotImplementedError(f"Shutdown no suportado em {self._platform}")
 
         self._run_cmd(cmd)
         self.log_action("shutdown", {"delay": delay})
 
     def restart(self, delay: int = 0) -> None:
-        """Reinicia o computador após `delay` segundos."""
+        """Reinicia o computador aps `delay` segundos."""
         if not self._confirm_destructive("restart"):
             self.log_action("restart_cancelled", {"delay": delay})
             return
@@ -332,13 +332,13 @@ class SystemActuator(BaseActuator):
         elif self._platform == "Darwin":
             cmd = ["sudo", "shutdown", "-r", f"+{delay}" if delay else "now"]
         else:
-            raise NotImplementedError(f"Restart não suportado em {self._platform}")
+            raise NotImplementedError(f"Restart no suportado em {self._platform}")
 
         self._run_cmd(cmd)
         self.log_action("restart", {"delay": delay})
 
     def sleep(self) -> None:
-        """Coloca o computador em modo de suspensão (sleep)."""
+        """Coloca o computador em modo de suspenso (sleep)."""
         if self.dry_run:
             self.log_action("sleep", {"dry_run": True})
             return
@@ -352,7 +352,7 @@ class SystemActuator(BaseActuator):
                         return
                     except RuntimeError:
                         continue
-            raise RuntimeError("Nenhum comando de suspensão encontrado no Linux")
+            raise RuntimeError("Nenhum comando de suspenso encontrado no Linux")
         elif self._platform == "Windows":
             self._run_cmd(
                 ["rundll32.exe", "powrprof.dll,SetSuspendState", "0", "1", "0"]
@@ -362,7 +362,7 @@ class SystemActuator(BaseActuator):
             self._run_cmd(["pmset", "sleepnow"])
             self.log_action("sleep")
         else:
-            raise NotImplementedError(f"Sleep não suportado em {self._platform}")
+            raise NotImplementedError(f"Sleep no suportado em {self._platform}")
 
     def hibernate(self) -> None:
         """Hiberna o computador."""
@@ -379,20 +379,20 @@ class SystemActuator(BaseActuator):
                 except RuntimeError:
                     pass
             raise RuntimeError(
-                "Hibernação não suportada ou systemctl não disponível"
+                "Hibernao no suportada ou systemctl no disponvel"
             )
         elif self._platform == "Windows":
             self._run_cmd(["shutdown", "/h"])
             self.log_action("hibernate")
         elif self._platform == "Darwin":
-            # macOS não tem hibernação direta, mas deep sleep
+            # macOS no tem hibernao direta, mas deep sleep
             self._run_cmd(["pmset", "sleepnow"])
             logger.warning(
-                "Hibernate não suportado nativamente no macOS, usando sleep"
+                "Hibernate no suportado nativamente no macOS, usando sleep"
             )
         else:
             raise NotImplementedError(
-                f"Hibernate não suportado em {self._platform}"
+                f"Hibernate no suportado em {self._platform}"
             )
 
     # ------------------------------------------------------------
@@ -439,7 +439,7 @@ class SystemActuator(BaseActuator):
                     except (IOError, OSError) as e:
                         logger.error(f"Falha ao escrever brilho via sysfs: {e}")
             raise RuntimeError(
-                "Nenhum método para controlar brilho no Linux (brightnessctl ou sysfs)"
+                "Nenhum mtodo para controlar brilho no Linux (brightnessctl ou sysfs)"
             )
 
         elif self._platform == "Windows":
@@ -454,11 +454,11 @@ class SystemActuator(BaseActuator):
 
         else:
             raise NotImplementedError(
-                f"Controle de brilho não suportado em {self._platform}"
+                f"Controle de brilho no suportado em {self._platform}"
             )
 
     def get_brightness(self) -> Optional[int]:
-        """Retorna o brilho atual (0-100) ou None se não suportado."""
+        """Retorna o brilho atual (0-100) ou None se no suportado."""
         if self._platform == "Linux":
             if HAS_GLOB:
                 backlight = glob.glob("/sys/class/backlight/*/brightness")
@@ -498,7 +498,7 @@ class SystemActuator(BaseActuator):
 
         elif self._platform == "Darwin":
             # macOS: usar 'brightness' (se instalado) ou osascript?
-            # Osascript não fornece leitura, então retorna None por enquanto
+            # Osascript no fornece leitura, ento retorna None por enquanto
             return None
 
         return None

@@ -1,9 +1,9 @@
 {
-  "generation": 348,
+  "generation": 349,
   "best_score": 110.0,
   "timestamp": "2026-04-02T19:44:28.908187",
   "is_ci": false,
-  "last_mission": "tech_frontier_expansion",
+  "last_mission": "roadmap_singularity_2026",
   "status": "LIBERATED",
   "knowledge_level": "Frontier-2026"
 }

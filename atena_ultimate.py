@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """
                 ATENA NEURAL v4.1 - ULTIMATE EDITION (LEAN)
-  LLM leve (phi-2) | PEFT (LoRA) | Hybrid RAG | Decodificação avançada
-  Otimizado para GitHub Actions (CPU, baixa memória)
+  LLM leve (phi-2) | PEFT (LoRA) | Hybrid RAG | Decodificao avanada
+  Otimizado para GitHub Actions (CPU, baixa memria)
 """
 
 import os
@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from collections import defaultdict, deque
 
 # =============================================================================
-# IMPORTAÇÕES OBRIGATÓRIAS (TORCH É ESSENCIAL)
+# IMPORTAES OBRIGATRIAS (TORCH  ESSENCIAL)
 # =============================================================================
 try:
     import torch
@@ -36,10 +36,10 @@ try:
     HAS_TORCH = True
 except ImportError:
     HAS_TORCH = False
-    logging.warning("PyTorch não instalado. Motor ultimate terá funcionalidade reduzida.")
+    logging.warning("PyTorch no instalado. Motor ultimate ter funcionalidade reduzida.")
 
 # =============================================================================
-# 1. CONFIGURAÇÃO ULTRA (LEAN)
+# 1. CONFIGURAO ULTRA (LEAN)
 # =============================================================================
 
 @dataclass
@@ -48,11 +48,11 @@ class UltraConfig:
     MODEL_DIR: Path = BASE_DIR / "models"
     CACHE_DIR: Path = BASE_DIR / "cache"
 
-    # LLM leve (padrão: phi-2, excelente para código e pequeno)
+    # LLM leve (padro: phi-2, excelente para cdigo e pequeno)
     use_llm: bool = True
     llm_model_name: str = os.getenv("LLM_MODEL_NAME", "microsoft/phi-2")
-    llm_quantization: str = "none"      # Desativado para CPU (mais rápido)
-    llm_device: str = "cpu"             # Força CPU no CI
+    llm_quantization: str = "none"      # Desativado para CPU (mais rpido)
+    llm_device: str = "cpu"             # Fora CPU no CI
     llm_max_length: int = 512           # Menor para velocidade
 
     # PEFT (opcional, mas leve)
@@ -61,14 +61,14 @@ class UltraConfig:
     lora_r: int = 8
     lora_alpha: int = 16
 
-    # RAG (desligado por padrão para CI, pois exige sentence-transformers)
+    # RAG (desligado por padro para CI, pois exige sentence-transformers)
     use_rag: bool = False
     rag_dense_model: str = "BAAI/bge-small-en-v1.5"
     rag_use_bm25: bool = False
     rag_reranker: str = ""
     rag_top_k: int = 3
 
-    # Decodificação simples (mais rápida)
+    # Decodificao simples (mais rpida)
     decoding_strategy: str = "beam"      # beam, contrastive, typical, diverse_beam
     temperature: float = 0.7
     top_p: float = 0.9
@@ -77,7 +77,7 @@ class UltraConfig:
     num_beams: int = 3                   # Reduzido
     diversity_penalty: float = 0.5
 
-    # Avaliação (desligar codebleu no CI para evitar dependências)
+    # Avaliao (desligar codebleu no CI para evitar dependncias)
     evaluate_codebleu: bool = False
     evaluate_pass_at_k: int = 1
     sandbox_type: str = "subprocess"    # fallback para subprocess (mais leve)
@@ -137,7 +137,7 @@ class SecureSandbox:
                 pass
 
 # =============================================================================
-# 3. RAG HÍBRIDO (desabilitado por padrão, mantido para compatibilidade)
+# 3. RAG HBRIDO (desabilitado por padro, mantido para compatibilidade)
 # =============================================================================
 
 class HybridRAG:
@@ -151,13 +151,13 @@ class HybridRAG:
         return []
 
 # =============================================================================
-# 4. GERADOR AVANÇADO (compatível com fallback)
+# 4. GERADOR AVANADO (compatvel com fallback)
 # =============================================================================
 
 class AdvancedGenerator:
     def __init__(self, model, tokenizer):
         if not HAS_TORCH:
-            raise RuntimeError("PyTorch necessário")
+            raise RuntimeError("PyTorch necessrio")
         self.model = model
         self.tokenizer = tokenizer
 
@@ -180,7 +180,7 @@ class AdvancedGenerator:
         return self.tokenizer.decode(output[0], skip_special_tokens=True)
 
 # =============================================================================
-# 5. AVALIADOR DE CÓDIGO (simples)
+# 5. AVALIADOR DE CDIGO (simples)
 # =============================================================================
 
 class CodeEvaluator:
@@ -192,7 +192,7 @@ class CodeEvaluator:
         return not any(re.search(p, code) for p in dangerous)
 
 # =============================================================================
-# 6. DUMMY MUTATION ENGINE (compatível com main.py)
+# 6. DUMMY MUTATION ENGINE (compatvel com main.py)
 # =============================================================================
 
 class DummyMutationEngine:
@@ -263,7 +263,7 @@ class AtenaUltimateCore:
             self.tokenizer = None
             return
 
-        # Tenta ler modelo de variável de ambiente ou arquivo
+        # Tenta ler modelo de varivel de ambiente ou arquivo
         model_name = cfg.llm_model_name
         if os.path.exists(".llm_model_name"):
             with open(".llm_model_name") as f:
@@ -284,7 +284,7 @@ class AtenaUltimateCore:
             if self.tokenizer.pad_token is None:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
             self.model.eval()
-            logging.info("✅ LLM carregado com sucesso")
+            logging.info(" LLM carregado com sucesso")
         except Exception as e:
             logging.error(f"Falha ao carregar LLM: {e}")
             self.model = None
@@ -316,7 +316,7 @@ class AtenaUltimateCore:
             try:
                 return self.generator.generate(prompt)
             except Exception as e:
-                logging.warning(f"Erro na geração: {e}")
+                logging.warning(f"Erro na gerao: {e}")
         return f"def {prompt.replace(' ', '_')}():\n    return 0\n"
 
     def evolve_one_cycle(self) -> Dict:
@@ -339,7 +339,7 @@ class AtenaUltimateCore:
         pass
 
 # =============================================================================
-# 8. INTEGRAÇÃO (patch)
+# 8. INTEGRAO (patch)
 # =============================================================================
 
 def patch_atena_core(original_core) -> AtenaUltimateCore:

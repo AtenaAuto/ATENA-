@@ -1,7 +1,8 @@
 {
-  "generation": 346,
-  "best_score": 100.73,
-  "timestamp": "2026-04-02T19:39:16.418060",
+  "generation": 347,
+  "best_score": 110.0,
+  "timestamp": "2026-04-02T19:44:28.908187",
   "is_ci": false,
-  "last_mission": "advanced_portfolio_optimizer"
+  "last_mission": "sentinela_liberation",
+  "status": "LIBERATED"
 }

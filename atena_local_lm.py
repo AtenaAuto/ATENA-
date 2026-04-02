@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                ATENA LOCAL LM PRO MAX v5.0 - ULTIMATE EDITION                ║
-║  Features: 4-bit Quantization | PEFT (LoRA/AdaLoRA/IA3) | Hybrid RAG        ║
-║  Contrastive Decoding | Knowledge Distillation | DeepSpeed | CodeBLEU       ║
-║  Sandbox Execution | MLflow | Optuna | Redis Cache | Multi-GPU              ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+
+                ATENA LOCAL LM PRO MAX v5.0 - ULTIMATE EDITION                
+  Features: 4-bit Quantization | PEFT (LoRA/AdaLoRA/IA3) | Hybrid RAG        
+  Contrastive Decoding | Knowledge Distillation | DeepSpeed | CodeBLEU       
+  Sandbox Execution | MLflow | Optuna | Redis Cache | Multi-GPU              
+
 """
 
 import os
@@ -37,14 +37,14 @@ from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 # ============================================================================
-# 1. CONFIGURAÇÃO ULTRA AVANÇADA
+# 1. CONFIGURAO ULTRA AVANADA
 # ============================================================================
 
 @dataclass
 class AtenaUltraConfig:
-    """Configuração com suporte a tudo que existe de mais moderno."""
+    """Configurao com suporte a tudo que existe de mais moderno."""
     
-    # Diretórios
+    # Diretrios
     base_dir: Path = Path("./atena_ultimate")
     cache_dir: Path = Path("./atena_cache")
     model_dir: Path = Path("./atena_models")
@@ -61,11 +61,11 @@ class AtenaUltraConfig:
     lora_dropout: float = 0.1
     target_modules: List[str] = field(default_factory=lambda: ["q_proj", "v_proj"])
     
-    # Quantização
+    # Quantizao
     quantization: str = "4bit"  # none, 4bit, 8bit, gptq, awq
     quantize_compute_dtype: str = "float16"  # float16, bfloat16
     
-    # RAG Híbrido
+    # RAG Hbrido
     use_rag: bool = True
     rag_dense_model: str = "BAAI/bge-small-en-v1.5"
     rag_sparse: bool = True  # BM25
@@ -73,7 +73,7 @@ class AtenaUltraConfig:
     rag_top_k: int = 10
     rag_hybrid_weights: Tuple[float, float] = (0.5, 0.5)
     
-    # Geração avançada
+    # Gerao avanada
     decoding_strategy: str = "contrastive"  # contrastive, typical, beam, diverse_beam
     temperature: float = 0.8
     top_p: float = 0.95
@@ -95,7 +95,7 @@ class AtenaUltraConfig:
     num_train_epochs: int = 3
     max_train_samples: int = 10000
     use_deepspeed: bool = True
-    deepspeed_config: str = "zero3.json"  # será gerado dinamicamente
+    deepspeed_config: str = "zero3.json"  # ser gerado dinamicamente
     use_mixed_precision: bool = True
     gradient_checkpointing: bool = True
     save_steps: int = 500
@@ -108,7 +108,7 @@ class AtenaUltraConfig:
     distillation_temperature: float = 4.0
     distillation_alpha: float = 0.5  # peso da perda de distill
     
-    # Avaliação de código
+    # Avaliao de cdigo
     sandbox_type: str = "docker"  # docker, nsjail, subprocess
     sandbox_timeout: int = 10
     sandbox_memory_mb: int = 1024
@@ -121,7 +121,7 @@ class AtenaUltraConfig:
     mlflow_experiment: str = "atena_ultimate"
     log_interval: int = 10
     
-    # Cache e Otimização
+    # Cache e Otimizao
     cache_backend: str = "redis"  # redis, memory, disk
     redis_url: str = "redis://localhost:6379/0"
     cache_ttl: int = 3600
@@ -165,11 +165,11 @@ class AtenaUltraConfig:
         self.deepspeed_config = str(self.base_dir / "deepspeed_config.json")
 
 # ============================================================================
-# 2. SANDBOX SEGURO PARA EXECUÇÃO DE CÓDIGO
+# 2. SANDBOX SEGURO PARA EXECUO DE CDIGO
 # ============================================================================
 
 class CodeSandbox:
-    """Executa código Python em ambiente isolado com limites de recursos."""
+    """Executa cdigo Python em ambiente isolado com limites de recursos."""
     
     def __init__(self, cfg: AtenaUltraConfig):
         self.cfg = cfg
@@ -185,20 +185,20 @@ class CodeSandbox:
         try:
             subprocess.run(["docker", "ps"], capture_output=True, check=True)
         except:
-            logging.warning("Docker não disponível, usando subprocess fallback")
+            logging.warning("Docker no disponvel, usando subprocess fallback")
             self.cfg.sandbox_type = "subprocess"
     
     def _check_nsjail(self):
         try:
             subprocess.run(["nsjail", "--version"], capture_output=True, check=True)
         except:
-            logging.warning("nsjail não encontrado, usando subprocess fallback")
+            logging.warning("nsjail no encontrado, usando subprocess fallback")
             self.cfg.sandbox_type = "subprocess"
     
     def execute(self, code: str, inputs: Optional[str] = None) -> Tuple[str, str, int]:
         """
-        Executa código e retorna (stdout, stderr, return_code).
-        Com limites de tempo e memória.
+        Executa cdigo e retorna (stdout, stderr, return_code).
+        Com limites de tempo e memria.
         """
         if self.cfg.sandbox_type == "docker":
             return self._execute_docker(code, inputs)
@@ -208,7 +208,7 @@ class CodeSandbox:
             return self._execute_subprocess(code, inputs)
     
     def _execute_docker(self, code: str, inputs: str) -> Tuple[str, str, int]:
-        # Cria um container temporário
+        # Cria um container temporrio
         dockerfile = f"""
         FROM python:3.10-slim
         RUN adduser --disabled-password --gecos '' sandbox
@@ -272,7 +272,7 @@ class CodeSandbox:
         return proc.stdout.decode(), proc.stderr.decode(), proc.returncode
 
 # ============================================================================
-# 3. RAG HÍBRIDO COM BM25 + DENSE + RE-RANKER
+# 3. RAG HBRIDO COM BM25 + DENSE + RE-RANKER
 # ============================================================================
 
 class HybridRAG:
@@ -291,7 +291,7 @@ class HybridRAG:
             from sentence_transformers import SentenceTransformer
             self.dense_retriever = SentenceTransformer(self.cfg.rag_dense_model)
         except ImportError:
-            logging.warning("sentence-transformers não instalado, RAG denso desativado")
+            logging.warning("sentence-transformers no instalado, RAG denso desativado")
     
     def _init_sparse(self):
         if self.cfg.rag_sparse:
@@ -299,7 +299,7 @@ class HybridRAG:
                 from rank_bm25 import BM25Okapi
                 self.bm25_available = True
             except ImportError:
-                logging.warning("rank_bm25 não instalado, RAG esparso desativado")
+                logging.warning("rank_bm25 no instalado, RAG esparso desativado")
                 self.bm25_available = False
         else:
             self.bm25_available = False
@@ -345,7 +345,7 @@ class HybridRAG:
             bm25_scores = self.bm25.get_scores(query.split())
             sparse_scores = list(enumerate(bm25_scores))
         
-        # 3. Fusão híbrida (reciprocal rank fusion ou soma ponderada)
+        # 3. Fuso hbrida (reciprocal rank fusion ou soma ponderada)
         if dense_scores and sparse_scores:
             # Normalizar
             max_dense = max(dense_scores, key=lambda x: x[1])[1] if dense_scores else 1
@@ -377,7 +377,7 @@ class HybridRAG:
         return final
 
 # ============================================================================
-# 4. PEFT AVANÇADO (LoRA, AdaLoRA, IA3, DoRA)
+# 4. PEFT AVANADO (LoRA, AdaLoRA, IA3, DoRA)
 # ============================================================================
 
 class PeftManager:
@@ -424,8 +424,8 @@ class PeftManager:
     
     @staticmethod
     def apply_dora(model, r=16, alpha=32):
-        # DoRA (Weight-Decomposed Low-Rank Adaptation) requer implementação customizada
-        # Usando PEFT que já suporta DoRA em versões recentes
+        # DoRA (Weight-Decomposed Low-Rank Adaptation) requer implementao customizada
+        # Usando PEFT que j suporta DoRA em verses recentes
         from peft import LoraConfig, get_peft_model, TaskType
         config = LoraConfig(
             task_type=TaskType.CAUSAL_LM,
@@ -447,14 +447,14 @@ class PeftManager:
         elif method == "dora":
             return PeftManager.apply_dora(model, **kwargs)
         else:
-            raise ValueError(f"Método PEFT desconhecido: {method}")
+            raise ValueError(f"Mtodo PEFT desconhecido: {method}")
 
 # ============================================================================
-# 5. GERADOR COM DECODING AVANÇADO (Contrastive, Typical, Diverse Beam)
+# 5. GERADOR COM DECODING AVANADO (Contrastive, Typical, Diverse Beam)
 # ============================================================================
 
 class AdvancedDecoder:
-    """Implementa decodificação state-of-the-art."""
+    """Implementa decodificao state-of-the-art."""
     
     def __init__(self, model, tokenizer, cfg: AtenaUltraConfig):
         self.model = model
@@ -471,11 +471,11 @@ class AdvancedDecoder:
             return self._typical_decoding(input_ids)
         elif strategy == "diverse_beam":
             return self._diverse_beam_search(input_ids)
-        else:  # beam search padrão
+        else:  # beam search padro
             return self._beam_search(input_ids)
     
     def _contrastive_decoding(self, input_ids: torch.Tensor) -> torch.Tensor:
-        """Contrastive Decoding: penaliza tokens muito prováveis no modelo base."""
+        """Contrastive Decoding: penaliza tokens muito provveis no modelo base."""
         # Necessita de um modelo amador (amateur) e um modelo especialista (expert)
         # Aqui simulamos usando temperature scaling como amateur
         max_len = input_ids.shape[1] + self.cfg.max_new_tokens
@@ -494,12 +494,12 @@ class AdvancedDecoder:
         return input_ids
     
     def _typical_decoding(self, input_ids: torch.Tensor) -> torch.Tensor:
-        """Typical Decoding: seleciona tokens com entropia próxima da típica."""
+        """Typical Decoding: seleciona tokens com entropia prxima da tpica."""
         for _ in range(self.cfg.max_new_tokens):
             logits = self.model(input_ids).logits[0, -1, :] / self.cfg.temperature
             probs = F.softmax(logits, dim=-1)
             entropy = -torch.sum(probs * torch.log(probs + 1e-10))
-            # Calcula distância da entropia de cada token (usando log(1/p))
+            # Calcula distncia da entropia de cada token (usando log(1/p))
             log_probs = torch.log(probs + 1e-10)
             typical_mask = torch.abs(-log_probs - entropy) < self.cfg.typical_mass
             if not typical_mask.any():
@@ -529,7 +529,7 @@ class AdvancedDecoder:
                     for i in range(len(topk_indices)):
                         token = topk_indices[i].item()
                         new_score = score - topk_log_probs[i].item()
-                        # Penalidade de diversidade: penaliza tokens já vistos no grupo
+                        # Penalidade de diversidade: penaliza tokens j vistos no grupo
                         group_tokens = [t for _, s in all_candidates if s % num_groups == group]
                         if diversity_penalty > 0 and token in group_tokens:
                             new_score += diversity_penalty * math.log(1 + group_tokens.count(token))
@@ -545,7 +545,7 @@ class AdvancedDecoder:
         return best_seq
     
     def _beam_search(self, input_ids: torch.Tensor) -> torch.Tensor:
-        """Beam search padrão."""
+        """Beam search padro."""
         return self.model.generate(
             input_ids,
             max_new_tokens=self.cfg.max_new_tokens,
@@ -559,7 +559,7 @@ class AdvancedDecoder:
         )
 
 # ============================================================================
-# 6. AVALIAÇÃO COM CODEBLEU E PASS@K
+# 6. AVALIAO COM CODEBLEU E PASS@K
 # ============================================================================
 
 class CodeEvaluator:
@@ -568,7 +568,7 @@ class CodeEvaluator:
         self.sandbox = CodeSandbox(cfg)
     
     def evaluate_codebleu(self, generated: str, reference: str) -> float:
-        """Calcula CodeBLEU (pesado, requer instalação adicional)."""
+        """Calcula CodeBLEU (pesado, requer instalao adicional)."""
         try:
             from codebleu import calc_codebleu
             result = calc_codebleu([reference], [generated], lang="python")
@@ -586,7 +586,7 @@ class CodeEvaluator:
         k = self.cfg.evaluate_pass_at_k
         passed = 0
         for _ in range(k):
-            # Gera uma variação (pequena mutação) para estimar robustez
+            # Gera uma variao (pequena mutao) para estimar robustez
             mutated = self._mutate_code(code)
             ok = True
             for inp, expected in test_cases:
@@ -599,15 +599,15 @@ class CodeEvaluator:
         return passed / k
     
     def _mutate_code(self, code: str) -> str:
-        """Mutação leve para testar robustez."""
-        # Exemplo: renomear variável temporariamente
+        """Mutao leve para testar robustez."""
+        # Exemplo: renomear varivel temporariamente
         lines = code.split('\n')
         if len(lines) > 2:
             lines[1] = lines[1].replace('x', 'xx')
         return '\n'.join(lines)
     
     def security_scan(self, code: str) -> bool:
-        """Verifica padrões perigosos."""
+        """Verifica padres perigosos."""
         dangerous = [
             r'os\.system', r'subprocess', r'eval', r'exec', r'__import__',
             r'compile', r'globals\(\)', r'locals\(\)', r'__builtins__'
@@ -618,7 +618,7 @@ class CodeEvaluator:
         return True
 
 # ============================================================================
-# 7. KNOWLEDGE DISTILLATION COM ADAPTAÇÃO DE TEMPERATURA
+# 7. KNOWLEDGE DISTILLATION COM ADAPTAO DE TEMPERATURA
 # ============================================================================
 
 class DistillationTrainer:
@@ -654,7 +654,7 @@ class DistillationTrainer:
             optimizer.zero_grad()
 
 # ============================================================================
-# 8. ORQUESTRADOR ULTIMATE (INTEGRAÇÃO TOTAL)
+# 8. ORQUESTRADOR ULTIMATE (INTEGRAO TOTAL)
 # ============================================================================
 
 class AtenaUltimateLM:
@@ -685,7 +685,7 @@ class AtenaUltimateLM:
         self.AutoTokenizer = AutoTokenizer
     
     def _init_model(self):
-        # Carrega modelo base com quantização
+        # Carrega modelo base com quantizao
         quantization_config = None
         if self.cfg.quantization == "4bit":
             from transformers import BitsAndBytesConfig
@@ -718,10 +718,10 @@ class AtenaUltimateLM:
                                            dropout=self.cfg.lora_dropout,
                                            target_modules=self.cfg.target_modules)
         
-        # Coloca em modo de avaliação inicial
+        # Coloca em modo de avaliao inicial
         self.model.eval()
         
-        # Decodificador avançado
+        # Decodificador avanado
         self.decoder = AdvancedDecoder(self.model, self.tokenizer, self.cfg)
     
     def _init_rag(self):
@@ -754,7 +754,7 @@ class AtenaUltimateLM:
             conn.close()
     
     def generate(self, prompt: str, context: Optional[str] = None) -> str:
-        """Gera código com base no prompt e contexto RAG."""
+        """Gera cdigo com base no prompt e contexto RAG."""
         # 1. Recupera contexto RAG
         rag_context = ""
         if self.rag:
@@ -765,24 +765,24 @@ class AtenaUltimateLM:
         full_prompt = f"{rag_context}\n# Task: {prompt}\n{context or ''}\n# Generated code:\n"
         inputs = self.tokenizer(full_prompt, return_tensors="pt", truncation=True, max_length=1024).to(self.device)
         
-        # 2. Geração com decodificação avançada
+        # 2. Gerao com decodificao avanada
         with torch.no_grad():
             output_ids = self.decoder.generate(inputs.input_ids)
         generated = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
         
-        # 3. Pós-processamento e validação
+        # 3. Ps-processamento e validao
         code = self._extract_code(generated)
         if not self.evaluator.security_scan(code):
             raise ValueError("Generated code contains dangerous patterns")
         return code
     
     def _extract_code(self, text: str) -> str:
-        """Extrai o bloco de código Python da saída."""
+        """Extrai o bloco de cdigo Python da sada."""
         pattern = r"```python\n(.*?)```"
         match = re.search(pattern, text, re.DOTALL)
         if match:
             return match.group(1)
-        # fallback: pegar linhas que começam com def ou class
+        # fallback: pegar linhas que comeam com def ou class
         lines = text.split('\n')
         code_lines = []
         in_code = False
@@ -842,7 +842,7 @@ class AtenaUltimateLM:
         self.model = trainer.model
     
     def evaluate_generation_quality(self, test_prompts: List[str], references: List[str]) -> Dict:
-        """Avalia a qualidade das gerações usando CodeBLEU e execução."""
+        """Avalia a qualidade das geraes usando CodeBLEU e execuo."""
         results = {"codebleu": [], "pass_at_k": [], "security": []}
         for prompt, ref in zip(test_prompts, references):
             try:
@@ -853,7 +853,7 @@ class AtenaUltimateLM:
                 results["pass_at_k"].append(0.0)
                 results["security"].append(self.evaluator.security_scan(code))
             except Exception as e:
-                self.logger.error(f"Erro na avaliação: {e}")
+                self.logger.error(f"Erro na avaliao: {e}")
         return {k: (sum(v)/len(v) if v else 0) for k, v in results.items()}
     
     def close(self):
@@ -869,7 +869,7 @@ class AtenaUltimateLM:
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Atena Ultimate LM")
-    parser.add_argument("--prompt", type=str, help="Prompt para geração")
+    parser.add_argument("--prompt", type=str, help="Prompt para gerao")
     parser.add_argument("--interactive", action="store_true", help="Modo interativo")
     parser.add_argument("--fine-tune", type=str, help="Dataset JSON para fine-tuning")
     args = parser.parse_args()
@@ -879,7 +879,7 @@ def main():
     if args.fine_tune:
         print(f"Fine-tuning com {args.fine_tune}...")
         lm.fine_tune(args.fine_tune)
-        print("Fine-tuning concluído.")
+        print("Fine-tuning concludo.")
     
     if args.interactive:
         print("Atena Ultimate LM - Modo interativo (Ctrl+C para sair)")
@@ -896,10 +896,10 @@ def main():
         code = lm.generate(args.prompt)
         print(code)
     else:
-        # Demo automática
+        # Demo automtica
         code = lm.generate("Write a Python function that sorts a list using quicksort")
         print("Generated code:\n", code)
-        # Avaliação simples
+        # Avaliao simples
         print("Security check:", lm.evaluator.security_scan(code))
     
     lm.close()

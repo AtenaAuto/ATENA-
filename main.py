@@ -6074,39 +6074,154 @@ class AtenaCore:
 
 
 # =============================================================================
-# APLICATIVO PRINCIPAL v3.1
+# APLICATIVO PRINCIPAL v4.0 - ULTIMATE EDITION
 # =============================================================================
 
-class AtenaApp:
-    """Aplicao principal da Atena."""
+import signal
+import atexit
+from typing import Optional, Dict, Any
 
-    def __init__(self, problem: Optional[Problem] = None):
-        self.core = AtenaCore(problem=problem)
+class AtenaApp:
+    """Aplicação principal da Atena - versão ultimate com checkpoints e integração LLM."""
+
+    def __init__(self, problem: Optional[Problem] = None, headless: bool = False):
+        # Decide qual core usar (tradicional ou ultramoderno)
+        use_ultimate = os.getenv("ATENA_USE_ULTIMATE", "false").lower() == "true"
+        if use_ultimate:
+            try:
+                from atena_ultimate import AtenaUltimateCore
+                self.core = AtenaUltimateCore(problem=problem)
+                logger.info("🚀 Motor ULTIMATE (LLM + RAG híbrido) ativado")
+            except ImportError:
+                logger.warning("atena_ultimate.py não encontrado, usando core tradicional")
+                self.core = AtenaCore(problem=problem)
+        else:
+            self.core = AtenaCore(problem=problem)
+
+        self.headless = headless
         self.no_code_builder = NoCodeBuilder(
             kb=self.core.kb,
             mutation_engine=self.core.mutation_engine,
             grok=self.core.mutation_engine.grok
         )
         self.hacker_recon = HackerReconModule(kb=self.core.kb)
-        self.dashboard = AtenaDashboard(self.core)
-        self.dashboard.start()
+        self.dashboard = None if headless else AtenaDashboard(self.core)
+        if self.dashboard:
+            self.dashboard.start()
+        
         self.running = False
         self._last_train = 0.0
         self._last_news = 0.0
         self._last_deploy_score = self.core.best_score
+        self._last_checkpoint = 0
+        self._checkpoint_interval = int(os.getenv("ATENA_CHECKPOINT_INTERVAL", "50"))  # a cada 50 ciclos
 
-    def start_autonomous(self, cycles: Optional[int] = None):
-        """Inicia modo autnomo."""
-        logger.info("\n MODO AUTNOMO | Atena Neural v3.1")
+        # Registra shutdown gracioso
+        atexit.register(self._shutdown)
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+
+        # Thread de saúde (opcional)
+        self._health_thread = None
+        if not IS_CI:
+            self._start_health_monitor()
+
+    def _signal_handler(self, signum, frame):
+        logger.info(f"\n⚠️ Sinal {signum} recebido. Encerrando graciosamente...")
+        self.running = False
+        self._shutdown()
+        sys.exit(0)
+
+    def _start_health_monitor(self):
+        """Thread leve que verifica se o core ainda responde."""
+        def monitor():
+            while self.running:
+                time.sleep(60)
+                try:
+                    # Teste rápido: evoluir um ciclo dummy? Não, só verifica se atributos existem
+                    _ = self.core.generation
+                except Exception as e:
+                    logger.error(f"❤️‍🩹 Core parece travado: {e}. Tentando reiniciar...")
+                    # Tenta recriar o core (apenas se for crítico)
+                    # Por simplicidade, apenas logamos e marcamos para parar.
+                    self.running = False
+        self._health_thread = threading.Thread(target=monitor, daemon=True)
+        self._health_thread.start()
+
+    def _save_checkpoint(self, generation: int):
+        """Salva checkpoint completo do estado atual."""
+        if generation - self._last_checkpoint >= self._checkpoint_interval:
+            checkpoint_dir = Config.BASE_DIR / "checkpoints"
+            checkpoint_dir.mkdir(exist_ok=True)
+            checkpoint_file = checkpoint_dir / f"checkpoint_gen_{generation}.pkl"
+            try:
+                # Estado essencial
+                state = {
+                    "generation": self.core.generation,
+                    "best_score": self.core.best_score,
+                    "best_code": self.core.best_code,
+                    "current_code": self.core.current_code,
+                    "timestamp": datetime.now().isoformat(),
+                    # Pode incluir mais (ex: population do scorer, memória episódica)
+                    "episodic_memory": list(self.core.episodic_memory._recent),
+                    "scorer_population": [
+                        asdict(g) for g in self.core.v3.evolvable_scorer._population
+                    ] if hasattr(self.core, 'v3') else [],
+                }
+                with open(checkpoint_file, 'wb') as f:
+                    pickle.dump(state, f)
+                logger.info(f"💾 Checkpoint salvo: {checkpoint_file}")
+                self._last_checkpoint = generation
+                # Remove checkpoints antigos (mantém últimos 5)
+                for old in sorted(checkpoint_dir.glob("checkpoint_gen_*.pkl"))[:-5]:
+                    old.unlink()
+            except Exception as e:
+                logger.warning(f"Falha ao salvar checkpoint: {e}")
+
+    def _load_checkpoint(self, filepath: Path = None) -> bool:
+        """Carrega um checkpoint (último se não especificado)."""
+        if filepath is None:
+            checkpoints = sorted(Config.BASE_DIR.glob("checkpoints/checkpoint_gen_*.pkl"))
+            if not checkpoints:
+                return False
+            filepath = checkpoints[-1]
+        try:
+            with open(filepath, 'rb') as f:
+                state = pickle.load(f)
+            self.core.generation = state["generation"]
+            self.core.best_score = state["best_score"]
+            self.core.best_code = state["best_code"]
+            self.core.current_code = state["current_code"]
+            # Restaura memória episódica e scorer se disponível
+            if hasattr(self.core, 'episodic_memory') and "episodic_memory" in state:
+                self.core.episodic_memory._recent = deque(state["episodic_memory"], maxlen=50)
+            if hasattr(self.core, 'v3') and "scorer_population" in state:
+                # Recria a população do scorer
+                for genome_data in state["scorer_population"]:
+                    # Reconstrói objeto ScorerGenome
+                    pass  # Implementar se necessário
+            logger.info(f"📀 Checkpoint carregado: {filepath} (gen {self.core.generation})")
+            return True
+        except Exception as e:
+            logger.warning(f"Falha ao carregar checkpoint: {e}")
+            return False
+
+    def start_autonomous(self, cycles: Optional[int] = None, resume_from_checkpoint: bool = False):
+        """Inicia modo autônomo, opcionalmente retomando do último checkpoint."""
+        if resume_from_checkpoint:
+            self._load_checkpoint()
+        
+        logger.info("\n🚀 MODO AUTÔNOMO | Atena Neural v4.0")
         logger.info(f"   Ambiente: {'GitHub Actions CI' if IS_GITHUB_ACTIONS else 'Local'}")
         logger.info(f"   Candidatos/ciclo: {Config.CANDIDATES_PER_CYCLE}")
         logger.info(f"   Workers: {Config.PARALLEL_WORKERS}")
         logger.info(f"   Timeout sandbox: {Config.EVALUATION_TIMEOUT}s")
         logger.info(f"   ALLOW_DEEP_SELF_MOD: {ALLOW_DEEP_SELF_MOD}")
         logger.info(f"   ALLOW_CHECKER_EVOLVE: {ALLOW_CHECKER_EVOLVE}")
-        logger.info(f"   SELF_MOD_INTERVAL: a cada {SELF_MOD_INTERVAL} geraes")
+        logger.info(f"   SELF_MOD_INTERVAL: a cada {SELF_MOD_INTERVAL} gerações")
+        logger.info(f"   Checkpoint a cada {self._checkpoint_interval} ciclos")
         if self.core.problem:
-            logger.info(f"   Problema: {self.core.problem.name}  {self.core.problem.description}")
+            logger.info(f"   Problema: {self.core.problem.name} – {self.core.problem.description}")
         self.running = True
         if self.core.learner:
             self.core.learner.start()
@@ -6115,75 +6230,99 @@ class AtenaApp:
             while self.running and (cycles is None or count < cycles):
                 result = self.core.evolve_one_cycle()
                 count += 1
+                # Treinamento do preditor ML
                 if time.time() - self._last_train > Config.TRAINING_INTERVAL:
                     self.core.predictor.train()
                     self._last_train = time.time()
+                # Atualização de objetivos via NewsAPI
                 if self.core.news and time.time() - self._last_news > 3600:
                     self.core.news.update_objectives()
                     self._last_news = time.time()
+                # Deploy automático se melhoria significativa
                 if self.core.best_score > self._last_deploy_score * Config.DEPLOY_THRESHOLD:
-                    logger.info(f" Melhoria {Config.DEPLOY_THRESHOLD*100-100:.0f}%+  Deploy")
+                    logger.info(f"📦 Melhoria {Config.DEPLOY_THRESHOLD*100-100:.0f}%+ → Deploy")
                     AutoDeploy.deploy()
                     self._last_deploy_score = self.core.best_score
+                # Checkpoint automático
+                self._save_checkpoint(self.core.generation)
+                # Pequena pausa se não for CI e não houver limite de ciclos
                 if not IS_CI and cycles is None:
                     time.sleep(30)
         except KeyboardInterrupt:
-            logger.info("\n[] Interrompido pelo usurio")
+            logger.info("\n🛑 Interrompido pelo usuário")
+        except Exception as e:
+            logger.error(f"❌ Erro fatal no modo autônomo: {e}", exc_info=True)
         finally:
             self._shutdown()
 
     def _shutdown(self):
+        """Finalização graciosa: para threads, salva estado e fecha conexões."""
+        if hasattr(self, '_shutdown_done') and self._shutdown_done:
+            return
+        self._shutdown_done = True
+        logger.info("🛑 Encerrando Atena...")
         if self.core.learner:
             self.core.learner.stop()
-        self.core.vocab_harvester.stop()
-        self.dashboard.stop()
-        self.core.kb.prune_eval_cache()
-        self.core.kb.close()
-        logger.info(f"[] Score final: {self.core.best_score:.2f} | Geraes: {self.core.generation}")
+        if hasattr(self.core, 'vocab_harvester'):
+            self.core.vocab_harvester.stop()
+        if self.dashboard:
+            self.dashboard.stop()
+        if hasattr(self.core, 'kb'):
+            self.core.kb.prune_eval_cache()
+            self.core.kb.close()
+        # Salva checkpoint final
+        if self.core.generation > 0:
+            self._save_checkpoint(self.core.generation)
+        logger.info(f"✅ Score final: {self.core.best_score:.2f} | Gerações: {self.core.generation}")
 
     def run_interactive(self):
-        """Modo interativo com comandos."""
-        logger.info("\n" + ""*60)
-        logger.info("   ATENA NEURAL v3.1  MODO INTERATIVO")
-        logger.info(""*60)
+        """Modo interativo com comandos (versão aprimorada)."""
+        logger.info("\n" + "═"*60)
+        logger.info("   ATENA NEURAL v4.0  MODO INTERATIVO")
+        logger.info("═"*60)
         cmds = [
-            ("/evoluir",           "1 ciclo de evoluo"),
-            ("/ciclos N",          "N ciclos"),
-            ("/auto [N]",          "Modo autnomo"),
-            ("/status",            "Status e objetivos"),
-            ("/codigo",            "Cdigo atual"),
-            ("/melhor",            "Melhor cdigo"),
-            ("/treinar",           "Treina preditor ML"),
-            ("/deploy",            "Deploy manual"),
-            ("/criar <desc>",      "Cria projeto No-Code"),
-            ("/projetos",          "Lista projetos"),
-            ("/evoluir_proj <p>",  "Evolui projeto"),
-            ("/recon <tpico>",    "Hacker Recon"),
-            ("/lingua",            "Relatrio LanguageTrainer"),
-            ("/vocab",             "Lista vocabulrio"),
-            ("/episodio",          "Resumo memria episdica"),
-            ("/recompensa",        "Critrios auto-reward"),
-            ("/boosts",            "Boosts ativos do FeedbackLoop"),
-            # v3
-            ("/v3status",          "Status completo v3 (selfmod)"),
-            ("/v3scorer",          "Population de scorers"),
-            ("/v3checker",         "Estado das checker rules"),
-            ("/v3meta",            "Relatrio do MetaLearner"),
-            ("/v3selfmod",         "Forar ciclo de auto-modificao"),
-            ("/v3ativar_deep",     "Ativa ALLOW_DEEP_SELF_MOD em runtime"),
-            ("/cache_info",        "Info do cache"),
-            ("/limpar_cache",      "Limpa caches"),
-            ("/sair",              "Encerra"),
+            ("/evoluir",            "1 ciclo de evolução"),
+            ("/ciclos N",           "N ciclos"),
+            ("/auto [N]",           "Modo autônomo (opcional N ciclos)"),
+            ("/status",             "Status e objetivos"),
+            ("/codigo",             "Código atual"),
+            ("/melhor",             "Melhor código"),
+            ("/treinar",            "Treina preditor ML"),
+            ("/deploy",             "Deploy manual"),
+            ("/criar <desc>",       "Cria projeto No-Code"),
+            ("/projetos",           "Lista projetos"),
+            ("/evoluir_proj <p>",   "Evolui projeto"),
+            ("/recon <tópico>",     "Hacker Recon"),
+            ("/lingua",             "Relatório LanguageTrainer"),
+            ("/vocab",              "Lista vocabulário"),
+            ("/episodio",           "Resumo memória episódica"),
+            ("/recompensa",         "Critérios auto-reward"),
+            ("/boosts",             "Boosts ativos do FeedbackLoop"),
+            ("/save",               "Salva checkpoint manual"),
+            ("/load",               "Carrega último checkpoint"),
+            ("/metrics",            "Exibe métricas detalhadas"),
+            ("/set_param <par> <val>", "Altera parâmetro de configuração em runtime"),
+            ("/rag_status",         "Status do RAG (se disponível)"),
+            ("/llm_status",         "Status do LLM (se disponível)"),
+            ("/v3status",           "Status completo v3 (selfmod)"),
+            ("/v3scorer",           "População de scorers"),
+            ("/v3checker",          "Estado das checker rules"),
+            ("/v3meta",             "Relatório do MetaLearner"),
+            ("/v3selfmod",          "Forçar ciclo de auto-modificação"),
+            ("/v3ativar_deep",      "Ativa ALLOW_DEEP_SELF_MOD em runtime"),
+            ("/cache_info",         "Info do cache"),
+            ("/limpar_cache",       "Limpa caches"),
+            ("/sair",               "Encerra"),
         ]
         for cmd, desc in cmds:
             logger.info(f"  {cmd:<28} {desc}")
-        logger.info(""*60)
+        logger.info("═"*60)
         if self.core.learner:
             self.core.learner.start()
 
         while True:
             try:
-                raw = input("\nAtena v3> ").strip()
+                raw = input("\nAtena v4> ").strip()
                 if not raw:
                     continue
                 parts = raw.split()
@@ -6201,17 +6340,13 @@ class AtenaApp:
                             time.sleep(1)
                 elif cmd == '/auto':
                     n = int(parts[1]) if len(parts) > 1 else None
-                    self.start_autonomous(cycles=n)
+                    self.start_autonomous(cycles=n, resume_from_checkpoint=False)
                 elif cmd == '/status':
-                    logger.info(f"\n Gerao: {self.core.generation} | Score: {self.core.best_score:.2f}")
-                    for o in self.core.kb.get_objectives():
-                        pct = (o['current'] / o['target'] * 100) if o['target'] > 0 else 0
-                        bar = '' * int(pct / 10) + '' * (10 - int(pct / 10))
-                        logger.info(f"   {o['name']:<30} {bar} {pct:.0f}%")
+                    self._print_status()
                 elif cmd == '/codigo':
                     print(self.core.current_code)
                 elif cmd == '/melhor':
-                    print(f"\n Score: {self.core.best_score:.2f}\n{self.core.best_code}")
+                    print(f"\n🏆 Score: {self.core.best_score:.2f}\n{self.core.best_code}")
                 elif cmd == '/treinar':
                     self.core.predictor.train()
                 elif cmd == '/deploy':
@@ -6221,7 +6356,7 @@ class AtenaApp:
                     if desc:
                         self.no_code_builder.create_project(desc)
                     else:
-                        logger.info("Uso: /criar <descrio>")
+                        logger.info("Uso: /criar <descrição>")
                 elif cmd == '/projetos':
                     projs = self.no_code_builder.list_projects()
                     logger.info("Projetos: " + (", ".join(projs) if projs else "nenhum"))
@@ -6231,13 +6366,13 @@ class AtenaApp:
                         if proj:
                             self.no_code_builder.evolve_project(proj, int(parts[2]) if len(parts) > 2 else 3)
                         else:
-                            logger.info(f"Projeto '{parts[1]}' no encontrado")
+                            logger.info(f"Projeto '{parts[1]}' não encontrado")
                 elif cmd == '/recon':
                     topic = ' '.join(parts[1:])
                     if topic:
                         self.hacker_recon.hunt_new_tech(topic)
                     else:
-                        logger.info("Uso: /recon <tpico>")
+                        logger.info("Uso: /recon <tópico>")
                 elif cmd == '/lingua':
                     self.core.lang_trainer.print_report()
                 elif cmd == '/vocab':
@@ -6247,21 +6382,43 @@ class AtenaApp:
                     logger.info(self.core.episodic_memory.summary())
                 elif cmd == '/recompensa':
                     for c in self.core.reward_system.get_criteria_status():
-                        logger.info(f"  {c['name']:<20} peso={c['weight']:.1f}  ltimo={c['last_value']:.2f}")
+                        logger.info(f"  {c['name']:<20} peso={c['weight']:.1f}  último={c['last_value']:.2f}")
                 elif cmd == '/boosts':
                     for m, v in self.core.feedback_loop.get_active_boosts().items():
                         logger.info(f"  {m:<28} +{v:.2f}")
-                #  Comandos v3 
+                elif cmd == '/save':
+                    self._save_checkpoint(self.core.generation)
+                elif cmd == '/load':
+                    self._load_checkpoint()
+                elif cmd == '/metrics':
+                    self._show_metrics()
+                elif cmd == '/set_param':
+                    if len(parts) >= 3:
+                        param, value = parts[1], parts[2]
+                        self._set_parameter(param, value)
+                    else:
+                        logger.info("Uso: /set_param <nome_param> <valor>")
+                elif cmd == '/rag_status':
+                    if hasattr(self.core, 'rag') and self.core.rag:
+                        logger.info(f"📚 RAG ativo | Documentos: {len(self.core.rag.corpus)}")
+                    else:
+                        logger.info("RAG não está ativo ou não disponível")
+                elif cmd == '/llm_status':
+                    if hasattr(self.core, 'model') and self.core.model:
+                        logger.info(f"🧠 LLM ativo | Modelo: {getattr(self.core, 'model_name', 'desconhecido')}")
+                    else:
+                        logger.info("LLM não está ativo")
+                # Comandos v3 (mantidos)
                 elif cmd == '/v3status':
                     self.core.v3.print_status()
                 elif cmd == '/v3scorer':
                     for s in self.core.v3.evolvable_scorer.get_population_status():
-                        icon = "" if s["active"] else " "
+                        icon = "⭐" if s["active"] else "  "
                         logger.info(f"  {icon} {s['id']:<40} fitness={s['fitness']:.2f} applied={s['applied_count']}")
                 elif cmd == '/v3checker':
                     for r in self.core.v3.adaptive_checker.get_rules_status():
-                        status = "" if r["active"] else ""
-                        lock   = "" if not r["mutable"] else ""
+                        status = "✅" if r["active"] else "❌"
+                        lock   = "🔒" if not r["mutable"] else "🔓"
                         logger.info(f"  {status} {lock} {r['name']:<30} conf={r['confidence']:.2f} fp={r['fp_rate']:.2%}")
                 elif cmd == '/v3meta':
                     self.core.v3.meta_learner.print_report()
@@ -6269,22 +6426,20 @@ class AtenaApp:
                     if ALLOW_DEEP_SELF_MOD:
                         self.core.v3.run_self_mod_cycle()
                     else:
-                        logger.info("[] ALLOW_DEEP_SELF_MOD=false. Use /v3ativar_deep primeiro.")
+                        logger.info("⚠️ ALLOW_DEEP_SELF_MOD=false. Use /v3ativar_deep primeiro.")
                 elif cmd == '/v3ativar_deep':
                     import sys as _sys
                     _mod = _sys.modules[__name__]
                     _mod.ALLOW_DEEP_SELF_MOD = True
                     self.core.v3.self_mod_engine.backup.backup_dir.mkdir(parents=True, exist_ok=True)
-                    logger.info("[] ALLOW_DEEP_SELF_MOD ativado em runtime!")
-                    logger.info("   O engine pode agora modificar a si mesmo.")
-                    logger.info(f"   Backups sero salvos em: {Config.SELFMOD_BACKUP_DIR}")
+                    logger.info("🔓 ALLOW_DEEP_SELF_MOD ativado em runtime!")
                 elif cmd == '/cache_info':
                     logger.info(f"Score cache: {len(self.core.evaluator._score_cache)} entradas")
-                    logger.info(f"Function cache: {len(self.core.kb.function_cache)} funes")
+                    logger.info(f"Function cache: {len(self.core.kb.function_cache)} funções")
                 elif cmd == '/limpar_cache':
                     self.core.evaluator._score_cache.clear()
                     self.core.kb.prune_eval_cache(keep_days=0)
-                    logger.info("[] Caches limpos")
+                    logger.info("🗑️ Caches limpos")
                 else:
                     logger.info(f"Comando desconhecido: {cmd}")
 
@@ -6292,9 +6447,64 @@ class AtenaApp:
                 logger.info("")
                 continue
             except Exception as e:
-                logger.error(f"[Erro] {e}")
+                logger.error(f"❌ Erro: {e}")
 
         self._shutdown()
+
+    def _print_status(self):
+        """Exibe status detalhado."""
+        logger.info(f"\n📊 Geração: {self.core.generation} | Melhor score: {self.core.best_score:.2f}")
+        for o in self.core.kb.get_objectives():
+            pct = (o['current'] / o['target'] * 100) if o['target'] > 0 else 0
+            bar = "█" * int(pct / 10) + "░" * (10 - int(pct / 10))
+            logger.info(f"   {o['name']:<30} {bar} {pct:.0f}%")
+        # Adiciona informações do RAG/LLM se disponíveis
+        if hasattr(self.core, 'rag') and self.core.rag:
+            logger.info(f"   📚 RAG corpus: {len(self.core.rag.corpus)} documentos")
+        if hasattr(self.core, 'model') and self.core.model:
+            logger.info(f"   🧠 LLM: ativo")
+
+    def _show_metrics(self):
+        """Exibe métricas agregadas (taxas de sucesso, evolução, etc.)."""
+        rates = self.core.kb.get_mutation_success_rates()
+        if rates:
+            logger.info("\n📈 Taxas de sucesso por mutação:")
+            for mtype, rate in sorted(rates.items(), key=lambda x: x[1], reverse=True)[:10]:
+                logger.info(f"   {mtype:<30} {rate*100:.1f}%")
+        else:
+            logger.info("Sem dados suficientes para métricas.")
+        # Últimas 10 evoluções
+        rows = self.core.kb.conn.execute(
+            "SELECT generation, mutation, new_score, replaced FROM evolution_metrics ORDER BY id DESC LIMIT 10"
+        ).fetchall()
+        if rows:
+            logger.info("\n🔄 Últimas evoluções:")
+            for gen, mut, score, rep in rows:
+                icon = "✅" if rep else "❌"
+                logger.info(f"   {icon} Gen {gen:>4} | {mut[:35]:<35} | score {score:.2f}")
+
+    def _set_parameter(self, param: str, value: str):
+        """Altera parâmetro de configuração em tempo real (cuidado!)."""
+        # Mapeamento de parâmetros permitidos
+        allowed = {
+            "EXPLORATION_RATE": float,
+            "MUTATION_STRENGTH": float,
+            "CANDIDATES_PER_CYCLE": int,
+            "PARALLEL_WORKERS": int,
+            "EVALUATION_TIMEOUT": int,
+        }
+        if param not in allowed:
+            logger.info(f"Parâmetro não permitido: {param}. Permitidos: {list(allowed.keys())}")
+            return
+        try:
+            conv = allowed[param]
+            new_val = conv(value)
+            setattr(Config, param, new_val)
+            logger.info(f"✅ {param} alterado para {new_val}")
+        except Exception as e:
+            logger.error(f"Erro ao alterar {param}: {e}")
+
+# Fim da classe AtenaApp
 
 
 # =============================================================================

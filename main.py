@@ -775,12 +775,22 @@ class KnowledgeBase:
         except Exception as e:
             logger.debug(f"Erro ao gerar embedding para consulta: {e}")
             return []
-        sims = []
-        for code, emb, purpose in self.function_cache:
-            sim = float(np.dot(q_emb, emb) / (np.linalg.norm(q_emb) * np.linalg.norm(emb) + 1e-8))
-            sims.append((sim, code, purpose))
-        sims.sort(reverse=True)
-        return [(c, s, p) for s, c, p in sims[:top_n] if s > 0.5]
+        # Otimização O(n) -> Operação Vetorizada com NumPy
+        codes, embs, purposes = zip(*self.function_cache)
+        embs_matrix = np.array(embs)
+        
+        # Cálculo de Similaridade de Cosseno em lote
+        norm_q = np.linalg.norm(q_emb)
+        norm_m = np.linalg.norm(embs_matrix, axis=1)
+        similarities = np.dot(embs_matrix, q_emb) / (norm_q * norm_m + 1e-8)
+        
+        # Filtragem e ordenação eficiente
+        results = []
+        for i in np.where(similarities > 0.5)[0]:
+            results.append((codes[i], float(similarities[i]), purposes[i]))
+        
+        results.sort(key=lambda x: x[1], reverse=True)
+        return results[:top_n]
 
     def get_function_by_purpose(self, keywords: List[str]) -> Optional[Tuple[str, str]]:
         """Retorna uma funo aleatria que corresponda a palavras-chave."""

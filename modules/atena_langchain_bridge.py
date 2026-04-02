@@ -7,31 +7,31 @@ from langgraph.graph import StateGraph, END
 from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
 
-# Importações dos componentes da Atena (ajuste os caminhos conforme sua estrutura)
+# Importaes dos componentes da Atena (ajuste os caminhos conforme sua estrutura)
 from atena_engine import AtenaCore, Config, MutationEngine, CodeEvaluator, Sandbox, EvolvableScorer
 from atena_engine import KnowledgeBase, AdaptiveChecker, MetaLearner
 
-# Configuração de logging
+# Configurao de logging
 logger = logging.getLogger("atena.langgraph")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s - %(message)s")
 
 # =============================================================================
-# 1. DEFINIÇÃO DO ESTADO (compatível com atena_state.json)
+# 1. DEFINIO DO ESTADO (compatvel com atena_state.json)
 # =============================================================================
 class AtenaState(TypedDict):
-    """Estado completo da evolução, mantido pelo LangGraph."""
-    messages: Annotated[Sequence[BaseMessage], operator.add]   # histórico de mensagens
-    generation: int                                             # geração atual
-    current_code: str                                           # código sendo evoluído
-    best_code: str                                              # melhor código até agora
+    """Estado completo da evoluo, mantido pelo LangGraph."""
+    messages: Annotated[Sequence[BaseMessage], operator.add]   # histrico de mensagens
+    generation: int                                             # gerao atual
+    current_code: str                                           # cdigo sendo evoludo
+    best_code: str                                              # melhor cdigo at agora
     best_score: float                                           # melhor score
     problem_name: Optional[str]                                 # nome do problema (se houver)
-    problem_description: Optional[str]                          # descrição do problema
-    mutation_history: List[Dict[str, Any]]                      # histórico de mutações aplicadas
-    last_mutation: Optional[str]                                # última mutação aplicada
-    last_score: float                                           # score da última avaliação
-    replaced: bool                                              # se a mutação foi aceita
-    error: Optional[str]                                        # último erro, se houver
+    problem_description: Optional[str]                          # descrio do problema
+    mutation_history: List[Dict[str, Any]]                      # histrico de mutaes aplicadas
+    last_mutation: Optional[str]                                # ltima mutao aplicada
+    last_score: float                                           # score da ltima avaliao
+    replaced: bool                                              # se a mutao foi aceita
+    error: Optional[str]                                        # ltimo erro, se houver
 
 # =============================================================================
 # 2. FERRAMENTAS LANGCHAIN QUE CHAMAM OS COMPONENTES DA ATENA
@@ -39,8 +39,8 @@ class AtenaState(TypedDict):
 @tool
 def mutate_code(code: str, mutation_type: str, core: AtenaCore) -> str:
     """
-    Aplica uma mutação ao código usando o MutationEngine da Atena.
-    Retorna o código mutado ou uma mensagem de erro.
+    Aplica uma mutao ao cdigo usando o MutationEngine da Atena.
+    Retorna o cdigo mutado ou uma mensagem de erro.
     """
     try:
         mutated, description = core.mutation_engine.mutate(code, mutation_type)
@@ -48,15 +48,15 @@ def mutate_code(code: str, mutation_type: str, core: AtenaCore) -> str:
             logger.info(f"Mutacao '{mutation_type}' aplicada: {description}")
             return mutated
         else:
-            return code  # mutação não alterou
+            return code  # mutao no alterou
     except Exception as e:
-        logger.error(f"Erro na mutação {mutation_type}: {e}")
+        logger.error(f"Erro na mutao {mutation_type}: {e}")
         return code
 
 @tool
 def evaluate_in_sandbox(code: str, core: AtenaCore) -> Dict[str, Any]:
     """
-    Avalia o código no sandbox da Atena e retorna um dicionário com score e detalhes.
+    Avalia o cdigo no sandbox da Atena e retorna um dicionrio com score e detalhes.
     """
     try:
         metrics = core.evaluator.evaluate(code, original_code=core.current_code)
@@ -71,29 +71,29 @@ def evaluate_in_sandbox(code: str, core: AtenaCore) -> Dict[str, Any]:
             "lines": metrics.get("lines", 0),
         }
     except Exception as e:
-        logger.error(f"Erro na avaliação: {e}")
+        logger.error(f"Erro na avaliao: {e}")
         return {"score": 0.0, "error": str(e)}
 
 # =============================================================================
-# 3. NÓS DO GRAFO
+# 3. NS DO GRAFO
 # =============================================================================
 def think_node(state: AtenaState, core: AtenaCore) -> Dict[str, Any]:
     """
-    Nó de pensamento: decide qual mutação aplicar a seguir.
-    Pode usar um LLM (ex: local LM ou Grok) para sugerir uma mutação baseada no contexto.
+    N de pensamento: decide qual mutao aplicar a seguir.
+    Pode usar um LLM (ex: local LM ou Grok) para sugerir uma mutao baseada no contexto.
     """
-    # Se houver um modelo de linguagem local, use-o para escolher a mutação
+    # Se houver um modelo de linguagem local, use-o para escolher a mutao
     if hasattr(core, 'local_lm') and core.local_lm:
         prompt = f"""
-        Atualmente temos um código com score {state['best_score']:.2f}.
+        Atualmente temos um cdigo com score {state['best_score']:.2f}.
         Problema: {state.get('problem_name', 'Nenhum')}
-        Deseja-se melhorar o código.
-        Que tipo de mutação seria mais promissora? Responda apenas com o nome da mutação.
-        Tipos disponíveis: {core.mutation_engine.mutation_types}
+        Deseja-se melhorar o cdigo.
+        Que tipo de mutao seria mais promissora? Responda apenas com o nome da mutao.
+        Tipos disponveis: {core.mutation_engine.mutation_types}
         """
         try:
             suggestion = core.local_lm.generate(prompt, max_new_tokens=20)
-            # Limpa a resposta para conter apenas o nome da mutação
+            # Limpa a resposta para conter apenas o nome da mutao
             mutation_type = suggestion.strip().split()[0] if suggestion else None
             if mutation_type in core.mutation_engine.mutation_types:
                 chosen = mutation_type
@@ -105,9 +105,9 @@ def think_node(state: AtenaState, core: AtenaCore) -> Dict[str, Any]:
     else:
         chosen = random.choice(core.mutation_engine.mutation_types)
 
-    logger.info(f"Nó think: escolheu mutação '{chosen}'")
-    # Registra a decisão como uma mensagem
-    msg = HumanMessage(content=f"Vou aplicar a mutação: {chosen}")
+    logger.info(f"N think: escolheu mutao '{chosen}'")
+    # Registra a deciso como uma mensagem
+    msg = HumanMessage(content=f"Vou aplicar a mutao: {chosen}")
     return {
         "messages": [msg],
         "last_mutation": chosen,
@@ -116,11 +116,11 @@ def think_node(state: AtenaState, core: AtenaCore) -> Dict[str, Any]:
 
 def mutate_node(state: AtenaState, core: AtenaCore) -> Dict[str, Any]:
     """
-    Nó de mutação: aplica a mutação escolhida ao código.
+    N de mutao: aplica a mutao escolhida ao cdigo.
     """
     mutation_type = state.get("last_mutation")
     if not mutation_type:
-        return {"error": "Nenhuma mutação escolhida"}
+        return {"error": "Nenhuma mutao escolhida"}
 
     mutated = mutate_code.invoke({
         "code": state["current_code"],
@@ -128,32 +128,32 @@ def mutate_node(state: AtenaState, core: AtenaCore) -> Dict[str, Any]:
         "core": core,
     })
     if mutated == state["current_code"]:
-        return {"error": f"Falha na mutação '{mutation_type}' (nenhuma alteração)"}
+        return {"error": f"Falha na mutao '{mutation_type}' (nenhuma alterao)"}
     else:
-        logger.info(f"Nó mutate: código mutado com sucesso")
+        logger.info(f"N mutate: cdigo mutado com sucesso")
         return {"current_code": mutated, "error": None}
 
 def test_node(state: AtenaState, core: AtenaCore) -> Dict[str, Any]:
     """
-    Nó de teste: avalia o código mutado no sandbox e atualiza o estado.
+    N de teste: avalia o cdigo mutado no sandbox e atualiza o estado.
     """
     code = state["current_code"]
     evaluation = evaluate_in_sandbox.invoke({"code": code, "core": core})
     score = evaluation.get("score", 0.0)
     valid = evaluation.get("valid", False)
 
-    # Atualiza o melhor código se necessário
+    # Atualiza o melhor cdigo se necessrio
     replaced = False
     if valid and score > state["best_score"] + Config.MIN_IMPROVEMENT_DELTA:
         replaced = True
         best_code = code
         best_score = score
-        logger.info(f"Nó test: nova melhor pontuação {score:.2f} (antes {state['best_score']:.2f})")
+        logger.info(f"N test: nova melhor pontuao {score:.2f} (antes {state['best_score']:.2f})")
     else:
         best_code = state["best_code"]
         best_score = state["best_score"]
 
-    # Registra o episódio na memória episódica (se disponível)
+    # Registra o episdio na memria episdica (se disponvel)
     if hasattr(core, 'episodic_memory'):
         core.episodic_memory.record(
             generation=state["generation"] + 1,
@@ -164,7 +164,7 @@ def test_node(state: AtenaState, core: AtenaCore) -> Dict[str, Any]:
             code_snapshot=code[:500],
         )
 
-    # Registra métricas no banco de conhecimento
+    # Registra mtricas no banco de conhecimento
     core.kb.record_evolution(
         generation=state["generation"] + 1,
         mutation=state.get("last_mutation", "none"),
@@ -188,29 +188,29 @@ def test_node(state: AtenaState, core: AtenaCore) -> Dict[str, Any]:
 def should_continue(state: AtenaState) -> str:
     """
     Decide se o grafo deve continuar evoluindo ou terminar.
-    Condição: se o score melhorou e ainda não atingimos o limite de gerações,
-    podemos continuar; caso contrário, paramos.
+    Condio: se o score melhorou e ainda no atingimos o limite de geraes,
+    podemos continuar; caso contrrio, paramos.
     """
-    # Aqui você pode adicionar uma condição mais sofisticada, como:
-    # - número máximo de gerações
+    # Aqui voc pode adicionar uma condio mais sofisticada, como:
+    # - nmero mximo de geraes
     # - score acima de um limiar
-    # - estagnação por várias gerações
-    if state.get("replaced", False) and state["best_score"] < 95.0:  # ex: 95 é o alvo
+    # - estagnao por vrias geraes
+    if state.get("replaced", False) and state["best_score"] < 95.0:  # ex: 95  o alvo
         return "mutate"   # continua tentando
     else:
         return END
 
 # =============================================================================
-# 4. CONSTRUÇÃO DO GRAFO
+# 4. CONSTRUO DO GRAFO
 # =============================================================================
 def create_atena_graph(core: AtenaCore) -> StateGraph:
     """
-    Cria o grafo LangGraph que orquestra o ciclo de evolução.
+    Cria o grafo LangGraph que orquestra o ciclo de evoluo.
     """
     # Inicializa o grafo com o estado definido
     graph = StateGraph(AtenaState)
 
-    # Adiciona nós (cada nó recebe o core como argumento via closure)
+    # Adiciona ns (cada n recebe o core como argumento via closure)
     graph.add_node("think", lambda state: think_node(state, core))
     graph.add_node("mutate", lambda state: mutate_node(state, core))
     graph.add_node("test", lambda state: test_node(state, core))
@@ -218,7 +218,7 @@ def create_atena_graph(core: AtenaCore) -> StateGraph:
     # Define o ponto de entrada
     graph.set_entry_point("think")
 
-    # Conecta os nós
+    # Conecta os ns
     graph.add_edge("think", "mutate")
     graph.add_edge("mutate", "test")
     graph.add_conditional_edges("test", should_continue)
@@ -227,10 +227,10 @@ def create_atena_graph(core: AtenaCore) -> StateGraph:
     return graph.compile()
 
 # =============================================================================
-# 5. FUNÇÃO PRINCIPAL (exemplo de uso)
+# 5. FUNO PRINCIPAL (exemplo de uso)
 # =============================================================================
 if __name__ == "__main__":
-    # Cria uma instância do AtenaCore (pode passar um problema opcional)
+    # Cria uma instncia do AtenaCore (pode passar um problema opcional)
     core = AtenaCore()
 
     # Inicializa o estado inicial
@@ -252,10 +252,10 @@ if __name__ == "__main__":
     # Cria o grafo
     app = create_atena_graph(core)
 
-    # Executa o grafo (pode ser assíncrono ou síncrono)
-    # Aqui usamos .invoke() síncrono
+    # Executa o grafo (pode ser assncrono ou sncrono)
+    # Aqui usamos .invoke() sncrono
     final_state = app.invoke(initial_state)
 
     # Exibe o resultado
-    logger.info(f"Evolução concluída. Melhor score: {final_state['best_score']:.2f}")
-    logger.info(f"Código final:\n{final_state['best_code']}")
+    logger.info(f"Evoluo concluda. Melhor score: {final_state['best_score']:.2f}")
+    logger.info(f"Cdigo final:\n{final_state['best_code']}")

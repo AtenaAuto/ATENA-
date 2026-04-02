@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-
                 ATENA NEURAL v4.0 - ULTIMATE EDITION                         
   LLM 4-bit | PEFT (LoRA/AdaLoRA/IA3) | Hybrid RAG + Re-ranker               
   Contrastive Decoding | CodeBLEU | Distillation | MLflow | Optuna          
-
 """
 
 import os
@@ -23,18 +21,32 @@ import hashlib
 import pickle
 import re
 import ast
+import math                      # <-- ADICIONADO (usado em diverse_beam_search)
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any, Callable
 from dataclasses import dataclass, field, asdict
 from collections import defaultdict, deque
 
 # =============================================================================
-# 1. CONFIGURAO ULTRA (com suporte a todas as novidades)
+# IMPORTAÇÕES OBRIGATÓRIAS PARA O MÓDULO (TORCH É ESSENCIAL)
+# =============================================================================
+try:
+    import torch
+    import torch.nn.functional as F
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+    # Se não houver torch, o motor ultimate não funcionará corretamente.
+    # A classe AdvancedGenerator será substituída por um fallback simples.
+    logging.warning("PyTorch não está instalado. O motor ultimate terá funcionalidade reduzida.")
+
+# =============================================================================
+# 1. CONFIGURAÇÃO ULTRA (com suporte a todas as novidades)
 # =============================================================================
 
 @dataclass
 class UltraConfig:
-    # Diretrios
+    # Diretórios
     BASE_DIR: Path = Path("./atena_evolution")
     MODEL_DIR: Path = BASE_DIR / "models"
     CACHE_DIR: Path = BASE_DIR / "cache"
@@ -52,14 +64,14 @@ class UltraConfig:
     lora_r: int = 16
     lora_alpha: int = 32
     
-    # RAG hbrido
+    # RAG híbrido
     use_rag: bool = True
     rag_dense_model: str = "BAAI/bge-small-en-v1.5"
     rag_use_bm25: bool = True
     rag_reranker: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     rag_top_k: int = 5
     
-    # Decodificao avanada
+    # Decodificação avançada
     decoding_strategy: str = "contrastive"  # contrastive, typical, diverse_beam
     temperature: float = 0.8
     top_p: float = 0.95
@@ -68,7 +80,7 @@ class UltraConfig:
     num_beams: int = 5
     diversity_penalty: float = 0.6
     
-    # Avaliao
+    # Avaliação
     evaluate_codebleu: bool = True
     evaluate_pass_at_k: int = 3
     sandbox_type: str = "docker"  # docker, nsjail, subprocess
@@ -83,7 +95,7 @@ class UltraConfig:
     use_wandb: bool = False
     mlflow_experiment: str = "atena_neural"
     
-    # Otimizao
+    # Otimização
     use_optuna: bool = True
     optuna_n_trials: int = 20
     
@@ -158,7 +170,7 @@ class SecureSandbox:
             os.unlink(fname)
 
 # =============================================================================
-# 3. RAG HBRIDO COM RE-RANKER (Dense + BM25 + Cross-encoder)
+# 3. RAG HÍBRIDO COM RE-RANKER (Dense + BM25 + Cross-encoder)
 # =============================================================================
 
 class HybridRAG:
@@ -167,6 +179,7 @@ class HybridRAG:
         self.bm25 = None
         self.reranker = None
         self.corpus = []
+        self.has_reranker = False
         self._init_dense()
         self._init_reranker()
     
@@ -175,17 +188,18 @@ class HybridRAG:
             from sentence_transformers import SentenceTransformer
             self.dense = SentenceTransformer(cfg.rag_dense_model)
         except ImportError:
-            logging.warning("sentence-transformers no instalado")
+            logging.warning("sentence-transformers não instalado")
     
     def _init_reranker(self):
-        if cfg.rag_reranker:
+        if cfg.rag_reranker and HAS_TORCH:
             try:
                 from transformers import AutoModelForSequenceClassification, AutoTokenizer
                 self.reranker_model = AutoModelForSequenceClassification.from_pretrained(cfg.rag_reranker)
                 self.reranker_tokenizer = AutoTokenizer.from_pretrained(cfg.rag_reranker)
                 self.reranker_model.eval()
                 self.has_reranker = True
-            except:
+            except Exception as e:
+                logging.warning(f"Erro ao carregar reranker: {e}")
                 self.has_reranker = False
     
     def add_documents(self, docs: List[str]):
@@ -193,9 +207,13 @@ class HybridRAG:
         if self.dense:
             self.dense_emb = self.dense.encode(docs, show_progress_bar=False)
         if cfg.rag_use_bm25:
-            from rank_bm25 import BM25Okapi
-            tokenized = [doc.split() for doc in self.corpus]
-            self.bm25 = BM25Okapi(tokenized)
+            try:
+                from rank_bm25 import BM25Okapi
+                tokenized = [doc.split() for doc in self.corpus]
+                self.bm25 = BM25Okapi(tokenized)
+            except ImportError:
+                logging.warning("rank_bm25 não instalado, desabilitando BM25")
+                self.bm25 = None
     
     def retrieve(self, query: str, top_k: int = None) -> List[Tuple[str, float]]:
         top_k = top_k or cfg.rag_top_k
@@ -210,18 +228,18 @@ class HybridRAG:
             dense_scores = list(enumerate(dense_scores))
         # BM25
         sparse_scores = []
-        if self.bm25:
+        if hasattr(self, 'bm25') and self.bm25:
             bm25_scores = self.bm25.get_scores(query.split())
             sparse_scores = list(enumerate(bm25_scores))
-        # Fuso hbrida (reciprocal rank fusion)
+        # Fusão híbrida (reciprocal rank fusion)
         scores = {}
         for idx, score in dense_scores:
             scores[idx] = scores.get(idx, 0) + 1.0 / (1 + score)  # RRF
         for idx, score in sparse_scores:
             scores[idx] = scores.get(idx, 0) + 1.0 / (1 + score)
         candidates = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:top_k*2]
-        # Re-ranking com cross-encoder
-        if self.has_reranker and candidates:
+        # Re-ranking com cross-encoder (requer torch)
+        if self.has_reranker and candidates and HAS_TORCH:
             pairs = [(query, self.corpus[idx]) for idx, _ in candidates]
             inputs = self.reranker_tokenizer(pairs, padding=True, truncation=True, return_tensors="pt", max_length=512)
             with torch.no_grad():
@@ -231,11 +249,13 @@ class HybridRAG:
         return [(self.corpus[idx], score) for idx, score in candidates[:top_k]]
 
 # =============================================================================
-# 4. GERADOR COM DECODIFICAO AVANADA (Contrastive, Typical, Diverse Beam)
+# 4. GERADOR COM DECODIFICAÇÃO AVANÇADA (Contrastive, Typical, Diverse Beam)
 # =============================================================================
 
 class AdvancedGenerator:
     def __init__(self, model, tokenizer):
+        if not HAS_TORCH:
+            raise RuntimeError("PyTorch é necessário para o AdvancedGenerator")
         self.model = model
         self.tokenizer = tokenizer
     
@@ -260,7 +280,6 @@ class AdvancedGenerator:
         return self.tokenizer.decode(output[0], skip_special_tokens=True)
     
     def _contrastive_decoding(self, input_ids, max_new_tokens):
-        # Simula amateur com alta temperatura
         for _ in range(max_new_tokens):
             logits = self.model(input_ids).logits[0, -1, :]
             amateur_logits = logits / 2.0
@@ -317,7 +336,7 @@ class AdvancedGenerator:
         return min(beams, key=lambda x: x[1])[0]
 
 # =============================================================================
-# 5. AVALIAO AVANADA (CodeBLEU, pass@k, segurana)
+# 5. AVALIAÇÃO AVANÇADA (CodeBLEU, pass@k, segurança)
 # =============================================================================
 
 class CodeEvaluator:
@@ -331,8 +350,11 @@ class CodeEvaluator:
             return result['codebleu']
         except ImportError:
             # fallback BLEU simples
-            from nltk.translate.bleu_score import sentence_bleu
-            return sentence_bleu([reference.split()], generated.split())
+            try:
+                from nltk.translate.bleu_score import sentence_bleu
+                return sentence_bleu([reference.split()], generated.split())
+            except ImportError:
+                return 0.0
     
     def evaluate_pass_at_k(self, code: str, test_cases: List[Tuple[str, str]], k: int = None) -> float:
         k = k or cfg.evaluate_pass_at_k
@@ -357,24 +379,30 @@ class CodeEvaluator:
 # =============================================================================
 
 class AtenaUltimateCore:
-    def __init__(self):
+    def __init__(self, problem=None):
         self.cfg = cfg
+        self.problem = problem  # compatibilidade com o core original
         self._init_llm()
         self._init_rag()
         self.evaluator = CodeEvaluator()
-        self.generator = AdvancedGenerator(self.model, self.tokenizer) if cfg.use_llm else None
+        if cfg.use_llm and HAS_TORCH and self.model is not None:
+            self.generator = AdvancedGenerator(self.model, self.tokenizer)
+        else:
+            self.generator = None
         self.kb = self._init_kb()
         self.mutation_engine = self._init_mutation_engine()
         self.current_code = self._load_current_code()
         self.best_score = self._evaluate(self.current_code)["score"]
         self.generation = 0
+        # Atributos para compatibilidade com o sistema original
+        self.original_code = self.current_code
+        self.engine_path = cfg.BASE_DIR / "code" / "atena_engine.py"
     
     def _init_llm(self):
-        if not cfg.use_llm:
+        if not cfg.use_llm or not HAS_TORCH:
             self.model = None
             self.tokenizer = None
             return
-        import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
         
         quantization_config = None
@@ -383,42 +411,64 @@ class AtenaUltimateCore:
         elif cfg.llm_quantization == "8bit":
             quantization_config = BitsAndBytesConfig(load_in_8bit=True)
         
-        self.model = AutoModelForCausalLM.from_pretrained(
-            cfg.llm_model_name,
-            quantization_config=quantization_config,
-            device_map=cfg.llm_device,
-            trust_remote_code=True
-        )
-        self.tokenizer = AutoTokenizer.from_pretrained(cfg.llm_model_name, trust_remote_code=True)
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-        
-        if cfg.use_peft:
-            self._apply_peft()
-        
-        self.model.eval()
+        try:
+            self.model = AutoModelForCausalLM.from_pretrained(
+                cfg.llm_model_name,
+                quantization_config=quantization_config,
+                device_map=cfg.llm_device,
+                trust_remote_code=True
+            )
+            self.tokenizer = AutoTokenizer.from_pretrained(cfg.llm_model_name, trust_remote_code=True)
+            if self.tokenizer.pad_token is None:
+                self.tokenizer.pad_token = self.tokenizer.eos_token
+            
+            if cfg.use_peft:
+                self._apply_peft()
+            
+            self.model.eval()
+        except Exception as e:
+            logging.error(f"Falha ao carregar modelo LLM: {e}")
+            self.model = None
+            self.tokenizer = None
     
     def _apply_peft(self):
-        from peft import LoraConfig, AdaLoraConfig, IA3Config, get_peft_model, TaskType
-        if cfg.peft_method == "lora":
-            config = LoraConfig(task_type=TaskType.CAUSAL_LM, r=cfg.lora_r, lora_alpha=cfg.lora_alpha, target_modules=["q_proj", "v_proj"])
-        elif cfg.peft_method == "adalora":
-            config = AdaLoraConfig(task_type=TaskType.CAUSAL_LM, r=cfg.lora_r, lora_alpha=cfg.lora_alpha, target_r=4)
-        elif cfg.peft_method == "ia3":
-            config = IA3Config(task_type=TaskType.CAUSAL_LM, target_modules=["k_proj", "v_proj", "q_proj"])
-        else:
-            return
-        self.model = get_peft_model(self.model, config)
-        logging.info(f"PEFT {cfg.peft_method} aplicado")
+        try:
+            from peft import LoraConfig, AdaLoraConfig, IA3Config, get_peft_model, TaskType
+            if cfg.peft_method == "lora":
+                config = LoraConfig(task_type=TaskType.CAUSAL_LM, r=cfg.lora_r, lora_alpha=cfg.lora_alpha, target_modules=["q_proj", "v_proj"])
+            elif cfg.peft_method == "adalora":
+                config = AdaLoraConfig(task_type=TaskType.CAUSAL_LM, r=cfg.lora_r, lora_alpha=cfg.lora_alpha, target_r=4)
+            elif cfg.peft_method == "ia3":
+                config = IA3Config(task_type=TaskType.CAUSAL_LM, target_modules=["k_proj", "v_proj", "q_proj"])
+            else:
+                return
+            self.model = get_peft_model(self.model, config)
+            logging.info(f"PEFT {cfg.peft_method} aplicado")
+        except Exception as e:
+            logging.warning(f"Erro ao aplicar PEFT: {e}")
     
     def _init_rag(self):
         self.rag = HybridRAG() if cfg.use_rag else None
         if self.rag:
-            # Carrega corpus do banco de conhecimento existente
-            self.rag.add_documents(["def exemplo(): pass"])  # placeholder
+            # Tenta carregar conhecimento existente do banco SQLite
+            try:
+                kb_path = cfg.BASE_DIR / "knowledge.db"
+                if kb_path.exists():
+                    conn = sqlite3.connect(str(kb_path))
+                    cursor = conn.execute("SELECT code FROM learned_functions LIMIT 100")
+                    docs = [row[0] for row in cursor.fetchall()]
+                    if docs:
+                        self.rag.add_documents(docs)
+                        logging.info(f"RAG populado com {len(docs)} documentos")
+                    conn.close()
+            except Exception as e:
+                logging.warning(f"Erro ao carregar documentos para RAG: {e}")
     
     def _init_kb(self):
-        conn = sqlite3.connect(cfg.BASE_DIR / "knowledge.db")
+        # Placeholder: pode ser expandido para conectar com o KnowledgeBase original
+        # Aqui retornamos um objeto dummy com uma conexão SQLite (para compatibilidade)
+        conn = sqlite3.connect(str(cfg.BASE_DIR / "knowledge.db"), check_same_thread=False)
+        conn.execute("PRAGMA journal_mode=WAL")
         return conn
     
     def _load_current_code(self) -> str:
@@ -428,22 +478,20 @@ class AtenaUltimateCore:
         return "def main():\n    print('Atena v4')\n"
     
     def _evaluate(self, code: str) -> Dict:
-        # Avaliao com CodeBLEU e segurana
-        score = 0.0
+        # Avaliação com CodeBLEU e segurança
         if not self.evaluator.security_scan(code):
             return {"score": 0.0, "valid": False, "security": False}
-        # Simula execuo e outras mtricas
+        # Executa no sandbox
         success, output, exec_time = self.evaluator.sandbox.execute(code)
         if not success:
             return {"score": 0.0, "valid": False, "runtime_error": output}
-        # Aqui voc pode usar um scorer evoluvel (como na v3)
-        # Por simplicidade, um scorer simples:
+        # Métricas simples (pode ser substituído pelo EvolvableScorer)
         lines = len(code.splitlines())
         score = min(100, max(0, 100 - lines/10 + exec_time*5))
         return {"score": round(score, 2), "valid": True, "lines": lines, "exec_time": exec_time}
     
     def _init_mutation_engine(self):
-        # Placeholder - poderia usar o MutationEngine original
+        # Placeholder - aqui você pode integrar com o MutationEngine original
         return None
     
     def generate_code(self, prompt: str) -> str:
@@ -462,31 +510,38 @@ class AtenaUltimateCore:
         if replaced:
             self.best_score = score
             self.current_code = new_code
-            (cfg.BASE_DIR / "code" / "atena_current.py").write_text(new_code)
+            code_file = cfg.BASE_DIR / "code" / "atena_current.py"
+            code_file.parent.mkdir(parents=True, exist_ok=True)
+            code_file.write_text(new_code)
         logging.info(f"Gen {self.generation}: score={score:.2f} best={self.best_score:.2f}")
         return {"generation": self.generation, "score": score, "replaced": replaced}
     
     def train_distillation(self, teacher_model_name: str):
-        if not cfg.use_distillation:
+        if not cfg.use_distillation or not HAS_TORCH:
             return
-        # Implementao simplificada - em produo seria mais robusta
-        from transformers import AutoModelForCausalLM, TrainingArguments, Trainer
-        teacher = AutoModelForCausalLM.from_pretrained(teacher_model_name, device_map="auto")
-        teacher.eval()
-        # ... loop de distillation ...
-        logging.info("Distillation concluda")
+        try:
+            from transformers import AutoModelForCausalLM
+            teacher = AutoModelForCausalLM.from_pretrained(teacher_model_name, device_map="auto")
+            teacher.eval()
+            # Aqui viria o loop de distillation
+            logging.info("Distillation concluída (placeholder)")
+        except Exception as e:
+            logging.warning(f"Erro na distillation: {e}")
 
 # =============================================================================
-# 7. INTEGRAO COM O SISTEMA ORIGINAL (patch)
+# 7. INTEGRAÇÃO COM O SISTEMA ORIGINAL (patch)
 # =============================================================================
 
 def patch_atena_core(original_core) -> AtenaUltimateCore:
-    """Substitui o core original pelo novo ultra-core mantendo compatibilidade."""
-    new_core = AtenaUltimateCore()
+    """
+    Substitui o core original pelo novo ultra-core mantendo compatibilidade.
+    Retorna a nova instância.
+    """
+    new_core = AtenaUltimateCore(problem=getattr(original_core, 'problem', None))
     # Copia atributos essenciais
     original_core.__class__ = type('PatchedCore', (original_core.__class__,), {})
     original_core.ultra = new_core
-    # Monkey patch dos mtodos principais
+    # Monkey patch dos métodos principais
     def evolve_one_cycle(self):
         return new_core.evolve_one_cycle()
     def generate_code(self, prompt):

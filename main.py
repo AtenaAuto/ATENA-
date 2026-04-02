@@ -76,6 +76,12 @@ try:
 except ImportError:
     HAS_CURIOSITY = False
 
+try:
+    from council_orchestrator import council
+    HAS_COUNCIL = True
+except ImportError:
+    HAS_COUNCIL = False
+
 # --- Bibliotecas opcionais com fallbacks ---
 try:
     import radon.complexity as radon_cc
@@ -5920,6 +5926,11 @@ class AtenaCore:
             else:
                 evolvable_score = self.v3.evolvable_scorer.compute(metrics)
                 blended = metrics["score"] * 0.7 + evolvable_score * 0.3
+                
+                # The Council: Orquestração Multi-Agente
+                if HAS_COUNCIL:
+                    council_vote = council.consensus_score(code, metrics)
+                    blended = blended * 0.8 + council_vote * 20.0 # Peso do conselho (escala 0-100)
             return code, desc, mtype, metrics, blended
 
         with concurrent.futures.ThreadPoolExecutor(

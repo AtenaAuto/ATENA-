@@ -28,7 +28,7 @@ from dataclasses import dataclass, field, asdict
 from collections import defaultdict, deque
 
 # =============================================================================
-# IMPORTAÇÕES OBRIGATÓRIAS PARA O MÓDULO (TORCH É ESSENCIAL)
+# IMPORTAES OBRIGATRIAS PARA O MDULO (TORCH  ESSENCIAL)
 # =============================================================================
 try:
     import torch
@@ -36,10 +36,10 @@ try:
     HAS_TORCH = True
 except ImportError:
     HAS_TORCH = False
-    logging.warning("PyTorch não está instalado. O motor ultimate terá funcionalidade reduzida.")
+    logging.warning("PyTorch no est instalado. O motor ultimate ter funcionalidade reduzida.")
 
 # =============================================================================
-# 1. CONFIGURAÇÃO ULTRA
+# 1. CONFIGURAO ULTRA
 # =============================================================================
 
 @dataclass
@@ -158,7 +158,7 @@ class SecureSandbox:
             os.unlink(fname)
 
 # =============================================================================
-# 3. RAG HÍBRIDO
+# 3. RAG HBRIDO
 # =============================================================================
 
 class HybridRAG:
@@ -176,7 +176,7 @@ class HybridRAG:
             from sentence_transformers import SentenceTransformer
             self.dense = SentenceTransformer(cfg.rag_dense_model)
         except ImportError:
-            logging.warning("sentence-transformers não instalado")
+            logging.warning("sentence-transformers no instalado")
     
     def _init_reranker(self):
         if cfg.rag_reranker and HAS_TORCH:
@@ -200,7 +200,7 @@ class HybridRAG:
                 tokenized = [doc.split() for doc in self.corpus]
                 self.bm25 = BM25Okapi(tokenized)
             except ImportError:
-                logging.warning("rank_bm25 não instalado, desabilitando BM25")
+                logging.warning("rank_bm25 no instalado, desabilitando BM25")
                 self.bm25 = None
     
     def retrieve(self, query: str, top_k: int = None) -> List[Tuple[str, float]]:
@@ -232,13 +232,13 @@ class HybridRAG:
         return [(self.corpus[idx], score) for idx, score in candidates[:top_k]]
 
 # =============================================================================
-# 4. GERADOR AVANÇADO
+# 4. GERADOR AVANADO
 # =============================================================================
 
 class AdvancedGenerator:
     def __init__(self, model, tokenizer):
         if not HAS_TORCH:
-            raise RuntimeError("PyTorch é necessário para o AdvancedGenerator")
+            raise RuntimeError("PyTorch  necessrio para o AdvancedGenerator")
         self.model = model
         self.tokenizer = tokenizer
     
@@ -318,7 +318,7 @@ class AdvancedGenerator:
         return min(beams, key=lambda x: x[1])[0]
 
 # =============================================================================
-# 5. AVALIADOR DE CÓDIGO
+# 5. AVALIADOR DE CDIGO
 # =============================================================================
 
 class CodeEvaluator:
@@ -371,7 +371,7 @@ class DummyMutationEngine:
         return []
 
 class DummyLearner:
-    """Substituto vazio para GitHubLearner (não faz nada)."""
+    """Substituto vazio para GitHubLearner (no faz nada)."""
     def start(self):
         pass
     def stop(self):
@@ -442,8 +442,8 @@ class AtenaUltimateCore:
         self.episodic_memory = DummyEpisodicMemory()
         self.reward_system = DummyRewardSystem()
         self.feedback_loop = DummyFeedbackLoop()
-        # O AtenaApp também acessa `self.v3` – vamos adicionar um dummy
-        self.v3 = None   # será ignorado, mas evita AttributeError
+        # O AtenaApp tambm acessa `self.v3`  vamos adicionar um dummy
+        self.v3 = None   # ser ignorado, mas evita AttributeError
         # ================================================================
 
     def _init_llm(self):
@@ -510,7 +510,7 @@ class AtenaUltimateCore:
                             self.rag.add_documents(docs)
                             logging.info(f"RAG populado com {len(docs)} documentos")
                     else:
-                        logging.info("Tabela 'learned_functions' ainda não existe. RAG aguardará.")
+                        logging.info("Tabela 'learned_functions' ainda no existe. RAG aguardar.")
                     conn.close()
             except Exception as e:
                 logging.warning(f"Erro ao carregar documentos para RAG: {e}")
@@ -564,12 +564,12 @@ class AtenaUltimateCore:
             from transformers import AutoModelForCausalLM
             teacher = AutoModelForCausalLM.from_pretrained(teacher_model_name, device_map="auto")
             teacher.eval()
-            logging.info("Distillation concluída (placeholder)")
+            logging.info("Distillation concluda (placeholder)")
         except Exception as e:
             logging.warning(f"Erro na distillation: {e}")
 
 # =============================================================================
-# 8. INTEGRAÇÃO COM O SISTEMA ORIGINAL (patch)
+# 8. INTEGRAO COM O SISTEMA ORIGINAL (patch)
 # =============================================================================
 
 def patch_atena_core(original_core) -> AtenaUltimateCore:

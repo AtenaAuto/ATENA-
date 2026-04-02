@@ -1,0 +1,1 @@
+import time\n\ndef sync_loop(agent, env):\n    print('🔱 NRS: Sincronizando picos neurais...')\n    while True:\n        spike = agent.get_spike()\n        if spike:\n            env.apply(spike)\n        time.sleep(0.001)

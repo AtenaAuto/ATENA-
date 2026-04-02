@@ -1,8 +1,8 @@
-name: 🧬 ATENA Ω - Evolução Cósmica v42.0 Singularity
+name: 🧬 ATENA Ω - Singularity v43.0
 
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '*/30 * * * *'          # A cada 30 minutos
   workflow_dispatch:
     inputs:
       generations:
@@ -10,6 +10,10 @@ on:
         default: '30'
         type: choice
         options: ['3', '10', '30', '50']
+      use_ultimate:
+        description: 'Usar motor ULTIMATE (LLM + RAG híbrido)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -23,11 +27,16 @@ env:
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
   HF_TOKEN: ${{ secrets.HF_TOKEN }}
   ATENA_MAX_RUNTIME: "300"
+  # Ativa o motor ultramoderno se solicitado
+  ATENA_USE_ULTIMATE: ${{ github.event.inputs.use_ultimate == 'true' && 'true' || 'false' }}
+  # Otimizações de performance
+  OMP_NUM_THREADS: "2"
+  MKL_NUM_THREADS: "2"
 
 jobs:
   evoluir:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20   # Aumentado para comportar LLM
     steps:
     - name: 📥 Checkout do código
       uses: actions/checkout@v4
@@ -35,67 +44,122 @@ jobs:
         fetch-depth: 0
         token: ${{ secrets.GH_TOKEN }}
 
+    # --------------------------------------------------------------------------
+    # CACHE DE DEPENDÊNCIAS (Python + Node + Modelos HF)
+    # --------------------------------------------------------------------------
     - name: 🐍 Setup Python com cache de dependências
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-        cache: 'pip'               # Cache do pip (funciona com requirements.txt ou pyproject.toml)
+        cache: 'pip'
+        cache-dependency-path: |
+          requirements.txt
+          pyproject.toml
 
-    - name: 📦 Instalar Node.js (sem cache, pois não há lock file)
+    - name: 📦 Setup Node.js (sem lock file)
       uses: actions/setup-node@v4
       with:
         node-version: '24'
-        # cache: 'npm'  # Removido para evitar erro de lock file ausente
+
+    - name: 💾 Cache dos modelos Hugging Face (opcional)
+      uses: actions/cache@v4
+      id: cache-hf
+      with:
+        path: ~/.cache/huggingface
+        key: ${{ runner.os }}-hf-${{ hashFiles('atena_ultimate.py') }}
+        restore-keys: |
+          ${{ runner.os }}-hf-
 
     - name: 🔧 Configurar identidade do Git
       run: |
         git config --global user.name "ATENA Ω"
         git config --global user.email "atena@evolution.ai"
 
-    - name: 📦 Instalação de dependências Python
+    - name: 📦 Instalação de dependências Python e Node
       run: |
         python -m pip install --upgrade pip
         pip install astor radon requests numpy scikit-learn psutil aiosqlite beautifulsoup4 huggingface_hub
-        pip install torch --index-url https://download.pytorch.org/whl/cpu
+        # Instalação condicional do motor ultramoderno
+        if [ "${{ env.ATENA_USE_ULTIMATE }}" = "true" ]; then
+          pip install torch transformers peft bitsandbytes sentence-transformers rank-bm25 scikit-learn codebleu nltk mlflow wandb optuna redis
+          # CPU-only torch (já instalado)
+        else
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+        fi
         pip install faiss-cpu
-        npm install -g tsx typescript   # Dependências globais do Node, sem lock file
+        npm install -g tsx typescript
 
+    # --------------------------------------------------------------------------
+    # SANITIZAÇÃO E VALIDAÇÃO ESTÁTICA
+    # --------------------------------------------------------------------------
     - name: 🧹 Sanitização avançada do código
       run: |
         find . -name "*.py" -exec sed -i 's/[^\x00-\x7F]//g' {} \;
-        # Opcional: instalar dos2unix se necessário (não crítico)
-        sudo apt-get update && sudo apt-get install -y dos2unix || true
+        sudo apt-get update && sudo apt-get install -y dos2unix shellcheck || true
         find . -name "*.py" -exec dos2unix {} \; 2>/dev/null || true
 
-    - name: 🧠 Restauração da memória (último artefato)
+    - name: 🔍 Lint e validação de sintaxe
       run: |
-        ARTIFACT_ID=$(gh api "repos/${{ github.repository }}/actions/artifacts?per_page=1" \
-          --jq '.artifacts[0].id' 2>/dev/null || echo "")
-        if [ -n "$ARTIFACT_ID" ]; then
-          gh api "repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip" > brain.zip
-          unzip -q -o brain.zip -d . && rm brain.zip
-          echo "✅ Memória restaurada do artefato ${ARTIFACT_ID}"
-        else
-          echo "ℹ️ Nenhum artefato anterior encontrado, iniciando do zero."
+        python -m py_compile main.py atena_ultimate.py atena_engine.py 2>/dev/null || true
+        # Se tiver flake8, rodar
+        pip install flake8 && flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
+
+    # --------------------------------------------------------------------------
+    # RESTAURAÇÃO DE MEMÓRIA (Checkpoint + Artefatos)
+    # --------------------------------------------------------------------------
+    - name: 🧠 Restauração do último checkpoint
+      uses: actions/download-artifact@v4
+      with:
+        name: atena-brain-latest
+        path: atena_evolution/
+      continue-on-error: true
+
+    - name: 🧠 Restauração da memória (artefato mais recente - fallback)
+      run: |
+        if [ ! -d "atena_evolution/knowledge" ]; then
+          ARTIFACT_ID=$(gh api "repos/${{ github.repository }}/actions/artifacts?per_page=1" \
+            --jq '.artifacts[0].id' 2>/dev/null || echo "")
+          if [ -n "$ARTIFACT_ID" ]; then
+            gh api "repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip" > brain.zip
+            unzip -q -o brain.zip -d . && rm brain.zip
+            echo "✅ Memória restaurada do artefato ${ARTIFACT_ID}"
+          else
+            echo "ℹ️ Nenhum artefato anterior encontrado, iniciando do zero."
+          fi
         fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       continue-on-error: true
 
-    - name: 🔮 Execução principal da ATENA (evolução profunda)
+    # --------------------------------------------------------------------------
+    # EXECUÇÃO PRINCIPAL (com suporte a motor ultimate)
+    # --------------------------------------------------------------------------
+    - name: 🔮 Execução da ATENA (evolução profunda)
       run: |
+        # Se o motor ultimate estiver ativo e o arquivo existir, garante que seja usado
+        if [ "${{ env.ATENA_USE_ULTIMATE }}" = "true" ] && [ -f "atena_ultimate.py" ]; then
+          echo "🚀 Usando motor ULTIMATE (LLM + RAG híbrido)"
+          # O main.py já usa a variável ATENA_USE_ULTIMATE
+        else
+          echo "⚙️ Usando motor clássico"
+        fi
         python main.py --auto --cycles ${{ github.event.inputs.generations || '10' }} --deep
       env:
         XAI_API_KEY: ${{ secrets.XAI_API_KEY || '' }}
         NEWS_API_KEY: ${{ secrets.NEWS_API_KEY || '' }}
         HF_TOKEN: ${{ secrets.HF_TOKEN || '' }}
+        # Ativa logging detalhado em CI
+        LOG_LEVEL: "INFO"
 
+    # --------------------------------------------------------------------------
+    # PÓS-PROCESSAMENTO: COMMIT, BACKUP, MÉTRICAS
+    # --------------------------------------------------------------------------
     - name: 📤 Commit das mutações (evolução do DNA)
       if: always()
       run: |
         git add .
         if ! git diff --cached --quiet; then
-          git commit -m "🧬 Ciclo evolutivo: ${{ github.run_id }} [Auto-modificação do sistema]"
+          git commit -m "🧬 Ciclo evolutivo: ${{ github.run_id }} [Auto-modificação]"
           git push origin main
         else
           echo "✅ Nenhuma mutação estrutural detectada neste ciclo."
@@ -119,12 +183,13 @@ jobs:
         "
       continue-on-error: true
 
-    - name: 📊 Relatório de métricas do ciclo
+    - name: 📊 Relatório de métricas (sumário + JSON)
       run: |
         echo "## 📈 Métricas da Evolução" >> $GITHUB_STEP_SUMMARY
         echo "- Run ID: ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
         echo -n "- Data: " >> $GITHUB_STEP_SUMMARY && date >> $GITHUB_STEP_SUMMARY
         echo "- Gerações solicitadas: ${{ github.event.inputs.generations || '10' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Motor: ${{ env.ATENA_USE_ULTIMATE == 'true' && 'ULTIMATE (LLM+RAG)' || 'Clássico' }}" >> $GITHUB_STEP_SUMMARY
         if [ -f "atena_evolution/logs/latest_metrics.json" ]; then
           echo "### 📊 Últimas métricas" >> $GITHUB_STEP_SUMMARY
           echo '```json' >> $GITHUB_STEP_SUMMARY
@@ -138,9 +203,40 @@ jobs:
       with:
         name: atena-brain-${{ github.run_id }}
         path: |
-          atena_evolution/knowledge/
-          atena_evolution/lm/model/
-          atena_evolution/reference_dna/
-          atena_evolution/topics/
-          atena_evolution/logs/
+          atena_evolution/
         retention-days: 7
+
+    - name: 🏷️ Atualizar artefato "latest" (para restauração rápida)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: atena-brain-latest
+        path: |
+          atena_evolution/
+        retention-days: 7
+
+    # --------------------------------------------------------------------------
+    # NOTIFICAÇÕES (opcionais - descomente se tiver webhooks)
+    # --------------------------------------------------------------------------
+    # - name: 📢 Notificar sucesso no Discord/Slack
+    #   if: success()
+    #   uses: rtCamp/action-slack-notify@v2
+    #   env:
+    #     SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+    #     SLACK_MESSAGE: "✅ Ciclo ATENA concluído com sucesso! Geração ${{ github.run_id }}"
+    #
+    # - name: 🚨 Notificar falha
+    #   if: failure()
+    #   uses: rtCamp/action-slack-notify@v2
+    #   env:
+    #     SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+    #     SLACK_MESSAGE: "❌ Falha no ciclo ATENA! Veja os logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+    # --------------------------------------------------------------------------
+    # LIMPEZA DE CACHES ANTIGAS (opcional, para economizar espaço)
+    # --------------------------------------------------------------------------
+    - name: 🧹 Limpeza de caches antigos do pip
+      if: always()
+      run: |
+        pip cache purge
+        rm -rf ~/.cache/pip

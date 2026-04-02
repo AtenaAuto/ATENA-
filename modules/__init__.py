@@ -1,18 +1,26 @@
+"""
+Carregador dinâmico de atuadores da Atena.
+Suporta carregamento sob demanda, mas também pode carregar todos antecipadamente.
+"""
+
 import importlib
 import logging
+from typing import Dict, Any, Optional
 
-# Mantemos a importao base para que os mdulos saibam de onde herdar
 from .base import BaseActuator
 
-logger = logging.getLogger("atena.loader")
+logger = logging.getLogger(__name__)
 
-# Mapeamento dinmico baseado na estrutura atual do seu GitHub
-_MODULE_MAP = {
+# Cache de módulos já carregados
+_loaded_modules: Dict[str, Any] = {}
+
+# Registro explícito dos caminhos dos módulos
+_REGISTRY: Dict[str, str] = {
     "Voice": ".Voice",
     "ArchitectActuator": ".architectactuator",
-    "AtenaEngine": ".atena_engine",    # Novo mdulo de evoluo
-    "AtenaTasks": ".atena_tasks",      # Novo gerenciador de tarefas
-    "AutomationActuator": ".automtion_actuator",
+    "AtenaEngine": ".atena_engine",
+    "AtenaTasks": ".atena_tasks",
+    "AutomationActuator": ".automation_actuator",
     "FileActuator": ".file_actuator",
     "MeuUtil": ".meu_util",
     "NotificationActuator": ".notification_actuator",
@@ -21,29 +29,44 @@ _MODULE_MAP = {
     "SystemActuator": ".system_actuator",
 }
 
-def __getattr__(name):
-    """
-    Carrega o mdulo dinamicamente apenas quando a ATENA o invoca.
-    Resolve erros de carregamento em cascata.
-    """
-    if name in _MODULE_MAP:
-        module_path = _MODULE_MAP[name]
-        try:
-            # Tenta importar o mdulo de forma relativa
-            module = importlib.import_module(module_path, __package__)
-            
-            # Tenta retornar a classe com o mesmo nome (Ex: Voice no arquivo Voice.py)
-            if hasattr(module, name):
-                return getattr(module, name)
-            return module
-            
-        except ImportError as e:
-            logger.error(f" Erro crtico ao carregar {name}: {e}")
-            raise AttributeError(f"Mdulo {name} no encontrado no caminho {module_path}")
-        except Exception as e:
-            logger.error(f" Falha inesperada no mdulo {name}: {e}")
-            return None
-            
-    raise AttributeError(f"O sistema ATENA no possui o atributo: {name}")
+def _load_module(name: str) -> Any:
+    """Carrega um único módulo e armazena em cache."""
+    module_path = _REGISTRY[name]
+    try:
+        module = importlib.import_module(module_path, package=__package__)
+        if hasattr(module, name):
+            obj = getattr(module, name)
+        else:
+            logger.warning(f"Módulo {module_path} não contém classe {name}, retornando módulo")
+            obj = module
+        _loaded_modules[name] = obj
+        logger.debug(f"Módulo carregado: {name}")
+        return obj
+    except ImportError as e:
+        logger.error(f"Erro ao carregar módulo {name} de {module_path}: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Erro inesperado ao carregar {name}: {e}")
+        raise
 
-__all__ = list(_MODULE_MAP.keys()) + ["BaseActuator"]
+def load_all() -> None:
+    """Carrega todos os módulos registrados antecipadamente."""
+    for name in _REGISTRY:
+        _load_module(name)
+    logger.info(f"Todos os {len(_REGISTRY)} módulos carregados com sucesso.")
+
+def __getattr__(name: str) -> Any:
+    """Carrega sob demanda se ainda não carregado."""
+    if name in _loaded_modules:
+        return _loaded_modules[name]
+    if name in _REGISTRY:
+        return _load_module(name)
+    raise AttributeError(f"'{__name__}' não possui o atributo '{name}'")
+
+def __dir__() -> list:
+    return sorted(list(_REGISTRY.keys()) + ["BaseActuator", "load_all"])
+
+# Opcional: carregar todos imediatamente (descomente se quiser comportamento antigo)
+# load_all()
+
+__all__ = list(_REGISTRY.keys()) + ["BaseActuator", "load_all"]

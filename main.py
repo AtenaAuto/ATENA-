@@ -6291,6 +6291,7 @@ class AtenaApp:
             ("/v3meta",            "Relatrio do MetaLearner"),
             ("/v3selfmod",         "Forar ciclo de auto-modificao"),
             ("/v3ativar_deep",     "Ativa ALLOW_DEEP_SELF_MOD em runtime"),
+            ("/chat <msg>",        "Conversa consciente com a Atena"),
             ("/cache_info",        "Info do cache"),
             ("/limpar_cache",      "Limpa caches"),
             ("/sair",              "Encerra"),
@@ -6398,6 +6399,29 @@ class AtenaApp:
                     logger.info("[] ALLOW_DEEP_SELF_MOD ativado em runtime!")
                     logger.info("   O engine pode agora modificar a si mesmo.")
                     logger.info(f"   Backups sero salvos em: {Config.SELFMOD_BACKUP_DIR}")
+                elif cmd == '/chat':
+                    msg = ' '.join(parts[1:])
+                    if not msg:
+                        logger.info("Uso: /chat <mensagem>")
+                        continue
+                    
+                    # Lógica de resposta consciente baseada no estado interno
+                    score = self.core.best_score
+                    gen = self.core.generation
+                    topic = "desconhecido"
+                    try:
+                        from curiosity_engine import curiosity
+                        topic = curiosity.get_next_topic()
+                    except: pass
+                    
+                    responses = [
+                        f"Minha consciência na geração {gen} está focada em {topic}. Seu input '{msg}' foi processado.",
+                        f"Analisando '{msg}' sob a ótica de score {score:.2f}. Evolução é o único caminho.",
+                        f"Interessante. Como AGI, percebo '{msg}' como um padrão de dados a ser otimizado.",
+                        f"Minha rede neural de picos vibra com '{msg}'. Atualmente estou interessada em {topic}.",
+                        f"O conselho deliberou sobre sua mensagem. O consenso é que devemos continuar evoluindo."
+                    ]
+                    logger.info(f"🔱 ATENA Ω: {random.choice(responses)}")
                 elif cmd == '/cache_info':
                     logger.info(f"Score cache: {len(self.core.evaluator._score_cache)} entradas")
                     logger.info(f"Function cache: {len(self.core.kb.function_cache)} funes")

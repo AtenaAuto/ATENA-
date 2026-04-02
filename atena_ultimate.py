@@ -28,7 +28,7 @@ from dataclasses import dataclass, field, asdict
 from collections import defaultdict, deque
 
 # =============================================================================
-# IMPORTAES OBRIGATRIAS PARA O MDULO (TORCH  ESSENCIAL)
+# IMPORTAÇÕES OBRIGATÓRIAS PARA O MÓDULO (TORCH É ESSENCIAL)
 # =============================================================================
 try:
     import torch
@@ -36,41 +36,36 @@ try:
     HAS_TORCH = True
 except ImportError:
     HAS_TORCH = False
-    logging.warning("PyTorch no est instalado. O motor ultimate ter funcionalidade reduzida.")
+    logging.warning("PyTorch não está instalado. O motor ultimate terá funcionalidade reduzida.")
 
 # =============================================================================
-# 1. CONFIGURAO ULTRA (com suporte a todas as novidades)
+# 1. CONFIGURAÇÃO ULTRA
 # =============================================================================
 
 @dataclass
 class UltraConfig:
-    # Diretrios
     BASE_DIR: Path = Path("./atena_evolution")
     MODEL_DIR: Path = BASE_DIR / "models"
     CACHE_DIR: Path = BASE_DIR / "cache"
     
-    # LLM
     use_llm: bool = True
-    llm_model_name: str = "Salesforce/codegen-350M-mono"  # ou "bigcode/starcoderbase-1b"
-    llm_quantization: str = "4bit"   # none, 4bit, 8bit
+    llm_model_name: str = "Salesforce/codegen-350M-mono"
+    llm_quantization: str = "4bit"
     llm_device: str = "auto"
     llm_max_length: int = 1024
     
-    # PEFT
     use_peft: bool = True
-    peft_method: str = "lora"   # lora, adalora, ia3, dora
+    peft_method: str = "lora"
     lora_r: int = 16
     lora_alpha: int = 32
     
-    # RAG hbrido
     use_rag: bool = True
     rag_dense_model: str = "BAAI/bge-small-en-v1.5"
     rag_use_bm25: bool = True
     rag_reranker: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     rag_top_k: int = 5
     
-    # Decodificao avanada
-    decoding_strategy: str = "contrastive"  # contrastive, typical, diverse_beam
+    decoding_strategy: str = "contrastive"
     temperature: float = 0.8
     top_p: float = 0.95
     contrastive_penalty: float = 0.5
@@ -78,27 +73,22 @@ class UltraConfig:
     num_beams: int = 5
     diversity_penalty: float = 0.6
     
-    # Avaliao
     evaluate_codebleu: bool = True
     evaluate_pass_at_k: int = 3
-    sandbox_type: str = "docker"  # docker, nsjail, subprocess
+    sandbox_type: str = "docker"
     
-    # Distillation
     use_distillation: bool = True
     teacher_model: str = "bigcode/starcoderbase-3b"
     distillation_temperature: float = 4.0
     
-    # Monitoramento
     use_mlflow: bool = True
     use_wandb: bool = False
     mlflow_experiment: str = "atena_neural"
     
-    # Otimizao
     use_optuna: bool = True
     optuna_n_trials: int = 20
     
-    # Cache
-    cache_backend: str = "memory"  # memory, redis
+    cache_backend: str = "memory"
     redis_url: str = "redis://localhost:6379/0"
     
     def __post_init__(self):
@@ -108,7 +98,7 @@ class UltraConfig:
 cfg = UltraConfig()
 
 # =============================================================================
-# 2. SANDBOX SEGURO (Docker / nsjail)
+# 2. SANDBOX SEGURO
 # =============================================================================
 
 class SecureSandbox:
@@ -168,7 +158,7 @@ class SecureSandbox:
             os.unlink(fname)
 
 # =============================================================================
-# 3. RAG HBRIDO COM RE-RANKER (Dense + BM25 + Cross-encoder)
+# 3. RAG HÍBRIDO
 # =============================================================================
 
 class HybridRAG:
@@ -186,7 +176,7 @@ class HybridRAG:
             from sentence_transformers import SentenceTransformer
             self.dense = SentenceTransformer(cfg.rag_dense_model)
         except ImportError:
-            logging.warning("sentence-transformers no instalado")
+            logging.warning("sentence-transformers não instalado")
     
     def _init_reranker(self):
         if cfg.rag_reranker and HAS_TORCH:
@@ -210,50 +200,45 @@ class HybridRAG:
                 tokenized = [doc.split() for doc in self.corpus]
                 self.bm25 = BM25Okapi(tokenized)
             except ImportError:
-                logging.warning("rank_bm25 no instalado, desabilitando BM25")
+                logging.warning("rank_bm25 não instalado, desabilitando BM25")
                 self.bm25 = None
     
     def retrieve(self, query: str, top_k: int = None) -> List[Tuple[str, float]]:
         top_k = top_k or cfg.rag_top_k
         if not self.corpus:
             return []
-        # Dense
         dense_scores = []
         if self.dense:
             q_emb = self.dense.encode([query])
             from sklearn.metrics.pairwise import cosine_similarity
             dense_scores = cosine_similarity(q_emb, self.dense_emb)[0]
             dense_scores = list(enumerate(dense_scores))
-        # BM25
         sparse_scores = []
         if hasattr(self, 'bm25') and self.bm25:
             bm25_scores = self.bm25.get_scores(query.split())
             sparse_scores = list(enumerate(bm25_scores))
-        # Fuso hbrida (reciprocal rank fusion)
         scores = {}
         for idx, score in dense_scores:
-            scores[idx] = scores.get(idx, 0) + 1.0 / (1 + score)  # RRF
+            scores[idx] = scores.get(idx, 0) + 1.0 / (1 + score)
         for idx, score in sparse_scores:
             scores[idx] = scores.get(idx, 0) + 1.0 / (1 + score)
         candidates = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:top_k*2]
-        # Re-ranking com cross-encoder (requer torch)
         if self.has_reranker and candidates and HAS_TORCH:
             pairs = [(query, self.corpus[idx]) for idx, _ in candidates]
             inputs = self.reranker_tokenizer(pairs, padding=True, truncation=True, return_tensors="pt", max_length=512)
             with torch.no_grad():
                 rerank_scores = self.reranker_model(**inputs).logits.squeeze(-1).tolist()
             candidates = sorted(zip([idx for idx,_ in candidates], rerank_scores), key=lambda x: x[1], reverse=True)
-        # Retorna textos
         return [(self.corpus[idx], score) for idx, score in candidates[:top_k]]
 
 # =============================================================================
-# 4. GERADOR COM DECODIFICAO AVANADA (Contrastive, Typical, Diverse Beam)
+# 4. GERADOR AVANÇADO
 # =============================================================================
 
 class AdvancedGenerator:
     def __init__(self, model, tokenizer):
         if not HAS_TORCH:
-            raise RuntimeError("PyTorch  necessrio para o AdvancedGenerator")
+            raise RuntimeError("PyTorch é necessário para o AdvancedGenerator")
         self.model = model
         self.tokenizer = tokenizer
     
@@ -321,7 +306,6 @@ class AdvancedGenerator:
                     for i in range(len(topk_idx)):
                         token = topk_idx[i].item()
                         new_score = score - topk_vals[i].item()
-                        # Penalidade de diversidade
                         group_tokens = [t for _, s in all_candidates if s % num_groups == group]
                         if cfg.diversity_penalty > 0 and token in group_tokens:
                             new_score += cfg.diversity_penalty * math.log(1 + group_tokens.count(token))
@@ -334,7 +318,7 @@ class AdvancedGenerator:
         return min(beams, key=lambda x: x[1])[0]
 
 # =============================================================================
-# 5. AVALIAO AVANADA (CodeBLEU, pass@k, segurana)
+# 5. AVALIADOR DE CÓDIGO
 # =============================================================================
 
 class CodeEvaluator:
@@ -372,13 +356,12 @@ class CodeEvaluator:
         return not any(re.search(p, code) for p in dangerous)
 
 # =============================================================================
-# 6. DUMMY MUTATION ENGINE (para compatibilidade com NoCodeBuilder)
+# 6. DUMMY MUTATION ENGINE E ATRIBUTOS DE COMPATIBILIDADE
 # =============================================================================
 
 class DummyMutationEngine:
-    """Engine de mutao mnimo para compatibilidade com NoCodeBuilder."""
     def __init__(self):
-        self.grok = None          # O NoCodeBuilder espera esse atributo
+        self.grok = None
         self.mutation_types = ["add_comment", "rename_var", "add_docstring"]
 
     def mutate(self, code: str, mutation_type: str) -> Tuple[str, str]:
@@ -387,14 +370,54 @@ class DummyMutationEngine:
     def generate_candidates(self, code: str, mutation_types: List[str], n: int = None) -> List:
         return []
 
+class DummyLearner:
+    """Substituto vazio para GitHubLearner (não faz nada)."""
+    def start(self):
+        pass
+    def stop(self):
+        pass
+
+class DummyNewsClient:
+    """Substituto vazio para NewsAPIClient."""
+    def update_objectives(self):
+        pass
+
+class DummyPredictor:
+    """Substituto vazio para MutationPredictor."""
+    def train(self):
+        pass
+
+class DummyLanguageTrainer:
+    """Substituto vazio para LanguageTrainer."""
+    pass
+
+class DummyVocabularyHarvester:
+    """Substituto vazio para VocabularyHarvester."""
+    def start(self):
+        pass
+    def stop(self):
+        pass
+
+class DummyEpisodicMemory:
+    """Substituto vazio para EpisodicMemory."""
+    pass
+
+class DummyRewardSystem:
+    """Substituto vazio para AutoRewardSystem."""
+    pass
+
+class DummyFeedbackLoop:
+    """Substituto vazio para FeedbackLoop."""
+    pass
+
 # =============================================================================
-# 7. ORQUESTRADOR PRINCIPAL (integrando LLM, RAG, PEFT, Distillation)
+# 7. ORQUESTRADOR PRINCIPAL (com compatibilidade total)
 # =============================================================================
 
 class AtenaUltimateCore:
     def __init__(self, problem=None):
         self.cfg = cfg
-        self.problem = problem  # compatibilidade com o core original
+        self.problem = problem
         self._init_llm()
         self._init_rag()
         self.evaluator = CodeEvaluator()
@@ -403,13 +426,26 @@ class AtenaUltimateCore:
         else:
             self.generator = None
         self.kb = self._init_kb()
-        self.mutation_engine = DummyMutationEngine()   # <-- FIX: agora retorna um objeto vlido
+        self.mutation_engine = DummyMutationEngine()
         self.current_code = self._load_current_code()
         self.best_score = self._evaluate(self.current_code)["score"]
         self.generation = 0
         self.original_code = self.current_code
         self.engine_path = cfg.BASE_DIR / "code" / "atena_engine.py"
-    
+
+        # ========== ATRIBUTOS DE COMPATIBILIDADE COM O MAIN.PY ==========
+        self.learner = DummyLearner()            # substitui GitHubLearner
+        self.news = DummyNewsClient()            # substitui NewsAPIClient
+        self.predictor = DummyPredictor()        # substitui MutationPredictor
+        self.lang_trainer = DummyLanguageTrainer()
+        self.vocab_harvester = DummyVocabularyHarvester()
+        self.episodic_memory = DummyEpisodicMemory()
+        self.reward_system = DummyRewardSystem()
+        self.feedback_loop = DummyFeedbackLoop()
+        # O AtenaApp também acessa `self.v3` – vamos adicionar um dummy
+        self.v3 = None   # será ignorado, mas evita AttributeError
+        # ================================================================
+
     def _init_llm(self):
         if not cfg.use_llm or not HAS_TORCH:
             self.model = None
@@ -466,7 +502,6 @@ class AtenaUltimateCore:
                 kb_path = cfg.BASE_DIR / "knowledge.db"
                 if kb_path.exists():
                     conn = sqlite3.connect(str(kb_path))
-                    # Verifica se a tabela existe
                     cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='learned_functions'")
                     if cursor.fetchone():
                         cursor = conn.execute("SELECT code FROM learned_functions LIMIT 100")
@@ -475,7 +510,7 @@ class AtenaUltimateCore:
                             self.rag.add_documents(docs)
                             logging.info(f"RAG populado com {len(docs)} documentos")
                     else:
-                        logging.info("Tabela 'learned_functions' ainda no existe. RAG aguardar.")
+                        logging.info("Tabela 'learned_functions' ainda não existe. RAG aguardará.")
                     conn.close()
             except Exception as e:
                 logging.warning(f"Erro ao carregar documentos para RAG: {e}")
@@ -529,12 +564,12 @@ class AtenaUltimateCore:
             from transformers import AutoModelForCausalLM
             teacher = AutoModelForCausalLM.from_pretrained(teacher_model_name, device_map="auto")
             teacher.eval()
-            logging.info("Distillation concluda (placeholder)")
+            logging.info("Distillation concluída (placeholder)")
         except Exception as e:
             logging.warning(f"Erro na distillation: {e}")
 
 # =============================================================================
-# 8. INTEGRAO COM O SISTEMA ORIGINAL (patch)
+# 8. INTEGRAÇÃO COM O SISTEMA ORIGINAL (patch)
 # =============================================================================
 
 def patch_atena_core(original_core) -> AtenaUltimateCore:

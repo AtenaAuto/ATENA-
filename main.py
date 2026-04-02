@@ -106,6 +106,12 @@ try:
 except ImportError:
     HAS_RLHF = False
 
+try:
+    from self_reflection import reflection
+    HAS_REFLECTION = True
+except ImportError:
+    HAS_REFLECTION = False
+
 # --- Bibliotecas opcionais com fallbacks ---
 try:
     import radon.complexity as radon_cc
@@ -6025,6 +6031,10 @@ class AtenaCore:
             if HAS_RLHF:
                 rlhf.record_feedback(mtype, True)
             
+            # Self-Reflection: Registra sucesso e gera pensamento
+            if HAS_REFLECTION:
+                reflection.reflect(self.generation, desc, True, best_candidate_score)
+            
             # Salva experiência na memória vetorial
             if HAS_VECTOR_MEMORY and HAS_TRANSFORMERS:
                 try:
@@ -6050,6 +6060,9 @@ class AtenaCore:
                 # RLHF: Registra falha (não melhorou)
                 if HAS_RLHF:
                     rlhf.record_feedback(mtype, False)
+                # Self-Reflection: Registra falha e gera pensamento
+                if HAS_REFLECTION:
+                    reflection.reflect(self.generation, desc, False, best_candidate_score)
             else:
                 desc, mtype = "none", "none"
                 metrics = self.evaluator.evaluate(self.current_code)

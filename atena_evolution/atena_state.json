@@ -1,9 +1,9 @@
 {
-  "generation": 350,
+  "generation": 351,
   "best_score": 110.0,
   "timestamp": "2026-04-02T19:44:28.908187",
   "is_ci": false,
-  "last_mission": "high_level_dialogue",
-  "status": "LIBERATED",
+  "last_mission": "cognitive_sleep_cycle",
+  "status": "SLEEPING",
   "knowledge_level": "Frontier-2026"
 }

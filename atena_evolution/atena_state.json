@@ -1,6 +1,7 @@
 {
-  "generation": 344,
-  "best_score": 99.73333333333333,
-  "timestamp": "2026-04-02T17:28:17.652609",
-  "is_ci": false
+  "generation": 346,
+  "best_score": 100.73,
+  "timestamp": "2026-04-02T19:39:16.418060",
+  "is_ci": false,
+  "last_mission": "advanced_portfolio_optimizer"
 }

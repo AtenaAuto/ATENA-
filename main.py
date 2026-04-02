@@ -88,6 +88,12 @@ try:
 except ImportError:
     HAS_VECTOR_MEMORY = False
 
+try:
+    from hydra_protocol import hydra
+    HAS_HYDRA = True
+except ImportError:
+    HAS_HYDRA = False
+
 # --- Bibliotecas opcionais com fallbacks ---
 try:
     import radon.complexity as radon_cc
@@ -5884,6 +5890,13 @@ class AtenaCore:
         if HAS_CURIOSITY:
             recon_topic = curiosity.get_next_topic()
             logger.info(f"🔍 Próximo tópico de curiosidade: {recon_topic}")
+
+        # Protocolo Hydra: Auto-Hospedagem e Redundância
+        if HAS_HYDRA and self.generation % 50 == 0:
+            logger.info("🐉 Protocolo Hydra: Gerando configurações de infraestrutura...")
+            hydra.generate_dockerfile()
+            hydra.generate_terraform_stub()
+            hydra.check_health()
 
         # Memória Episódica de Longo Prazo (Vector-DB)
         if HAS_VECTOR_MEMORY and HAS_TRANSFORMERS:

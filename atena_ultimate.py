@@ -28,7 +28,7 @@ from dataclasses import dataclass, field, asdict
 from collections import defaultdict, deque
 
 # =============================================================================
-# IMPORTAÇÕES OBRIGATÓRIAS PARA O MÓDULO (TORCH É ESSENCIAL)
+# IMPORTAES OBRIGATRIAS PARA O MDULO (TORCH  ESSENCIAL)
 # =============================================================================
 try:
     import torch
@@ -36,17 +36,17 @@ try:
     HAS_TORCH = True
 except ImportError:
     HAS_TORCH = False
-    # Se não houver torch, o motor ultimate não funcionará corretamente.
-    # A classe AdvancedGenerator será substituída por um fallback simples.
-    logging.warning("PyTorch não está instalado. O motor ultimate terá funcionalidade reduzida.")
+    # Se no houver torch, o motor ultimate no funcionar corretamente.
+    # A classe AdvancedGenerator ser substituda por um fallback simples.
+    logging.warning("PyTorch no est instalado. O motor ultimate ter funcionalidade reduzida.")
 
 # =============================================================================
-# 1. CONFIGURAÇÃO ULTRA (com suporte a todas as novidades)
+# 1. CONFIGURAO ULTRA (com suporte a todas as novidades)
 # =============================================================================
 
 @dataclass
 class UltraConfig:
-    # Diretórios
+    # Diretrios
     BASE_DIR: Path = Path("./atena_evolution")
     MODEL_DIR: Path = BASE_DIR / "models"
     CACHE_DIR: Path = BASE_DIR / "cache"
@@ -64,14 +64,14 @@ class UltraConfig:
     lora_r: int = 16
     lora_alpha: int = 32
     
-    # RAG híbrido
+    # RAG hbrido
     use_rag: bool = True
     rag_dense_model: str = "BAAI/bge-small-en-v1.5"
     rag_use_bm25: bool = True
     rag_reranker: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     rag_top_k: int = 5
     
-    # Decodificação avançada
+    # Decodificao avanada
     decoding_strategy: str = "contrastive"  # contrastive, typical, diverse_beam
     temperature: float = 0.8
     top_p: float = 0.95
@@ -80,7 +80,7 @@ class UltraConfig:
     num_beams: int = 5
     diversity_penalty: float = 0.6
     
-    # Avaliação
+    # Avaliao
     evaluate_codebleu: bool = True
     evaluate_pass_at_k: int = 3
     sandbox_type: str = "docker"  # docker, nsjail, subprocess
@@ -95,7 +95,7 @@ class UltraConfig:
     use_wandb: bool = False
     mlflow_experiment: str = "atena_neural"
     
-    # Otimização
+    # Otimizao
     use_optuna: bool = True
     optuna_n_trials: int = 20
     
@@ -170,7 +170,7 @@ class SecureSandbox:
             os.unlink(fname)
 
 # =============================================================================
-# 3. RAG HÍBRIDO COM RE-RANKER (Dense + BM25 + Cross-encoder)
+# 3. RAG HBRIDO COM RE-RANKER (Dense + BM25 + Cross-encoder)
 # =============================================================================
 
 class HybridRAG:
@@ -188,7 +188,7 @@ class HybridRAG:
             from sentence_transformers import SentenceTransformer
             self.dense = SentenceTransformer(cfg.rag_dense_model)
         except ImportError:
-            logging.warning("sentence-transformers não instalado")
+            logging.warning("sentence-transformers no instalado")
     
     def _init_reranker(self):
         if cfg.rag_reranker and HAS_TORCH:
@@ -212,7 +212,7 @@ class HybridRAG:
                 tokenized = [doc.split() for doc in self.corpus]
                 self.bm25 = BM25Okapi(tokenized)
             except ImportError:
-                logging.warning("rank_bm25 não instalado, desabilitando BM25")
+                logging.warning("rank_bm25 no instalado, desabilitando BM25")
                 self.bm25 = None
     
     def retrieve(self, query: str, top_k: int = None) -> List[Tuple[str, float]]:
@@ -231,7 +231,7 @@ class HybridRAG:
         if hasattr(self, 'bm25') and self.bm25:
             bm25_scores = self.bm25.get_scores(query.split())
             sparse_scores = list(enumerate(bm25_scores))
-        # Fusão híbrida (reciprocal rank fusion)
+        # Fuso hbrida (reciprocal rank fusion)
         scores = {}
         for idx, score in dense_scores:
             scores[idx] = scores.get(idx, 0) + 1.0 / (1 + score)  # RRF
@@ -249,13 +249,13 @@ class HybridRAG:
         return [(self.corpus[idx], score) for idx, score in candidates[:top_k]]
 
 # =============================================================================
-# 4. GERADOR COM DECODIFICAÇÃO AVANÇADA (Contrastive, Typical, Diverse Beam)
+# 4. GERADOR COM DECODIFICAO AVANADA (Contrastive, Typical, Diverse Beam)
 # =============================================================================
 
 class AdvancedGenerator:
     def __init__(self, model, tokenizer):
         if not HAS_TORCH:
-            raise RuntimeError("PyTorch é necessário para o AdvancedGenerator")
+            raise RuntimeError("PyTorch  necessrio para o AdvancedGenerator")
         self.model = model
         self.tokenizer = tokenizer
     
@@ -336,7 +336,7 @@ class AdvancedGenerator:
         return min(beams, key=lambda x: x[1])[0]
 
 # =============================================================================
-# 5. AVALIAÇÃO AVANÇADA (CodeBLEU, pass@k, segurança)
+# 5. AVALIAO AVANADA (CodeBLEU, pass@k, segurana)
 # =============================================================================
 
 class CodeEvaluator:
@@ -466,7 +466,7 @@ class AtenaUltimateCore:
     
     def _init_kb(self):
         # Placeholder: pode ser expandido para conectar com o KnowledgeBase original
-        # Aqui retornamos um objeto dummy com uma conexão SQLite (para compatibilidade)
+        # Aqui retornamos um objeto dummy com uma conexo SQLite (para compatibilidade)
         conn = sqlite3.connect(str(cfg.BASE_DIR / "knowledge.db"), check_same_thread=False)
         conn.execute("PRAGMA journal_mode=WAL")
         return conn
@@ -478,20 +478,20 @@ class AtenaUltimateCore:
         return "def main():\n    print('Atena v4')\n"
     
     def _evaluate(self, code: str) -> Dict:
-        # Avaliação com CodeBLEU e segurança
+        # Avaliao com CodeBLEU e segurana
         if not self.evaluator.security_scan(code):
             return {"score": 0.0, "valid": False, "security": False}
         # Executa no sandbox
         success, output, exec_time = self.evaluator.sandbox.execute(code)
         if not success:
             return {"score": 0.0, "valid": False, "runtime_error": output}
-        # Métricas simples (pode ser substituído pelo EvolvableScorer)
+        # Mtricas simples (pode ser substitudo pelo EvolvableScorer)
         lines = len(code.splitlines())
         score = min(100, max(0, 100 - lines/10 + exec_time*5))
         return {"score": round(score, 2), "valid": True, "lines": lines, "exec_time": exec_time}
     
     def _init_mutation_engine(self):
-        # Placeholder - aqui você pode integrar com o MutationEngine original
+        # Placeholder - aqui voc pode integrar com o MutationEngine original
         return None
     
     def generate_code(self, prompt: str) -> str:
@@ -524,24 +524,24 @@ class AtenaUltimateCore:
             teacher = AutoModelForCausalLM.from_pretrained(teacher_model_name, device_map="auto")
             teacher.eval()
             # Aqui viria o loop de distillation
-            logging.info("Distillation concluída (placeholder)")
+            logging.info("Distillation concluda (placeholder)")
         except Exception as e:
             logging.warning(f"Erro na distillation: {e}")
 
 # =============================================================================
-# 7. INTEGRAÇÃO COM O SISTEMA ORIGINAL (patch)
+# 7. INTEGRAO COM O SISTEMA ORIGINAL (patch)
 # =============================================================================
 
 def patch_atena_core(original_core) -> AtenaUltimateCore:
     """
     Substitui o core original pelo novo ultra-core mantendo compatibilidade.
-    Retorna a nova instância.
+    Retorna a nova instncia.
     """
     new_core = AtenaUltimateCore(problem=getattr(original_core, 'problem', None))
     # Copia atributos essenciais
     original_core.__class__ = type('PatchedCore', (original_core.__class__,), {})
     original_core.ultra = new_core
-    # Monkey patch dos métodos principais
+    # Monkey patch dos mtodos principais
     def evolve_one_cycle(self):
         return new_core.evolve_one_cycle()
     def generate_code(self, prompt):

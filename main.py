@@ -82,6 +82,12 @@ try:
 except ImportError:
     HAS_COUNCIL = False
 
+try:
+    from vector_memory import vector_memory
+    HAS_VECTOR_MEMORY = True
+except ImportError:
+    HAS_VECTOR_MEMORY = False
+
 # --- Bibliotecas opcionais com fallbacks ---
 try:
     import radon.complexity as radon_cc
@@ -4629,7 +4635,7 @@ class EpisodicMemory:
         patterns = self.get_best_patterns(3)
         if not patterns:
             return None
-        last = patterns[0]["pattern"].split("")[-1].strip()
+        last = patterns[0]["pattern"].split("->")[-1].strip()
         return last if last else None
 
     def forget_old(self, keep_days: int = 14, min_score: float = 20.0):
@@ -5879,6 +5885,18 @@ class AtenaCore:
             recon_topic = curiosity.get_next_topic()
             logger.info(f"🔍 Próximo tópico de curiosidade: {recon_topic}")
 
+        # Memória Episódica de Longo Prazo (Vector-DB)
+        if HAS_VECTOR_MEMORY and HAS_TRANSFORMERS:
+            try:
+                current_emb = self.evaluator.get_embedding(self.current_code)
+                similar_experiences = vector_memory.search_similar(current_emb, top_k=3)
+                if similar_experiences:
+                    logger.info(f"🧠 Memória de Longo Prazo: {len(similar_experiences)} experiências similares encontradas.")
+                    for exp, dist in similar_experiences:
+                        logger.info(f"  - Experiência: {exp.get('mutation', 'N/A')} (Distância: {dist:.4f})")
+            except Exception as e:
+                logger.debug(f"Erro ao acessar memória vetorial: {e}")
+
         objectives = self.kb.get_objectives()
         weights = self._compute_mutation_weights(objectives)
 
@@ -5961,6 +5979,20 @@ class AtenaCore:
             replaced = True
             if HAS_CURIOSITY:
                 curiosity.update_reward(recon_topic, 1.0)
+            
+            # Salva experiência na memória vetorial
+            if HAS_VECTOR_MEMORY and HAS_TRANSFORMERS:
+                try:
+                    new_emb = self.evaluator.get_embedding(code)
+                    vector_memory.add_experience(new_emb, {
+                        "generation": self.generation,
+                        "mutation": desc,
+                        "score": best_candidate_score,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                except Exception as e:
+                    logger.debug(f"Erro ao salvar na memória vetorial: {e}")
+
             if mtype == "optimize_workflow" and Config.ALLOW_WORKFLOW_MUTATION:
                 apply_workflow_mutation()
                 self.kb.update_objective("otimizar_workflow", 1.0)

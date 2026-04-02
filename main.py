@@ -6072,7 +6072,8 @@ class AtenaCore:
         total = max(1, metrics.get("tests_total", 1))
         self.kb.update_objective("aumentar_cobertura_testes", metrics.get("tests_passed", 0) / total)
 
-
+# =============================================================================
+Config.setup()
 # =============================================================================
 # APLICATIVO PRINCIPAL v4.0 - ULTIMATE EDITION
 # =============================================================================

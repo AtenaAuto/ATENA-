@@ -94,6 +94,12 @@ try:
 except ImportError:
     HAS_HYDRA = False
 
+try:
+    from world_model import world_model
+    HAS_WORLD_MODEL = True
+except ImportError:
+    HAS_WORLD_MODEL = False
+
 # --- Bibliotecas opcionais com fallbacks ---
 try:
     import radon.complexity as radon_cc
@@ -5962,6 +5968,16 @@ class AtenaCore:
                 if HAS_COUNCIL:
                     council_vote = council.consensus_score(code, metrics)
                     blended = blended * 0.8 + council_vote * 20.0 # Peso do conselho (escala 0-100)
+                
+                # World Model: Simulação de Ambiente
+                if HAS_WORLD_MODEL:
+                    success, predicted_score, logs = world_model.simulate_mutation(code)
+                    if not success:
+                        logger.warning(f"⚠️ WorldModel previu falha crítica para mutação: {desc[:30]}")
+                        blended *= 0.1 # Penalidade severa por falha na simulação
+                    else:
+                        logger.info(f"✅ WorldModel validou mutação: {desc[:30]} (Score previsto: {predicted_score:.2f})")
+                        blended *= 1.1 # Bônus por validação em ambiente isolado
             return code, desc, mtype, metrics, blended
 
         with concurrent.futures.ThreadPoolExecutor(

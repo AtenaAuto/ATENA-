@@ -21,6 +21,7 @@ _REGISTRY: Dict[str, str] = {
     "AtenaEngine": ".atena_engine",
     "AtenaTasks": ".atena_tasks",
     "AutomationActuator": ".automation_actuator",
+    "ComputerActuator": ".computer_actuator",
     "FileActuator": ".file_actuator",
     "MeuUtil": ".meu_util",
     "NotificationActuator": ".notification_actuator",

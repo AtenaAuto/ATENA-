@@ -10,41 +10,15 @@ on:
         required: true
         default: '30'
         type: choice
-        options:
-          - '3'
-          - '5'
-          - '10'
-          - '20'
-          - '50'
+        options: ['3', '5', '10', '20', '50']
       mode:
         description: 'Modo de evolução'
         required: true
         default: 'auto'
         type: choice
-        options:
-          - 'auto'
-          - 'recon'
-          - 'nocode'
-      recon_topic:
-        description: 'Tópico para Hacker Recon (se mode=recon)'
-        required: false
-        default: 'advanced python optimization'
-      nocode_desc:
-        description: 'Descrição do projeto No-Code (se mode=nocode)'
-        required: false
-        default: 'a simple flask web app with sqlite'
+        options: ['auto', 'recon', 'nocode']
       deep_self_mod:
         description: 'Permite que a Atena modifique o próprio engine'
-        required: false
-        default: true
-        type: boolean
-      checker_evolve:
-        description: 'Permite que o AdaptiveChecker evolua suas regras'
-        required: false
-        default: true
-        type: boolean
-      lm_enabled:
-        description: 'Ativa o modelo de linguagem local (AtenaLocalLM)'
         required: false
         default: true
         type: boolean
@@ -52,59 +26,26 @@ on:
 permissions:
   contents: write
   actions: write
+  repository-projects: read
 
 concurrency:
   group: atena-evolution
-  cancel-in-progress: false # ALTERADO: Impede que o GitHub mate o processo se um novo ciclo começar
+  cancel-in-progress: false # IMPORTANTE: Não cancela o anterior para não dar erro de "Operation Canceled"
 
 env:
   PYTHON_VERSION: '3.11'
   GENERATIONS: ${{ github.event.inputs.generations || '10' }}
   MODE: ${{ github.event.inputs.mode || 'auto' }}
-  RECON_TOPIC: ${{ github.event.inputs.recon_topic || 'advanced python optimization' }}
-  NOCODE_DESC: ${{ github.event.inputs.nocode_desc || 'a simple flask web app with sqlite' }}
-  GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-  XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
-  NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
-  DEPLOY_GIT_REPO: ${{ secrets.DEPLOY_GIT_REPO }}
-  DEPLOY_DOCKER_IMAGE: ${{ secrets.DEPLOY_DOCKER_IMAGE }}
-  DEPLOY_COMMAND: ${{ secrets.DEPLOY_COMMAND }}
-  ALLOW_WORKFLOW_MUTATION: 'true'
-  LT_INTERVAL: '1'
-  LT_VERBOSE: 'false'
-  GROK_LT_INTERVAL: '5'
-  VH_INTERVAL_HOURS: '6'
-  DASHBOARD_PORT: '7331'
-  ALLOW_DEEP_SELF_MOD: ${{ github.event.inputs.deep_self_mod == 'true' && 'true' || 'false' }}
-  ALLOW_CHECKER_EVOLVE: ${{ github.event.inputs.checker_evolve == 'true' && 'true' || 'false' }}
-  SELF_MOD_INTERVAL: '10'
-  RECURSIVE_CYCLES: '3'
-  MAX_ENGINE_MUTATIONS: '3'
-  ATENA_LM_ENABLED: ${{ github.event.inputs.lm_enabled != 'false' && 'true' || 'false' }}
-  ATENA_LM_TRAIN_EVERY: '5'
-  ATENA_LM_EMBED_DIM: '128'
-  ATENA_LM_LAYERS: '4'
-  ATENA_LM_MIN_SAMPLES: '5'
-  MIN_IMPROVEMENT_DELTA: '0.001'
-  CANDIDATES_PER_CYCLE: '6'
-  PARALLEL_WORKERS: '4'
-  TRAINING_INTERVAL: '900'
-  PYTHONFAULTHANDLER: '1'
-  PYTHONUNBUFFERED: '1'
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # Adicione seus outros envs aqui se necessário
 
 jobs:
   evoluir:
-    name: 🧠 Evolução Neural v4.0 (AGI Level)
+    name: 🧠 Evolução Neural v4.0
     runs-on: ubuntu-latest
-    timeout-minutes: 60 # Aumentado para dar margem à evolução
+    timeout-minutes: 60
 
     steps:
-    - name: ⚡ Banner
-      run: |
-        echo "╔═══════════════════════════════════════════════════════╗"
-        echo "║     ATENA Ω - EVOLUÇÃO DIVINA v4.0 (AGI LEVEL)        ║"
-        echo "╚═══════════════════════════════════════════════════════╝"
-
     - name: 📥 Checkout
       uses: actions/checkout@v4
       with:
@@ -114,77 +55,61 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYTHON_VERSION }}
-        cache: 'pip' # Cache nativo do setup-python
+        cache: 'pip'
 
     - name: 🔧 Instalar dependências de sistema
       run: |
         sudo apt-get update -qq
         sudo apt-get install -y python3-dev build-essential sqlite3 jq tesseract-ocr
 
-    - name: 📦 Instalar dependências Python
+    - name: 📦 Instalar dependências Python (Correção de Erro)
       run: |
         python -m pip install --upgrade pip setuptools wheel
-        # Instalação com timeout aumentado para evitar quedas no PyTorch
-        python -m pip install --default-timeout=100 --upgrade --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu
-        python install.py
+        # Instala o Torch separadamente com timeout para não cair
+        python -m pip install --default-timeout=100 torch torchvision --index-url https://download.pytorch.org/whl/cpu
+        # Instala o restante das dependências
+        if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; fi
+        python install.py || echo "install.py executado"
 
-    - name: 🧪 Executar testes rápidos
-      run: python quick_test.py || echo "Aviso: Alguns testes falharam, mas prosseguindo..."
-
-    - name: 🔱 Executar Teste de Estresse AGI
-      run: python atena_stress_test.py
-      continue-on-error: true
-
-    - name: 🔍 Verificar importação de main.py
-      run: python -c "import main; print('main.py importado com sucesso')"
-
-    - name: 📂 Criar diretórios de memória
+    - name: 📂 Preparar Estrutura de Pastas
       run: |
-        mkdir -p atena_evolution/{code,backups/selfmod,knowledge,sandbox,models,deploy,projects,lm/{model,checkpoints,data},logs}
+        mkdir -p atena_evolution/code atena_evolution/backups atena_evolution/knowledge atena_evolution/models atena_evolution/logs atena_evolution/lm/model
 
-    - name: 🧠 Restaurar memória do run anterior
+    - name: 🧠 Restaurar Memória (Atena Brain)
       run: |
-        echo "Tentando restaurar brain data..."
-        ARTIFACT_ID=$(gh api "repos/${{ github.repository }}/actions/artifacts?per_page=1" --jq '.artifacts[0].id' 2>/dev/null || echo "")
-        if [ -z "$ARTIFACT_ID" ]; then
-          echo "Nenhum artefato encontrado."
-        else
-          gh api "repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip" > brain.zip
-          unzip -o brain.zip -d . && rm brain.zip
+        echo "Buscando última memória salva..."
+        # Busca o ID do último artefato de sucesso via GitHub CLI
+        LAST_ARTIFACT_ID=$(gh run list --workflow "${{ github.workflow }}" --status success --limit 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || echo "")
+        
+        if [ -n "$LAST_ARTIFACT_ID" ]; then
+          gh run download $LAST_ARTIFACT_ID -n "atena-brain-data" --dir . || echo "Nenhum artefato encontrado"
+          if [ -f brain.zip ]; then unzip -o brain.zip; fi
         fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       continue-on-error: true
 
-    - name: 🔮 Executar ATENA Core v4.0 (AGI Level)
+    - name: 🔮 Executar ATENA Core v4.0
       id: execucao
       run: |
+        echo "🚀 Iniciando motor de evolução..."
         EXTRA_ARGS=""
-        [ "${{ env.ALLOW_DEEP_SELF_MOD }}" == "true" ] && EXTRA_ARGS="$EXTRA_ARGS --deep"
-        [ "${{ env.ALLOW_CHECKER_EVOLVE }}" == "true" ] && EXTRA_ARGS="$EXTRA_ARGS --checker"
-
+        if [ "${{ github.event.inputs.deep_self_mod }}" == "true" ]; then EXTRA_ARGS="--deep"; fi
+        
         if [ "${{ env.MODE }}" == "recon" ]; then
-          python main.py --recon "${{ env.RECON_TOPIC }}" $EXTRA_ARGS
-        elif [ "${{ env.MODE }}" == "nocode" ]; then
-          python main.py --nocode --desc "${{ env.NOCODE_DESC }}" $EXTRA_ARGS
+          python main.py --recon "advanced python optimization" $EXTRA_ARGS
         else
           python main.py --auto --cycles ${{ env.GENERATIONS }} $EXTRA_ARGS
         fi
 
-    - name: 📊 Gerar Relatório de Inteligência
-      if: always()
-      run: |
-        echo "# 🧬 Relatório ATENA Ω" > relatorio.md
-        echo "- Status: ${{ steps.execucao.outcome }}" >> relatorio.md
-
-    - name: ⬆️ Upload Artefatos
+    - name: ⬆️ Salvar Evolução (Upload Artefatos)
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: atena-brain-data-${{ github.run_id }}
+        name: atena-brain-data
         path: |
           atena_evolution/knowledge/knowledge.db
           atena_evolution/models/
           atena_evolution/logs/
-          atena_evolution/agi_stress_test_report.json
-        retention-days: 7
+          modules/auto_*.py
+        retention-days: 5

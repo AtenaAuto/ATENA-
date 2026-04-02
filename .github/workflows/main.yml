@@ -1,4 +1,4 @@
-name: 🧬 ATENA Ω - Singularity v43.1
+name: 🧬 ATENA Ω - Singularity v43.2
 
 on:
   schedule:
@@ -14,6 +14,14 @@ on:
         description: 'Usar motor ULTIMATE (LLM + RAG híbrido)'
         type: boolean
         default: false
+      llm_model:
+        description: 'Modelo LLM (se ultimate)'
+        type: choice
+        default: 'phi2'
+        options:
+          - 'phi2'
+          - 'codegen350'
+          - 'starcoder1b'
 
 permissions:
   contents: write
@@ -27,18 +35,16 @@ env:
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
   HF_TOKEN: ${{ secrets.HF_TOKEN }}
   ATENA_MAX_RUNTIME: "300"
-  # Ativa o motor ultramoderno se solicitado (boolean -> string)
   ATENA_USE_ULTIMATE: ${{ github.event.inputs.use_ultimate == 'true' && 'true' || 'false' }}
-  # Otimizações de performance
+  LLM_MODEL_CHOICE: ${{ github.event.inputs.llm_model || 'phi2' }}
   OMP_NUM_THREADS: "2"
   MKL_NUM_THREADS: "2"
-  # Evita baixar modelos grandes desnecessariamente se não for ultimate
   TRANSFORMERS_OFFLINE: ${{ github.event.inputs.use_ultimate == 'true' && '0' || '1' }}
 
 jobs:
   evoluir:
     runs-on: ubuntu-latest
-    timeout-minutes: 25   # Aumentado para comportar LLM e download de modelos
+    timeout-minutes: 25
     steps:
     - name: 📥 Checkout do código
       uses: actions/checkout@v4
@@ -46,9 +52,6 @@ jobs:
         fetch-depth: 0
         token: ${{ secrets.GH_TOKEN }}
 
-    # --------------------------------------------------------------------------
-    # CACHE DE DEPENDÊNCIAS (Python + Node + Modelos HF)
-    # --------------------------------------------------------------------------
     - name: 🐍 Setup Python com cache de dependências
       uses: actions/setup-python@v5
       with:
@@ -59,20 +62,20 @@ jobs:
           requirements-ultimate.txt
           pyproject.toml
 
-    - name: 📦 Setup Node.js (sem lock file)
+    - name: 📦 Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '24'
 
-    - name: 💾 Cache dos modelos Hugging Face (apenas se ultimate)
+    - name: 💾 Cache dos modelos Hugging Face
       if: env.ATENA_USE_ULTIMATE == 'true'
       uses: actions/cache@v4
       id: cache-hf
       with:
         path: ~/.cache/huggingface
-        key: ${{ runner.os }}-hf-ultimate-${{ hashFiles('atena_ultimate.py', 'requirements-ultimate.txt') }}
+        key: ${{ runner.os }}-hf-${{ env.LLM_MODEL_CHOICE }}-${{ hashFiles('atena_ultimate.py') }}
         restore-keys: |
-          ${{ runner.os }}-hf-ultimate-
+          ${{ runner.os }}-hf-${{ env.LLM_MODEL_CHOICE }}-
 
     - name: 🔧 Configurar identidade do Git
       run: |
@@ -85,34 +88,28 @@ jobs:
         pip install astor radon requests numpy scikit-learn psutil aiosqlite beautifulsoup4 huggingface_hub faiss-cpu
         npm install -g tsx typescript
 
-    - name: 📦 Instalação de dependências do motor ULTIMATE (condicional)
+    - name: 📦 Instalação de dependências do motor ULTIMATE
       if: env.ATENA_USE_ULTIMATE == 'true'
       run: |
-        # Instala torch com suporte a CPU (mais leve para CI)
         pip install torch --index-url https://download.pytorch.org/whl/cpu
         pip install transformers peft bitsandbytes sentence-transformers rank-bm25 codebleu nltk mlflow wandb optuna redis
-        # Verifica instalação
         python -c "import torch; print(f'PyTorch version: {torch.__version__}')"
 
-    - name: 📝 Criar arquivo de requirements-ultimate.txt (se não existir)
+    - name: 📝 Criar arquivo de configuração do modelo LLM
+      if: env.ATENA_USE_ULTIMATE == 'true'
       run: |
-        if [ ! -f requirements-ultimate.txt ] && [ "${{ env.ATENA_USE_ULTIMATE }}" = "true" ]; then
-          echo "torch" > requirements-ultimate.txt
-          echo "transformers" >> requirements-ultimate.txt
-          echo "peft" >> requirements-ultimate.txt
-          echo "sentence-transformers" >> requirements-ultimate.txt
-          echo "rank-bm25" >> requirements-ultimate.txt
-          echo "codebleu" >> requirements-ultimate.txt
-          echo "nltk" >> requirements-ultimate.txt
-          echo "mlflow" >> requirements-ultimate.txt
-          echo "wandb" >> requirements-ultimate.txt
-          echo "optuna" >> requirements-ultimate.txt
-          echo "redis" >> requirements-ultimate.txt
-        fi
+        case "${{ env.LLM_MODEL_CHOICE }}" in
+          phi2)
+            echo "microsoft/phi-2" > .llm_model_name
+            ;;
+          codegen350)
+            echo "Salesforce/codegen-350M-mono" > .llm_model_name
+            ;;
+          starcoder1b)
+            echo "bigcode/starcoderbase-1b" > .llm_model_name
+            ;;
+        esac
 
-    # --------------------------------------------------------------------------
-    # SANITIZAÇÃO E VALIDAÇÃO ESTÁTICA
-    # --------------------------------------------------------------------------
     - name: 🧹 Sanitização avançada do código
       run: |
         find . -name "*.py" -exec sed -i 's/[^\x00-\x7F]//g' {} \;
@@ -134,9 +131,6 @@ jobs:
           pip list | grep -E "peft|bitsandbytes|codebleu|mlflow|wandb|optuna" || true
         fi
 
-    # --------------------------------------------------------------------------
-    # RESTAURAÇÃO DE MEMÓRIA (Checkpoint + Artefatos)
-    # --------------------------------------------------------------------------
     - name: 🧠 Restauração do último checkpoint
       uses: actions/download-artifact@v4
       with:
@@ -161,16 +155,16 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       continue-on-error: true
 
-    # --------------------------------------------------------------------------
-    # EXECUÇÃO PRINCIPAL (com fallback automático)
-    # --------------------------------------------------------------------------
-    - name: 🔮 Execução da ATENA (tentativa com motor ultimate se ativado)
+    - name: 🔮 Execução da ATENA (tentativa com motor ultimate)
       id: run_atena
       run: |
-        # Verifica se o motor ultimate deve ser usado e se o arquivo existe
         if [ "${{ env.ATENA_USE_ULTIMATE }}" = "true" ] && [ -f "atena_ultimate.py" ]; then
           echo "🚀 Usando motor ULTIMATE (LLM + RAG híbrido)"
           export ATENA_USE_ULTIMATE=true
+          if [ -f ".llm_model_name" ]; then
+            export LLM_MODEL_NAME=$(cat .llm_model_name)
+            echo "📦 Modelo LLM: $LLM_MODEL_NAME"
+          fi
         else
           echo "⚙️ Usando motor clássico"
           export ATENA_USE_ULTIMATE=false
@@ -181,7 +175,6 @@ jobs:
         NEWS_API_KEY: ${{ secrets.NEWS_API_KEY || '' }}
         HF_TOKEN: ${{ secrets.HF_TOKEN || '' }}
         LOG_LEVEL: "INFO"
-        # Força o uso de CPU para evitar problemas de CUDA
         CUDA_VISIBLE_DEVICES: ""
 
     - name: 🔄 Fallback para motor clássico (em caso de falha do ultimate)
@@ -196,9 +189,6 @@ jobs:
         HF_TOKEN: ${{ secrets.HF_TOKEN || '' }}
         LOG_LEVEL: "INFO"
 
-    # --------------------------------------------------------------------------
-    # PÓS-PROCESSAMENTO: COMMIT, BACKUP, MÉTRICAS
-    # --------------------------------------------------------------------------
     - name: 📤 Commit das mutações (evolução do DNA)
       if: always()
       run: |
@@ -260,26 +250,6 @@ jobs:
           atena_evolution/
         retention-days: 7
 
-    # --------------------------------------------------------------------------
-    # NOTIFICAÇÕES (opcionais)
-    # --------------------------------------------------------------------------
-    # - name: 📢 Notificar sucesso no Discord/Slack
-    #   if: success()
-    #   uses: rtCamp/action-slack-notify@v2
-    #   env:
-    #     SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-    #     SLACK_MESSAGE: "✅ Ciclo ATENA concluído com sucesso! Geração ${{ github.run_id }}"
-    #
-    # - name: 🚨 Notificar falha
-    #   if: failure()
-    #   uses: rtCamp/action-slack-notify@v2
-    #   env:
-    #     SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-    #     SLACK_MESSAGE: "❌ Falha no ciclo ATENA! Veja os logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
-    # --------------------------------------------------------------------------
-    # LIMPEZA DE CACHES ANTIGAS (opcional)
-    # --------------------------------------------------------------------------
     - name: 🧹 Limpeza de caches antigos do pip
       if: always()
       run: |

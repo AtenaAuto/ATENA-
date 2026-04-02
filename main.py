@@ -6121,6 +6121,27 @@ class AtenaCore:
             replaced=replaced,
         )
 
+        # Hiper-Evoluo (Nvel AGI)
+        try:
+            from modules.hyper_evolution import HyperEvolutionEngine
+            hyper = HyperEvolutionEngine()
+            if HAS_CURIOSITY:
+                topic = curiosity.get_next_topic()
+                if random.random() < 0.3: # 30% de chance de gerar novo mdulo
+                    proposal = hyper.propose_new_module(topic)
+                    if hyper.run_adversarial_test(proposal["code"]):
+                        with open(proposal["path"], "w") as f:
+                            f.write(proposal["code"])
+                        logger.info(f"🔱 Hiper-Evoluo: Novo mdulo auto-gerado: {proposal['name']}")
+            
+            # Evoluo da funo de recompensa
+            new_weights = hyper.evolve_reward_function(metrics)
+            for k, v in new_weights.items():
+                if k in weights:
+                    weights[k] *= v
+        except Exception as e:
+            logger.debug(f"Erro na Hiper-Evoluo: {e}")
+
         gc.collect()
         return {
             "generation": self.generation,

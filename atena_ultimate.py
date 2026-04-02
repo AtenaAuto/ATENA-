@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
                 ATENA NEURAL v4.2 - ULTIMATE EDITION (CORRIGIDO)
-  LLM leve (phi-2) | Geração de código válido | Fallback robusto
+  LLM leve (phi-2) | Gerao de cdigo vlido | Fallback robusto
 """
 
 import os
@@ -21,17 +21,17 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 
 # =============================================================================
-# IMPORTAÇÕES OBRIGATÓRIAS
+# IMPORTAES OBRIGATRIAS
 # =============================================================================
 try:
     import torch
     HAS_TORCH = True
 except ImportError:
     HAS_TORCH = False
-    logging.warning("PyTorch não instalado. Motor ultimate terá funcionalidade reduzida.")
+    logging.warning("PyTorch no instalado. Motor ultimate ter funcionalidade reduzida.")
 
 # =============================================================================
-# 1. CONFIGURAÇÃO ULTRA (AJUSTADA)
+# 1. CONFIGURAO ULTRA (AJUSTADA)
 # =============================================================================
 @dataclass
 class UltraConfig:
@@ -40,8 +40,8 @@ class UltraConfig:
     llm_model_name: str = os.getenv("LLM_MODEL_NAME", "microsoft/phi-2")
     llm_device: str = "cpu"
     llm_max_length: int = 512
-    temperature: float = 0.3          # Menos criativo, mais determinístico
-    num_beams: int = 2                # Mais rápido
+    temperature: float = 0.3          # Menos criativo, mais determinstico
+    num_beams: int = 2                # Mais rpido
     max_new_tokens: int = 256
 
 cfg = UltraConfig()
@@ -73,7 +73,7 @@ class AdvancedGenerator:
         self.tokenizer = tokenizer
 
     def generate(self, prompt: str, max_new_tokens: int = 256) -> str:
-        # Monta um prompt estruturado para gerar APENAS código
+        # Monta um prompt estruturado para gerar APENAS cdigo
         full_prompt = f"""You are an expert Python programmer. Write ONLY the Python function requested. No explanations, no markdown, no extra text.
 
 {prompt}
@@ -90,12 +90,12 @@ Function:"""
                 pad_token_id=self.tokenizer.eos_token_id
             )
         result = self.tokenizer.decode(output[0], skip_special_tokens=True)
-        # Extrai apenas o código (remove texto anterior)
+        # Extrai apenas o cdigo (remove texto anterior)
         if "```python" in result:
             result = result.split("```python")[-1].split("```")[0]
         elif "```" in result:
             result = result.split("```")[1]
-        # Remove linhas que não começam com 'def ' ou 'class '
+        # Remove linhas que no comeam com 'def ' ou 'class '
         lines = result.split('\n')
         code_lines = []
         in_function = False
@@ -220,7 +220,7 @@ class AtenaUltimateCore:
     def generate_code(self, prompt: str) -> str:
         if not self.generator:
             return "def dummy():\n    return 0"
-        # Tenta até 3 vezes gerar código válido
+        # Tenta at 3 vezes gerar cdigo vlido
         for attempt in range(3):
             code = self.generator.generate(prompt)
             if code and 'def ' in code and '(' in code:

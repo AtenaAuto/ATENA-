@@ -100,6 +100,12 @@ try:
 except ImportError:
     HAS_WORLD_MODEL = False
 
+try:
+    from rlhf_engine import rlhf
+    HAS_RLHF = True
+except ImportError:
+    HAS_RLHF = False
+
 # --- Bibliotecas opcionais com fallbacks ---
 try:
     import radon.complexity as radon_cc
@@ -5978,6 +5984,12 @@ class AtenaCore:
                     else:
                         logger.info(f"✅ WorldModel validou mutação: {desc[:30]} (Score previsto: {predicted_score:.2f})")
                         blended *= 1.1 # Bônus por validação em ambiente isolado
+                
+                # RLHF Interno: Modelo de Recompensa Local
+                if HAS_RLHF:
+                    reward_mult = rlhf.get_reward_multiplier(mtype)
+                    blended *= reward_mult
+                    logger.info(f"🧠 RLHF: Multiplicador de recompensa para '{mtype}': {reward_mult:.2f}")
             return code, desc, mtype, metrics, blended
 
         with concurrent.futures.ThreadPoolExecutor(
@@ -6009,6 +6021,10 @@ class AtenaCore:
             if HAS_CURIOSITY:
                 curiosity.update_reward(recon_topic, 1.0)
             
+            # RLHF: Registra sucesso
+            if HAS_RLHF:
+                rlhf.record_feedback(mtype, True)
+            
             # Salva experiência na memória vetorial
             if HAS_VECTOR_MEMORY and HAS_TRANSFORMERS:
                 try:
@@ -6031,6 +6047,9 @@ class AtenaCore:
                 logger.info(f"  No melhorou (melhor: {best_candidate_score:.2f}, threshold: {improvement_threshold:.2f})")
                 if HAS_CURIOSITY:
                     curiosity.update_reward(recon_topic, 0.1)
+                # RLHF: Registra falha (não melhorou)
+                if HAS_RLHF:
+                    rlhf.record_feedback(mtype, False)
             else:
                 desc, mtype = "none", "none"
                 metrics = self.evaluator.evaluate(self.current_code)

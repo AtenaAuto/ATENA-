@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                ATENA NEURAL v4.0 - ULTIMATE EDITION                         ║
-║  LLM 4-bit | PEFT (LoRA/AdaLoRA/IA3) | Hybrid RAG + Re-ranker               ║
-║  Contrastive Decoding | CodeBLEU | Distillation | MLflow | Optuna          ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+
+                ATENA NEURAL v4.0 - ULTIMATE EDITION                         
+  LLM 4-bit | PEFT (LoRA/AdaLoRA/IA3) | Hybrid RAG + Re-ranker               
+  Contrastive Decoding | CodeBLEU | Distillation | MLflow | Optuna          
+
 """
 
 import os
@@ -29,12 +29,12 @@ from dataclasses import dataclass, field, asdict
 from collections import defaultdict, deque
 
 # =============================================================================
-# 1. CONFIGURAÇÃO ULTRA (com suporte a todas as novidades)
+# 1. CONFIGURAO ULTRA (com suporte a todas as novidades)
 # =============================================================================
 
 @dataclass
 class UltraConfig:
-    # Diretórios
+    # Diretrios
     BASE_DIR: Path = Path("./atena_evolution")
     MODEL_DIR: Path = BASE_DIR / "models"
     CACHE_DIR: Path = BASE_DIR / "cache"
@@ -52,14 +52,14 @@ class UltraConfig:
     lora_r: int = 16
     lora_alpha: int = 32
     
-    # RAG híbrido
+    # RAG hbrido
     use_rag: bool = True
     rag_dense_model: str = "BAAI/bge-small-en-v1.5"
     rag_use_bm25: bool = True
     rag_reranker: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     rag_top_k: int = 5
     
-    # Decodificação avançada
+    # Decodificao avanada
     decoding_strategy: str = "contrastive"  # contrastive, typical, diverse_beam
     temperature: float = 0.8
     top_p: float = 0.95
@@ -68,7 +68,7 @@ class UltraConfig:
     num_beams: int = 5
     diversity_penalty: float = 0.6
     
-    # Avaliação
+    # Avaliao
     evaluate_codebleu: bool = True
     evaluate_pass_at_k: int = 3
     sandbox_type: str = "docker"  # docker, nsjail, subprocess
@@ -83,7 +83,7 @@ class UltraConfig:
     use_wandb: bool = False
     mlflow_experiment: str = "atena_neural"
     
-    # Otimização
+    # Otimizao
     use_optuna: bool = True
     optuna_n_trials: int = 20
     
@@ -158,7 +158,7 @@ class SecureSandbox:
             os.unlink(fname)
 
 # =============================================================================
-# 3. RAG HÍBRIDO COM RE-RANKER (Dense + BM25 + Cross-encoder)
+# 3. RAG HBRIDO COM RE-RANKER (Dense + BM25 + Cross-encoder)
 # =============================================================================
 
 class HybridRAG:
@@ -175,7 +175,7 @@ class HybridRAG:
             from sentence_transformers import SentenceTransformer
             self.dense = SentenceTransformer(cfg.rag_dense_model)
         except ImportError:
-            logging.warning("sentence-transformers não instalado")
+            logging.warning("sentence-transformers no instalado")
     
     def _init_reranker(self):
         if cfg.rag_reranker:
@@ -213,7 +213,7 @@ class HybridRAG:
         if self.bm25:
             bm25_scores = self.bm25.get_scores(query.split())
             sparse_scores = list(enumerate(bm25_scores))
-        # Fusão híbrida (reciprocal rank fusion)
+        # Fuso hbrida (reciprocal rank fusion)
         scores = {}
         for idx, score in dense_scores:
             scores[idx] = scores.get(idx, 0) + 1.0 / (1 + score)  # RRF
@@ -231,7 +231,7 @@ class HybridRAG:
         return [(self.corpus[idx], score) for idx, score in candidates[:top_k]]
 
 # =============================================================================
-# 4. GERADOR COM DECODIFICAÇÃO AVANÇADA (Contrastive, Typical, Diverse Beam)
+# 4. GERADOR COM DECODIFICAO AVANADA (Contrastive, Typical, Diverse Beam)
 # =============================================================================
 
 class AdvancedGenerator:
@@ -317,7 +317,7 @@ class AdvancedGenerator:
         return min(beams, key=lambda x: x[1])[0]
 
 # =============================================================================
-# 5. AVALIAÇÃO AVANÇADA (CodeBLEU, pass@k, segurança)
+# 5. AVALIAO AVANADA (CodeBLEU, pass@k, segurana)
 # =============================================================================
 
 class CodeEvaluator:
@@ -428,15 +428,15 @@ class AtenaUltimateCore:
         return "def main():\n    print('Atena v4')\n"
     
     def _evaluate(self, code: str) -> Dict:
-        # Avaliação com CodeBLEU e segurança
+        # Avaliao com CodeBLEU e segurana
         score = 0.0
         if not self.evaluator.security_scan(code):
             return {"score": 0.0, "valid": False, "security": False}
-        # Simula execução e outras métricas
+        # Simula execuo e outras mtricas
         success, output, exec_time = self.evaluator.sandbox.execute(code)
         if not success:
             return {"score": 0.0, "valid": False, "runtime_error": output}
-        # Aqui você pode usar um scorer evoluível (como na v3)
+        # Aqui voc pode usar um scorer evoluvel (como na v3)
         # Por simplicidade, um scorer simples:
         lines = len(code.splitlines())
         score = min(100, max(0, 100 - lines/10 + exec_time*5))
@@ -469,15 +469,15 @@ class AtenaUltimateCore:
     def train_distillation(self, teacher_model_name: str):
         if not cfg.use_distillation:
             return
-        # Implementação simplificada - em produção seria mais robusta
+        # Implementao simplificada - em produo seria mais robusta
         from transformers import AutoModelForCausalLM, TrainingArguments, Trainer
         teacher = AutoModelForCausalLM.from_pretrained(teacher_model_name, device_map="auto")
         teacher.eval()
         # ... loop de distillation ...
-        logging.info("Distillation concluída")
+        logging.info("Distillation concluda")
 
 # =============================================================================
-# 7. INTEGRAÇÃO COM O SISTEMA ORIGINAL (patch)
+# 7. INTEGRAO COM O SISTEMA ORIGINAL (patch)
 # =============================================================================
 
 def patch_atena_core(original_core) -> AtenaUltimateCore:
@@ -486,7 +486,7 @@ def patch_atena_core(original_core) -> AtenaUltimateCore:
     # Copia atributos essenciais
     original_core.__class__ = type('PatchedCore', (original_core.__class__,), {})
     original_core.ultra = new_core
-    # Monkey patch dos métodos principais
+    # Monkey patch dos mtodos principais
     def evolve_one_cycle(self):
         return new_core.evolve_one_cycle()
     def generate_code(self, prompt):

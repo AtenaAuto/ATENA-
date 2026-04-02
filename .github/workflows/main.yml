@@ -479,13 +479,3 @@ jobs:
           atena_evolution/lm/ngram.pkl
           atena_evolution/lm/data/
         retention-days: 7
-
-    - name: 🔔 Notificar Sucesso/Falha
-      if: always()
-      uses: rjstone/discord-webhook-notify@v1
-      with:
-        severity: ${{ job.status }}
-        description: "Atena Ω CI/CD Run #${{ github.run_number }} - ${{ job.status }}"
-        webhookUrl: ${{ secrets.DISCORD_WEBHOOK }}
-        details: "[Ver Workflow](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-

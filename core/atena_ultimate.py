@@ -37,12 +37,12 @@ except ImportError:
 class UltraConfig:
     BASE_DIR: Path = Path("./atena_evolution")
     use_llm: bool = True
-    llm_model_name: str = os.getenv("LLM_MODEL_NAME", "microsoft/phi-2")
+    llm_model_name: str = os.getenv("LLM_MODEL_NAME", "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B")
     llm_device: str = "cpu"
-    llm_max_length: int = 512
-    temperature: float = 0.3          # Menos criativo, mais determinstico
-    num_beams: int = 2                # Mais rpido
-    max_new_tokens: int = 256
+    llm_max_length: int = 2048        # Aumentado para suportar Chain-of-Thought
+    temperature: float = 0.6          # Ajustado para melhor raciocínio
+    num_beams: int = 1                # DeepSeek-R1 prefere amostragem simples
+    max_new_tokens: int = 1024        # Aumentado para o bloco <think> e resposta
 
 cfg = UltraConfig()
 
@@ -72,14 +72,12 @@ class AdvancedGenerator:
         self.model = model
         self.tokenizer = tokenizer
 
-    def generate(self, prompt: str, max_new_tokens: int = 256) -> str:
-        # Monta um prompt estruturado para gerar APENAS cdigo
-        full_prompt = f"""You are an expert Python programmer. Write ONLY the Python function requested. No explanations, no markdown, no extra text.
-
-{prompt}
-
-Function:"""
-        inputs = self.tokenizer(full_prompt, return_tensors="pt", truncation=True, max_length=512).to(self.model.device)
+    def generate(self, prompt: str, max_new_tokens: int = 1024) -> str:
+        # Prompt otimizado para DeepSeek-R1 (Reasoning)
+        full_prompt = f"""<system>You are an expert autonomous AI agent. Use your internal reasoning to solve the task.</system>
+<user>{prompt}</user>
+<think>"""
+        inputs = self.tokenizer(full_prompt, return_tensors="pt", truncation=True, max_length=cfg.llm_max_length).to(self.model.device)
         with torch.no_grad():
             output = self.model.generate(
                 inputs.input_ids,
@@ -90,7 +88,14 @@ Function:"""
                 pad_token_id=self.tokenizer.eos_token_id
             )
         result = self.tokenizer.decode(output[0], skip_special_tokens=True)
-        # Extrai apenas o cdigo (remove texto anterior)
+        
+        # Extração inteligente para DeepSeek-R1 (remove o bloco <think> se presente)
+        if "</think>" in result:
+            thought_process = result.split("</think>")[0].replace("<think>", "").strip()
+            result = result.split("</think>")[-1].strip()
+            logging.info(f"🧠 Raciocínio da IA: {thought_process[:200]}...")
+
+        # Extrai apenas o código (remove markdown)
         if "```python" in result:
             result = result.split("```python")[-1].split("```")[0]
         elif "```" in result:

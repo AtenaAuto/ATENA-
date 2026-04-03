@@ -8,15 +8,23 @@ on:
       generations:
         description: 'Número de gerações'
         required: true
-        default: '30'
+        default: '10'
         type: choice
-        options: ['3', '5', '10', '20', '50']
+        options:
+          - '3'
+          - '5'
+          - '10'
+          - '20'
+          - '50'
       mode:
         description: 'Modo de evolução'
         required: true
         default: 'auto'
         type: choice
-        options: ['auto', 'recon', 'nocode']
+        options:
+          - 'auto'
+          - 'recon'
+          - 'nocode'
       deep_self_mod:
         description: 'Permite que a Atena modifique o próprio engine'
         required: false
@@ -30,14 +38,13 @@ permissions:
 
 concurrency:
   group: atena-evolution
-  cancel-in-progress: false # IMPORTANTE: Não cancela o anterior para não dar erro de "Operation Canceled"
+  cancel-in-progress: false
 
 env:
   PYTHON_VERSION: '3.11'
   GENERATIONS: ${{ github.event.inputs.generations || '10' }}
   MODE: ${{ github.event.inputs.mode || 'auto' }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  # Adicione seus outros envs aqui se necessário
 
 jobs:
   evoluir:
@@ -62,14 +69,19 @@ jobs:
         sudo apt-get update -qq
         sudo apt-get install -y python3-dev build-essential sqlite3 jq tesseract-ocr
 
-    - name: 📦 Instalar dependências Python (Correção de Erro)
+    - name: 📦 Instalar dependências Python
       run: |
         python -m pip install --upgrade pip setuptools wheel
         # Instala o Torch separadamente com timeout para não cair
         python -m pip install --default-timeout=100 torch torchvision --index-url https://download.pytorch.org/whl/cpu
-        # Instala o restante das dependências
-        if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; fi
-        python install.py || echo "install.py executado"
+        # Instala as dependências do projeto
+        if [ -f setup/requirements.txt ]; then
+          python -m pip install -r setup/requirements.txt
+        fi
+        # Executa o instalador customizado se existir
+        if [ -f setup/install.py ]; then
+          python setup/install.py || echo "install.py executado com avisos"
+        fi
 
     - name: 📂 Preparar Estrutura de Pastas
       run: |
@@ -78,9 +90,8 @@ jobs:
     - name: 🧠 Restaurar Memória (Atena Brain)
       run: |
         echo "Buscando última memória salva..."
-        # Busca o ID do último artefato de sucesso via GitHub CLI
         LAST_ARTIFACT_ID=$(gh run list --workflow "${{ github.workflow }}" --status success --limit 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || echo "")
-        
+
         if [ -n "$LAST_ARTIFACT_ID" ]; then
           gh run download $LAST_ARTIFACT_ID -n "atena-brain-data" --dir . || echo "Nenhum artefato encontrado"
           if [ -f brain.zip ]; then unzip -o brain.zip; fi
@@ -95,11 +106,13 @@ jobs:
         echo "🚀 Iniciando motor de evolução..."
         EXTRA_ARGS=""
         if [ "${{ github.event.inputs.deep_self_mod }}" == "true" ]; then EXTRA_ARGS="--deep"; fi
-        
+
         if [ "${{ env.MODE }}" == "recon" ]; then
-          python main.py --recon "advanced python optimization" $EXTRA_ARGS
+          python core/main.py --recon "advanced python optimization" $EXTRA_ARGS
+        elif [ "${{ env.MODE }}" == "nocode" ]; then
+          python core/main.py --nocode --desc "a simple flask web app with sqlite" $EXTRA_ARGS
         else
-          python main.py --auto --cycles ${{ env.GENERATIONS }} $EXTRA_ARGS
+          python core/main.py --auto --cycles ${{ env.GENERATIONS }} $EXTRA_ARGS
         fi
 
     - name: ⬆️ Salvar Evolução (Upload Artefatos)

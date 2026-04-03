@@ -6278,7 +6278,11 @@ class AtenaApp:
             self.core.learner.stop()
         self.core.vocab_harvester.stop()
         self.dashboard.stop()
-        self.core.kb.prune_eval_cache()
+        try:
+            # Prune cache ANTES de fechar a conexão
+            self.core.kb.prune_eval_cache()
+        except Exception as e:
+            logger.warning(f"Erro ao limpar cache no shutdown: {e}")
         self.core.kb.close()
         logger.info(f"[] Score final: {self.core.best_score:.2f} | Geraes: {self.core.generation}")
 

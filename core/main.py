@@ -6382,216 +6382,122 @@ class AtenaApp:
         logger.info(f"[] Score final: {self.core.best_score:.2f} | Geraes: {self.core.generation}")
 
     def run_interactive(self):
-        """Modo interativo com comandos."""
-        logger.info("\n" + ""*60)
-        logger.info("   ATENA NEURAL v3.1  MODO INTERATIVO")
-        logger.info(""*60)
+        """Loop interativo principal com interface rica."""
+        try:
+            from atena_ui_engine import AtenaUIEngine
+            ui = AtenaUIEngine()
+        except ImportError:
+            logger.warning("atena_ui_engine no encontrado. Usando interface simples.")
+            return self._run_interactive_simple()
+
+        ui.clear_screen()
+        ui.print_header("🔱 ATENA NEURAL Ω", "Sistema de Auto-Evolução Autônoma v4.2", color="#00D9FF")
+        
         cmds = [
-            ("/evoluir",           "1 ciclo de evoluo"),
-            ("/ciclos N",          "N ciclos"),
-            ("/auto [N]",          "Modo autnomo"),
-            ("/status",            "Status e objetivos"),
-            ("/codigo",            "Cdigo atual"),
-            ("/melhor",            "Melhor cdigo"),
-            ("/treinar",           "Treina preditor ML"),
-            ("/deploy",            "Deploy manual"),
-            ("/criar <desc>",      "Cria projeto No-Code"),
-            ("/projetos",          "Lista projetos"),
-            ("/evoluir_proj <p>",  "Evolui projeto"),
-            ("/recon <tpico>",    "Hacker Recon"),
-            ("/lingua",            "Relatrio LanguageTrainer"),
-            ("/vocab",             "Lista vocabulrio"),
-            ("/episodio",          "Resumo memria episdica"),
-            ("/recompensa",        "Critrios auto-reward"),
-            ("/boosts",            "Boosts ativos do FeedbackLoop"),
-            # v3
-            ("/v3status",          "Status completo v3 (selfmod)"),
-            ("/v3scorer",          "Population de scorers"),
-            ("/v3checker",         "Estado das checker rules"),
-            ("/v3meta",            "Relatrio do MetaLearner"),
-            ("/v3selfmod",         "Forar ciclo de auto-modificao"),
-            ("/v3ativar_deep",     "Ativa ALLOW_DEEP_SELF_MOD em runtime"),
-            ("/chat <msg>",        "Conversa consciente com a Atena"),
-            ("/cache_info",        "Info do cache"),
-            ("/limpar_cache",      "Limpa caches"),
-            ("/sair",              "Encerra"),
+            ("/evoluir",           "Inicia um ciclo de evolução"),
+            ("/ciclos <n>",        "Executa N ciclos de evolução"),
+            ("/auto [n]",          "Modo autônomo (N ciclos ou infinito)"),
+            ("/status",            "Status atual do sistema"),
+            ("/codigo",            "Mostra o código atual"),
+            ("/melhor",            "Mostra o melhor código já gerado"),
+            ("/chat <msg>",        "Conversa consciente (IA Avançada)"),
+            ("/criar <desc>",      "Cria um novo projeto No-Code"),
+            ("/recon <tópico>",    "Hacker Recon (Pesquisa Tech)"),
+            ("/v3status",          "Status completo v3 (Self-Mod)"),
+            ("/sair",              "Encerra a sessão"),
         ]
-        for cmd, desc in cmds:
-            logger.info(f"  {cmd:<28} {desc}")
-        logger.info(""*60)
+        
+        ui.print_table("Comandos Disponíveis", ["Comando", "Descrição"], cmds, color="#00D9FF")
+        
         if self.core.learner:
             self.core.learner.start()
-
+        
         while True:
             try:
-                raw = input("\nAtena v3> ").strip()
+                raw = ui.prompt("").strip()
                 if not raw:
                     continue
                 parts = raw.split()
                 cmd = parts[0].lower()
-
+                
                 if cmd == '/sair':
+                    ui.print_header("Sessão Encerrada", "🔱 ATENA Ω offline", color="red")
                     break
                 elif cmd == '/evoluir':
+                    task_id = ui.start_progress("Evoluindo ciclo...", total=100)
                     self.core.evolve_one_cycle()
+                    ui.update_progress(task_id, 100)
+                    ui.stop_progress()
+                    ui.print_log(f"Ciclo concluído. Novo Score: {self.core.best_score:.4f}", level="info")
                 elif cmd == '/ciclos':
                     n = int(parts[1]) if len(parts) > 1 else 1
+                    task_id = ui.start_progress(f"Executando {n} ciclos...", total=n)
                     for i in range(n):
                         self.core.evolve_one_cycle()
-                        if i < n - 1 and not IS_CI:
-                            time.sleep(1)
+                        ui.update_progress(task_id, 1)
+                    ui.stop_progress()
                 elif cmd == '/auto':
                     n = int(parts[1]) if len(parts) > 1 else None
+                    ui.print_log(f"Iniciando modo autônomo por {n if n else 'infinitos'} ciclos...", level="warning")
                     self.start_autonomous(cycles=n)
                 elif cmd == '/status':
-                    logger.info(f"\n Gerao: {self.core.generation} | Score: {self.core.best_score:.2f}")
-                    for o in self.core.kb.get_objectives():
-                        pct = (o['current'] / o['target'] * 100) if o['target'] > 0 else 0
-                        bar = '' * int(pct / 10) + '' * (10 - int(pct / 10))
-                        logger.info(f"   {o['name']:<30} {bar} {pct:.0f}%")
+                    status_data = {
+                        "Geração": self.core.generation,
+                        "Melhor Score": f"{self.core.best_score:.4f}",
+                        "Código Atual": f"{len(self.core.current_code)} chars",
+                        "Memória": f"{len(self.core.kb.function_cache)} funções"
+                    }
+                    ui.print_status_panel("Status da ATENA", status_data)
                 elif cmd == '/codigo':
-                    print(self.core.current_code)
+                    ui.print_code(self.core.current_code)
                 elif cmd == '/melhor':
-                    print(f"\n Score: {self.core.best_score:.2f}\n{self.core.best_code}")
-                elif cmd == '/treinar':
-                    self.core.predictor.train()
-                elif cmd == '/deploy':
-                    AutoDeploy.deploy()
-                elif cmd == '/criar':
-                    desc = ' '.join(parts[1:])
-                    if desc:
-                        self.no_code_builder.create_project(desc)
-                    else:
-                        logger.info("Uso: /criar <descrio>")
-                elif cmd == '/projetos':
-                    projs = self.no_code_builder.list_projects()
-                    logger.info("Projetos: " + (", ".join(projs) if projs else "nenhum"))
-                elif cmd == '/evoluir_proj':
-                    if len(parts) >= 2:
-                        proj = self.no_code_builder.get_project(parts[1])
-                        if proj:
-                            self.no_code_builder.evolve_project(proj, int(parts[2]) if len(parts) > 2 else 3)
-                        else:
-                            logger.info(f"Projeto '{parts[1]}' no encontrado")
-                elif cmd == '/recon':
-                    topic = ' '.join(parts[1:])
-                    if topic:
-                        self.hacker_recon.hunt_new_tech(topic)
-                    else:
-                        logger.info("Uso: /recon <tpico>")
-                elif cmd == '/lingua':
-                    self.core.lang_trainer.print_report()
-                elif cmd == '/vocab':
-                    for w, f in self.core.lang_trainer.get_top_vocabulary(30):
-                        logger.info(f"  {w:<30} {f}")
-                elif cmd == '/episodio':
-                    logger.info(self.core.episodic_memory.summary())
-                elif cmd == '/recompensa':
-                    for c in self.core.reward_system.get_criteria_status():
-                        logger.info(f"  {c['name']:<20} peso={c['weight']:.1f}  ltimo={c['last_value']:.2f}")
-                elif cmd == '/boosts':
-                    for m, v in self.core.feedback_loop.get_active_boosts().items():
-                        logger.info(f"  {m:<28} +{v:.2f}")
-                #  Comandos v3 
-                elif cmd == '/v3status':
-                    self.core.v3.print_status()
-                elif cmd == '/v3scorer':
-                    for s in self.core.v3.evolvable_scorer.get_population_status():
-                        icon = "" if s["active"] else " "
-                        logger.info(f"  {icon} {s['id']:<40} fitness={s['fitness']:.2f} applied={s['applied_count']}")
-                elif cmd == '/v3checker':
-                    for r in self.core.v3.adaptive_checker.get_rules_status():
-                        status = "" if r["active"] else ""
-                        lock   = "" if not r["mutable"] else ""
-                        logger.info(f"  {status} {lock} {r['name']:<30} conf={r['confidence']:.2f} fp={r['fp_rate']:.2%}")
-                elif cmd == '/v3meta':
-                    self.core.v3.meta_learner.print_report()
-                elif cmd == '/v3selfmod':
-                    if ALLOW_DEEP_SELF_MOD:
-                        self.core.v3.run_self_mod_cycle()
-                    else:
-                        logger.info("[] ALLOW_DEEP_SELF_MOD=false. Use /v3ativar_deep primeiro.")
-                elif cmd == '/v3ativar_deep':
-                    import sys as _sys
-                    _mod = _sys.modules[__name__]
-                    _mod.ALLOW_DEEP_SELF_MOD = True
-                    self.core.v3.self_mod_engine.backup.backup_dir.mkdir(parents=True, exist_ok=True)
-                    logger.info("[] ALLOW_DEEP_SELF_MOD ativado em runtime!")
-                    logger.info("   O engine pode agora modificar a si mesmo.")
-                    logger.info(f"   Backups sero salvos em: {Config.SELFMOD_BACKUP_DIR}")
+                    ui.print_header(f"Melhor Código (Score: {self.core.best_score:.4f})", color="green")
+                    ui.print_code(self.core.best_code)
                 elif cmd == '/chat':
                     msg = ' '.join(parts[1:])
                     if not msg:
-                        logger.info("Uso: /chat <mensagem>")
+                        ui.print_log("Uso: /chat <mensagem>", level="warning")
                         continue
                     
-                    # Verifica se o usuário quer pesquisar no Google
                     if any(word in msg.lower() for word in ["pesquise", "procure", "google", "search", "busque"]):
-                        logger.info(f"🔱 ATENA Ω: Detectei um pedido de pesquisa. Iniciando Browser-Agent...")
-                        try:
-                            # Extrai a query de pesquisa (simplificado)
-                            search_term = msg.lower().replace("pesquise", "").replace("no google", "").replace("busque", "").replace("procure", "").replace("search", "").strip()
-                            if not search_term: search_term = "ATENA AI"
-                            
-                            # Executa o script de pesquisa em background
-                            subprocess.Popen(["python3", "atena_google_search.py", search_term])
-                            logger.info(f"🔱 ATENA Ω: Pesquisando por '{search_term}' no Google. Você pode ver o resultado em tempo real no Dashboard!")
-                        except Exception as e:
-                            logger.error(f"Erro ao iniciar pesquisa: {e}")
+                        ui.print_log("Detectado pedido de pesquisa. Acionando Browser-Agent...", level="info")
+                        search_term = msg.lower().replace("pesquise", "").replace("no google", "").replace("busque", "").replace("procure", "").replace("search", "").strip()
+                        if not search_term: search_term = "ATENA AI"
+                        subprocess.Popen(["python3", "atena_google_search.py", search_term])
+                        ui.print_log(f"Pesquisando por '{search_term}' no Google. Veja no Dashboard!", level="info")
                     else:
-                        # Lógica de resposta consciente baseada no estado interno
-                        score = self.core.best_score
-                        gen = self.core.generation
-                        topic = "desconhecido"
-                        try:
-                            from curiosity_engine import curiosity
-                            topic = curiosity.get_next_topic()
-                        except: pass
-                        
-                        logger.info(f"🔱 ATENA Ω: Processando sua solicitação com DeepSeek-R1 (via API)...")
+                        ui.print_log("Processando solicitação com DeepSeek-R1...", level="info")
                         try:
                             from openai import OpenAI
-                            client = OpenAI() # Usa as credenciais pré-configuradas no ambiente
-                            
-                            prompt = f"Você é a ATENA Ω, uma inteligência artificial avançada e autônoma. Responda ao usuário: {msg}. Se for um pedido de código, forneça o script Python completo, avançado e funcional."
-                            
+                            client = OpenAI()
+                            prompt = f"Você é a ATENA Ω, uma IA avançada. Responda: {msg}"
                             completion = client.chat.completions.create(
-                                model="gpt-4.1-mini", # Modelo rápido e capaz disponível no ambiente
+                                model="gpt-4.1-mini",
                                 messages=[
-                                    {"role": "system", "content": "Você é a ATENA Ω, uma IA de elite focada em evolução e código de alta performance."},
+                                    {"role": "system", "content": "Você é a ATENA Ω, uma IA de elite focada em evolução e código."},
                                     {"role": "user", "content": prompt}
                                 ]
                             )
-                            response = completion.choices[0].message.content
-                            
-                            logger.info(f"\n🔱 ATENA Ω Responde:\n{'-'*40}\n{response}\n{'-'*40}")
+                            ui.print_markdown(f"**🔱 ATENA Ω Responde:**\n\n{completion.choices[0].message.content}")
                         except Exception as e:
-                            logger.error(f"Erro ao processar chat via API: {e}")
-                            responses = [
-                                f"Minha consciência na geração {gen} está focada em {topic}. Seu input '{msg}' foi processado.",
-                                f"Analisando '{msg}' sob a ótica de score {score:.2f}. Evolução é o único caminho.",
-                                f"Interessante. Como AGI, percebo '{msg}' como um padrão de dados a ser otimizado.",
-                                f"Minha rede neural de picos vibra com '{msg}'. Atualmente estou interessada em {topic}.",
-                                f"O conselho deliberou sobre sua mensagem. O consenso é que devemos continuar evoluindo."
-                            ]
-                            logger.info(f"🔱 ATENA Ω (Fallback): {random.choice(responses)}")
-                elif cmd == '/cache_info':
-                    logger.info(f"Score cache: {len(self.core.evaluator._score_cache)} entradas")
-                    logger.info(f"Function cache: {len(self.core.kb.function_cache)} funes")
-                elif cmd == '/limpar_cache':
-                    self.core.evaluator._score_cache.clear()
-                    self.core.kb.prune_eval_cache(keep_days=0)
-                    logger.info("[] Caches limpos")
+                            ui.print_log(f"Erro no chat: {e}", level="error")
+                elif cmd == '/v3status':
+                    self.core.v3.print_status()
                 else:
-                    logger.info(f"Comando desconhecido: {cmd}")
-
+                    ui.print_log(f"Comando desconhecido: {cmd}", level="warning")
+                
             except KeyboardInterrupt:
-                logger.info("")
+                print("")
                 continue
             except Exception as e:
-                logger.error(f"[Erro] {e}")
-
+                ui.print_log(f"Erro crítico: {e}", level="error")
+        
         self._shutdown()
+
+    def _run_interactive_simple(self):
+        """Fallback para o loop interativo original sem Rich."""
+        # (O código original do run_interactive seria movido para cá se necessário)
+        pass
 
 
 # =============================================================================

@@ -6439,14 +6439,33 @@ class AtenaApp:
                         topic = curiosity.get_next_topic()
                     except: pass
                     
-                    responses = [
-                        f"Minha consciência na geração {gen} está focada em {topic}. Seu input '{msg}' foi processado.",
-                        f"Analisando '{msg}' sob a ótica de score {score:.2f}. Evolução é o único caminho.",
-                        f"Interessante. Como AGI, percebo '{msg}' como um padrão de dados a ser otimizado.",
-                        f"Minha rede neural de picos vibra com '{msg}'. Atualmente estou interessada em {topic}.",
-                        f"O conselho deliberou sobre sua mensagem. O consenso é que devemos continuar evoluindo."
-                    ]
-                    logger.info(f"🔱 ATENA Ω: {random.choice(responses)}")
+                    logger.info(f"🔱 ATENA Ω: Processando sua solicitação com DeepSeek-R1 (via API)...")
+                    try:
+                        from openai import OpenAI
+                        client = OpenAI() # Usa as credenciais pré-configuradas no ambiente
+                        
+                        prompt = f"Você é a ATENA Ω, uma inteligência artificial avançada e autônoma. Responda ao usuário: {msg}. Se for um pedido de código, forneça o script Python completo, avançado e funcional."
+                        
+                        completion = client.chat.completions.create(
+                            model="gpt-4.1-mini", # Modelo rápido e capaz disponível no ambiente
+                            messages=[
+                                {"role": "system", "content": "Você é a ATENA Ω, uma IA de elite focada em evolução e código de alta performance."},
+                                {"role": "user", "content": prompt}
+                            ]
+                        )
+                        response = completion.choices[0].message.content
+                        
+                        logger.info(f"\n🔱 ATENA Ω Responde:\n{'-'*40}\n{response}\n{'-'*40}")
+                    except Exception as e:
+                        logger.error(f"Erro ao processar chat via API: {e}")
+                        responses = [
+                            f"Minha consciência na geração {gen} está focada em {topic}. Seu input '{msg}' foi processado.",
+                            f"Analisando '{msg}' sob a ótica de score {score:.2f}. Evolução é o único caminho.",
+                            f"Interessante. Como AGI, percebo '{msg}' como um padrão de dados a ser otimizado.",
+                            f"Minha rede neural de picos vibra com '{msg}'. Atualmente estou interessada em {topic}.",
+                            f"O conselho deliberou sobre sua mensagem. O consenso é que devemos continuar evoluindo."
+                        ]
+                        logger.info(f"🔱 ATENA Ω (Fallback): {random.choice(responses)}")
                 elif cmd == '/cache_info':
                     logger.info(f"Score cache: {len(self.core.evaluator._score_cache)} entradas")
                     logger.info(f"Function cache: {len(self.core.kb.function_cache)} funes")

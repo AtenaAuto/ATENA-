@@ -2,7 +2,7 @@ name: 🧬 ATENA Ω - Evolução Divina v4.2 (DeepSeek-R1 Edition)
 
 on:
   schedule:
-    - cron: '0 */6 * * *' # Executa a cada 6 horas para economizar recursos
+    - cron: '0 */30 * * *' # Executa a cada 30 minutus para economizar recursos
   workflow_dispatch:
     inputs:
       model_size:
@@ -19,9 +19,9 @@ on:
         default: '5'
         type: choice
         options:
-          - '3'
-          - '5'
           - '10'
+          - '30'
+          - '50'
       mode:
         description: 'Modo de evolução'
         required: true
@@ -43,7 +43,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        model_size: [1.5B] # Por padrão no schedule, roda a leve. No manual, pode escolher.
+        model_size: [1.5B] 
     
     env:
       PYTHON_VERSION: '3.11'
@@ -60,14 +60,15 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYTHON_VERSION }}
-        cache: 'pip'
+        # Removido cache temporariamente para garantir instalação limpa se necessário
+        # cache: 'pip'
 
     - name: 🔧 Instalar dependências
       run: |
         sudo apt-get update -qq
         sudo apt-get install -y sqlite3
         python -m pip install --upgrade pip
-        python -m pip install torch transformers accelerate faiss-cpu astor
+        python -m pip install requests torch transformers accelerate faiss-cpu astor
 
     - name: 📂 Preparar Estrutura
       run: |
@@ -87,3 +88,4 @@ jobs:
           atena_evolution/knowledge/knowledge.db
           atena_evolution/logs/
         retention-days: 3
+        

@@ -227,13 +227,23 @@ with tab3:
         st.subheader("📸 Última Navegação do Browser-Agent")
         
         # Procura por screenshots recentes
-        screenshot_path = "/home/ubuntu/atena_repo/atena_github_test.png"
+        col1, col2 = st.columns(2)
         
-        if os.path.exists(screenshot_path):
-            st.image(screenshot_path, caption="Screenshot da Navegação", use_column_width=True)
-            st.success(f"✅ Screenshot capturado em tempo real")
-        else:
-            st.info("📷 Aguardando primeira navegação...")
+        with col1:
+            st.subheader("GitHub ATENA")
+            github_shot = "/home/ubuntu/atena_repo/atena_github_test.png"
+            if os.path.exists(github_shot):
+                st.image(github_shot, use_column_width=True)
+            else:
+                st.info("Aguardando navegação no GitHub...")
+                
+        with col2:
+            st.subheader("Pesquisa Google")
+            google_shot = "/home/ubuntu/atena_repo/google_search_result.png"
+            if os.path.exists(google_shot):
+                st.image(google_shot, use_column_width=True)
+            else:
+                st.info("Aguardando pesquisa no Google...")
         
         st.divider()
         

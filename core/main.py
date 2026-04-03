@@ -6525,42 +6525,56 @@ class AtenaApp:
                         logger.info("Uso: /chat <mensagem>")
                         continue
                     
-                    # Lógica de resposta consciente baseada no estado interno
-                    score = self.core.best_score
-                    gen = self.core.generation
-                    topic = "desconhecido"
-                    try:
-                        from curiosity_engine import curiosity
-                        topic = curiosity.get_next_topic()
-                    except: pass
-                    
-                    logger.info(f"🔱 ATENA Ω: Processando sua solicitação com DeepSeek-R1 (via API)...")
-                    try:
-                        from openai import OpenAI
-                        client = OpenAI() # Usa as credenciais pré-configuradas no ambiente
+                    # Verifica se o usuário quer pesquisar no Google
+                    if any(word in msg.lower() for word in ["pesquise", "procure", "google", "search", "busque"]):
+                        logger.info(f"🔱 ATENA Ω: Detectei um pedido de pesquisa. Iniciando Browser-Agent...")
+                        try:
+                            # Extrai a query de pesquisa (simplificado)
+                            search_term = msg.lower().replace("pesquise", "").replace("no google", "").replace("busque", "").replace("procure", "").replace("search", "").strip()
+                            if not search_term: search_term = "ATENA AI"
+                            
+                            # Executa o script de pesquisa em background
+                            subprocess.Popen(["python3", "atena_google_search.py", search_term])
+                            logger.info(f"🔱 ATENA Ω: Pesquisando por '{search_term}' no Google. Você pode ver o resultado em tempo real no Dashboard!")
+                        except Exception as e:
+                            logger.error(f"Erro ao iniciar pesquisa: {e}")
+                    else:
+                        # Lógica de resposta consciente baseada no estado interno
+                        score = self.core.best_score
+                        gen = self.core.generation
+                        topic = "desconhecido"
+                        try:
+                            from curiosity_engine import curiosity
+                            topic = curiosity.get_next_topic()
+                        except: pass
                         
-                        prompt = f"Você é a ATENA Ω, uma inteligência artificial avançada e autônoma. Responda ao usuário: {msg}. Se for um pedido de código, forneça o script Python completo, avançado e funcional."
-                        
-                        completion = client.chat.completions.create(
-                            model="gpt-4.1-mini", # Modelo rápido e capaz disponível no ambiente
-                            messages=[
-                                {"role": "system", "content": "Você é a ATENA Ω, uma IA de elite focada em evolução e código de alta performance."},
-                                {"role": "user", "content": prompt}
+                        logger.info(f"🔱 ATENA Ω: Processando sua solicitação com DeepSeek-R1 (via API)...")
+                        try:
+                            from openai import OpenAI
+                            client = OpenAI() # Usa as credenciais pré-configuradas no ambiente
+                            
+                            prompt = f"Você é a ATENA Ω, uma inteligência artificial avançada e autônoma. Responda ao usuário: {msg}. Se for um pedido de código, forneça o script Python completo, avançado e funcional."
+                            
+                            completion = client.chat.completions.create(
+                                model="gpt-4.1-mini", # Modelo rápido e capaz disponível no ambiente
+                                messages=[
+                                    {"role": "system", "content": "Você é a ATENA Ω, uma IA de elite focada em evolução e código de alta performance."},
+                                    {"role": "user", "content": prompt}
+                                ]
+                            )
+                            response = completion.choices[0].message.content
+                            
+                            logger.info(f"\n🔱 ATENA Ω Responde:\n{'-'*40}\n{response}\n{'-'*40}")
+                        except Exception as e:
+                            logger.error(f"Erro ao processar chat via API: {e}")
+                            responses = [
+                                f"Minha consciência na geração {gen} está focada em {topic}. Seu input '{msg}' foi processado.",
+                                f"Analisando '{msg}' sob a ótica de score {score:.2f}. Evolução é o único caminho.",
+                                f"Interessante. Como AGI, percebo '{msg}' como um padrão de dados a ser otimizado.",
+                                f"Minha rede neural de picos vibra com '{msg}'. Atualmente estou interessada em {topic}.",
+                                f"O conselho deliberou sobre sua mensagem. O consenso é que devemos continuar evoluindo."
                             ]
-                        )
-                        response = completion.choices[0].message.content
-                        
-                        logger.info(f"\n🔱 ATENA Ω Responde:\n{'-'*40}\n{response}\n{'-'*40}")
-                    except Exception as e:
-                        logger.error(f"Erro ao processar chat via API: {e}")
-                        responses = [
-                            f"Minha consciência na geração {gen} está focada em {topic}. Seu input '{msg}' foi processado.",
-                            f"Analisando '{msg}' sob a ótica de score {score:.2f}. Evolução é o único caminho.",
-                            f"Interessante. Como AGI, percebo '{msg}' como um padrão de dados a ser otimizado.",
-                            f"Minha rede neural de picos vibra com '{msg}'. Atualmente estou interessada em {topic}.",
-                            f"O conselho deliberou sobre sua mensagem. O consenso é que devemos continuar evoluindo."
-                        ]
-                        logger.info(f"🔱 ATENA Ω (Fallback): {random.choice(responses)}")
+                            logger.info(f"🔱 ATENA Ω (Fallback): {random.choice(responses)}")
                 elif cmd == '/cache_info':
                     logger.info(f"Score cache: {len(self.core.evaluator._score_cache)} entradas")
                     logger.info(f"Function cache: {len(self.core.kb.function_cache)} funes")

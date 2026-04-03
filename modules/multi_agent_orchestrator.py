@@ -3,6 +3,7 @@ import threading
 import time
 from typing import Dict, List, Any, Callable, Optional
 from queue import Queue
+from atena_control_bridge import AtenaControlBridge
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,14 @@ class MultiAgentOrchestrator:
         logger.info(f"Agente {agent.agent_id} registrado. Total de agentes: {len(self.agents)}")
 
     def _worker_loop(self):
+        bridge = AtenaControlBridge()
         while not self._stop_event.is_set():
+            # Verifica se o sistema está pausado via Bridge
+            if bridge.is_paused():
+                logger.info("Orquestrador em PAUSA. Aguardando sinal de retomada...")
+                time.sleep(2)
+                continue
+
             try:
                 task = self.task_queue.get(timeout=1)
                 logger.info(f"Orquestrador: Nova tarefa na fila: {task.get('description', 'Sem descrição')}")

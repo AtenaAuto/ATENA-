@@ -1,9 +1,14 @@
 import streamlit as st
 import os
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
 import json
+
+# Adiciona o caminho dos módulos
+sys.path.append(os.path.join(os.getcwd(), 'modules'))
+from atena_control_bridge import AtenaControlBridge
 
 # Configuração da página
 st.set_page_config(
@@ -47,10 +52,52 @@ st.markdown("""
 # Título principal
 st.markdown('<div class="main-header">🔱 ATENA Live Dashboard</div>', unsafe_allow_html=True)
 
+# Inicializa o Control Bridge
+bridge = AtenaControlBridge()
+current_state = bridge.get_state()
+
 # Sidebar para controles
 with st.sidebar:
     st.header("⚙️ Controles")
     
+    # Status do Sistema
+    st.subheader("📊 Status do Sistema")
+    if current_state.get("status") == "paused":
+        st.warning("🔴 PAUSADO", icon="⏸️")
+    else:
+        st.success("🟢 EXECUTANDO", icon="▶️")
+    
+    st.divider()
+    
+    # Botões de Controle
+    st.subheader("🎮 Controle de Execução")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("⏸️ PAUSAR", use_container_width=True):
+            bridge.send_command("pause")
+            st.success("✅ ATENA pausada com sucesso!")
+            time.sleep(1)
+            st.rerun()
+    
+    with col2:
+        if st.button("▶️ RETOMAR", use_container_width=True):
+            bridge.send_command("resume")
+            st.success("✅ ATENA retomada com sucesso!")
+            time.sleep(1)
+            st.rerun()
+    
+    if st.button("🛑 CANCELAR TUDO", use_container_width=True):
+        bridge.send_command("stop")
+        st.error("❌ Todas as tarefas foram canceladas!")
+        time.sleep(1)
+        st.rerun()
+    
+    st.divider()
+    
+    # Opções de Visualização
+    st.subheader("👁️ Visualização")
     refresh_interval = st.slider(
         "Intervalo de Atualização (segundos)",
         min_value=1,
@@ -66,9 +113,6 @@ with st.sidebar:
     
     if st.button("🔄 Atualizar Agora"):
         st.rerun()
-    
-    if st.button("🛑 Parar ATENA"):
-        st.warning("Comando enviado para parar a ATENA")
 
 # Layout principal em abas
 tab1, tab2, tab3, tab4 = st.tabs([
@@ -80,13 +124,22 @@ tab1, tab2, tab3, tab4 = st.tabs([
 
 # TAB 1: Status em Tempo Real
 with tab1:
+    # Indicador de Status Grande
+    if current_state.get("status") == "paused":
+        st.error("⏸️ SISTEMA PAUSADO - Clique em RETOMAR na barra lateral para continuar")
+    else:
+        st.success("▶️ SISTEMA EM EXECUÇÃO - Processando tarefas normalmente")
+    
+    st.divider()
+    
     col1, col2, col3 = st.columns(3)
     
     with col1:
+        status_text = "PAUSADA" if current_state.get("status") == "paused" else "ATIVA"
         st.metric(
             label="🤖 Status da ATENA",
-            value="ATIVA",
-            delta="Online",
+            value=status_text,
+            delta="Controlável",
             delta_color="normal"
         )
     
@@ -248,8 +301,13 @@ with col1:
 with col2:
     st.caption("🔱 ATENA v4.2 - Inteligência Artificial Autônoma")
 with col3:
-    st.caption("🚀 Status: Operacional e Evoluindo")
+    status_display = "⏸️ PAUSADA" if current_state.get("status") == "paused" else "🚀 EXECUTANDO"
+    st.caption(f"Status: {status_display}")
 
-# Auto-refresh
-time.sleep(refresh_interval)
-st.rerun()
+# Auto-refresh (apenas se não estiver pausado)
+if current_state.get("status") != "paused":
+    time.sleep(refresh_interval)
+    st.rerun()
+else:
+    time.sleep(1)  # Verifica a cada 1 segundo se foi retomado
+    st.rerun()

@@ -100,6 +100,37 @@ try:
 except ImportError:
     HAS_WORLD_MODEL = False
 
+# --- Novos Módulos Avançados ---
+try:
+    from federated_learning import FederatedLearningServer
+    HAS_FEDERATED = True
+except ImportError:
+    HAS_FEDERATED = False
+
+try:
+    from graph_memory import KnowledgeGraph
+    HAS_GRAPH_MEMORY = True
+except ImportError:
+    HAS_GRAPH_MEMORY = False
+
+try:
+    from hyperparameter_optimizer import HyperparameterOptimizer
+    HAS_HYPER_OPT = True
+except ImportError:
+    HAS_HYPER_OPT = False
+
+try:
+    from multi_agent_orchestrator import MultiAgentOrchestrator
+    HAS_ORCHESTRATOR = True
+except ImportError:
+    HAS_ORCHESTRATOR = False
+
+try:
+    from game_theory_simulator import GameTheorySimulator
+    HAS_GAME_THEORY = True
+except ImportError:
+    HAS_GAME_THEORY = False
+
 try:
     from rlhf_engine import rlhf
     HAS_RLHF = True
@@ -5828,6 +5859,20 @@ class AtenaCore:
         self.evaluator = CodeEvaluator(self.sandbox, self.kb, problem=problem)
         self.mutation_engine = MutationEngine(self.kb)
         self.predictor = MutationPredictor(self.kb)
+        
+        # Inicialização de Módulos Avançados
+        if HAS_GRAPH_MEMORY:
+            self.graph_memory = KnowledgeGraph()
+            logger.info("🔱 Módulo Avançado: Memória de Grafo de Conhecimento Ativa")
+        
+        if HAS_ORCHESTRATOR:
+            self.orchestrator = MultiAgentOrchestrator()
+            self.orchestrator.start()
+            logger.info("🔱 Módulo Avançado: Orquestrador Multi-Agente Ativo")
+            
+        if HAS_FEDERATED:
+            self.fed_server = FederatedLearningServer(initial_weights={"base_score": 0.5})
+            logger.info("🔱 Módulo Avançado: Servidor de Aprendizado Federado Ativo")
         self.news = NewsAPIClient(self.kb) if Config.NEWS_API_KEY else None
         self.learner = GitHubLearner(self.kb) if Config.GITHUB_TOKEN else None
         self.current_code = Config.CURRENT_CODE_FILE.read_text()

@@ -132,6 +132,12 @@ except ImportError:
     HAS_GAME_THEORY = False
 
 try:
+    from atena_browser_agent import AtenaBrowserAgent
+    HAS_BROWSER_AGENT = True
+except ImportError:
+    HAS_BROWSER_AGENT = False
+
+try:
     from rlhf_engine import rlhf
     HAS_RLHF = True
 except ImportError:
@@ -5867,6 +5873,50 @@ class AtenaCore:
         
         if HAS_ORCHESTRATOR:
             self.orchestrator = MultiAgentOrchestrator()
+            
+            # Registra o Browser Agent se disponível
+            if HAS_BROWSER_AGENT:
+                from multi_agent_orchestrator import Agent
+                import asyncio
+                
+                def browser_task_handler(task):
+                    logger.info(f"Iniciando tarefa de navegação: {task.get('url')}")
+                    agent = AtenaBrowserAgent()
+                    
+                    async def run_browser_task():
+                        await agent.launch(headless=True)
+                        success = await agent.navigate(task.get('url'))
+                        if success:
+                            if task.get('action') == 'screenshot':
+                                await agent.take_screenshot(task.get('output_path', 'screenshot.png'))
+                                result = f"Screenshot salvo em {task.get('output_path', 'screenshot.png')}"
+                            elif task.get('action') == 'extract_text':
+                                text = await agent.get_text_content()
+                                result = f"Texto extraído ({len(text)} caracteres): {text[:200]}..."
+                            else:
+                                result = "Navegação concluída com sucesso."
+                        else:
+                            result = "Falha na navegação."
+                        await agent.close()
+                        return result
+                    
+                    # Executa a corrotina em um novo loop de eventos para a thread do agente
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        return loop.run_until_complete(run_browser_task())
+                    finally:
+                        loop.close()
+
+                browser_agent = Agent(
+                    agent_id="ATENA-Browser-01",
+                    role="Navegador Web Autônomo",
+                    capabilities=["web_browsing", "data_extraction", "screenshot"],
+                    task_handler=browser_task_handler
+                )
+                self.orchestrator.register_agent(browser_agent)
+                logger.info("🔱 Módulo Avançado: ATENA-Browser-Agent Registrado no Orquestrador")
+
             self.orchestrator.start()
             logger.info("🔱 Módulo Avançado: Orquestrador Multi-Agente Ativo")
             

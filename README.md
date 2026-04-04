@@ -59,6 +59,7 @@ Isso inicia o núcleo principal da ATENA.
 ./atena invoke   # Missão de criação de script avançado
 ./atena dialog   # Sessão de diálogo
 ./atena assistant # Conversa + tarefas + evolução em background
+./atena doctor   # Healthcheck rápido (CLI, skills, compilações)
 ./atena atena-like # Alias do modo assistant
 ./atena help     # Ajuda
 ```

@@ -15,6 +15,7 @@ COMMANDS = {
     "invoke": ROOT / "protocols" / "atena_invoke.py",
     "dialog": ROOT / "protocols" / "atena_dialogue_session.py",
     "assistant": ROOT / "core" / "atena_terminal_assistant.py",
+    "doctor": ROOT / "core" / "atena_doctor.py",
 }
 
 ALIASES = {
@@ -38,6 +39,7 @@ def render_help() -> None:
         table.add_row("./atena invoke", "Missão avançada de criação de script")
         table.add_row("./atena dialog", "Sessão de diálogo")
         table.add_row("./atena assistant", "Modo assistente com evolução em background")
+        table.add_row("./atena doctor", "Diagnóstico rápido (estilo healthcheck)")
         table.add_row("./atena atena-like", "Alias do modo assistant")
         table.add_row("./atena help", "Exibe esta ajuda")
         console.print(table)
@@ -50,6 +52,7 @@ def render_help() -> None:
         print("  ./atena invoke          # missão avançada")
         print("  ./atena dialog          # sessão de diálogo")
         print("  ./atena assistant       # assistente + evolução")
+        print("  ./atena doctor          # diagnóstico rápido")
         print("  ./atena atena-like      # alias do assistant")
         print("  ./atena help            # ajuda")
 

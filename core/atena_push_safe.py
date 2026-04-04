@@ -17,6 +17,11 @@ GENERATED_FILES = [
     ROOT / "atena_evolution" / "portfolio_optimization_results.json",
     ROOT / "modules" / "atena_advanced_portfolio_optimizer.py",
 ]
+GENERATED_DIRS = [
+    ROOT / "core" / "__pycache__",
+    ROOT / "protocols" / "__pycache__",
+    ROOT / "skills" / "neural-reality-sync" / "scripts" / "__pycache__",
+]
 
 
 def run(cmd: list[str], timeout: int = 240) -> subprocess.CompletedProcess:
@@ -29,6 +34,14 @@ def cleanup_generated_artifacts():
         if path.exists() and not path.name == "atena_advanced_portfolio_optimizer.py":
             try:
                 path.unlink()
+            except Exception:
+                pass
+    for directory in GENERATED_DIRS:
+        if directory.exists():
+            try:
+                import shutil
+
+                shutil.rmtree(directory)
             except Exception:
                 pass
 

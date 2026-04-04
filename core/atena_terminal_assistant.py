@@ -94,7 +94,7 @@ Comandos:
 
 
 def main() -> int:
-    print("🔱 ATENA Ω Assistant iniciada.")
+    print("🔱 ATENA-Like Assistant iniciada.")
     print("Evolução em segundo plano: ATIVA.")
     print("Digite /help para ver os comandos.")
 

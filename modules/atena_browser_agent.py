@@ -16,7 +16,7 @@ class AtenaBrowserAgent:
         logger.info(f"Lançando navegador (headless={headless})...")
         self.playwright = await async_playwright().start()
         self.browser = await self.playwright.chromium.launch(headless=headless)
-        self.context = await self.browser.new_context()
+        self.context = await self.browser.new_context(ignore_https_errors=True)
         self.page = await self.context.new_page()
         logger.info("Navegador iniciado com sucesso.")
 

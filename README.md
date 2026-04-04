@@ -59,6 +59,7 @@ Isso inicia o núcleo principal da ATENA.
 ./atena invoke   # Missão de criação de script avançado
 ./atena dialog   # Sessão de diálogo
 ./atena assistant # Conversa + tarefas + evolução em background
+./atena atena-like # Alias do modo assistant
 ./atena help     # Ajuda
 ```
 
@@ -92,7 +93,7 @@ A ATENA Ω possui um **Verificador Neuro-Simbólico** ativo que impede a execuç
 - **Última Missão:** Criptografia Quântica
 - **Execução no terminal:** ✅ Suporta execução com um comando (`./atena`)
 - **Missão avançada sem API externa:** ✅ Possui fallback local no invocador (`./atena invoke`)
-- **Modo assistente contínuo:** ✅ Conversa e tarefas com evolução em background (`./atena assistant`)
+- **Modo assistente contínuo (ATENA-Like):** ✅ Conversa e tarefas com evolução em background (`./atena assistant` ou `./atena atena-like`)
 
 ---
 

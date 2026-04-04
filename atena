@@ -13,6 +13,7 @@ Uso:
   ./atena invoke          # executa missão de criação de script avançado
   ./atena dialog          # inicia sessão de diálogo
   ./atena assistant       # conversa + tarefas com evolução em background
+  ./atena atena-like      # alias do modo assistant
   ./atena help            # mostra esta ajuda
 EOF
 }
@@ -29,7 +30,7 @@ case "$command" in
   dialog)
     exec python3 "$ROOT_DIR/protocols/atena_dialogue_session.py"
     ;;
-  assistant)
+  assistant|atena-like|like)
     exec python3 "$ROOT_DIR/core/atena_terminal_assistant.py"
     ;;
   help|-h|--help)

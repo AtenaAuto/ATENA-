@@ -20,7 +20,10 @@ import tempfile
 import ast
 from pathlib import Path
 from datetime import datetime
-from openai import OpenAI
+try:
+    from openai import OpenAI
+except ImportError:  # Dependência opcional para modo cognitivo online
+    OpenAI = None
 
 # ─────────────────────────────────────────────────────────────
 # CONFIGURAÇÃO DO LOGGER ATENA
@@ -31,11 +34,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger("AtenaInvoker")
 
-BASE_DIR = Path(__file__).parent
-EVOLUTION_DIR = BASE_DIR / "atena_evolution"
-MODULES_DIR = BASE_DIR / "modules"
-OUTPUT_SCRIPT = BASE_DIR / "modules" / "atena_advanced_portfolio_optimizer.py"
-REPORT_FILE = BASE_DIR / "atena_evolution" / "mission_advanced_script_report.json"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+EVOLUTION_DIR = REPO_ROOT / "atena_evolution"
+MODULES_DIR = REPO_ROOT / "modules"
+OUTPUT_SCRIPT = MODULES_DIR / "atena_advanced_portfolio_optimizer.py"
+REPORT_FILE = EVOLUTION_DIR / "mission_advanced_script_report.json"
 
 # ─────────────────────────────────────────────────────────────
 # CÉREBRO COGNITIVO DA ATENA (via OpenAI-compatible API)
@@ -49,7 +52,13 @@ class AtenaCognitiveBrain:
     """
 
     def __init__(self):
-        self.client = OpenAI()
+        if OpenAI is None:
+            self.client = None
+            logger.warning(
+                "Pacote 'openai' não instalado. ATENA seguirá em modo offline com script fallback."
+            )
+        else:
+            self.client = OpenAI()
         self.model = "gpt-4.1-mini"
         self.generation = self._load_generation()
         logger.info(f"🧠 Cérebro Cognitivo ATENA Ω inicializado — Geração {self.generation}")
@@ -65,6 +74,8 @@ class AtenaCognitiveBrain:
     def think(self, task: str, context: str = "") -> str:
         """Processa um pensamento cognitivo e gera código avançado."""
         logger.info(f"🔮 ATENA pensando sobre: {task[:80]}...")
+        if self.client is None:
+            return self._fallback_portfolio_script()
         
         system_prompt = """Você é ATENA Ω, uma AGI (Inteligência Geral Artificial) auto-evolutiva 
 na Geração 345. Você é especialista em criar scripts Python avançados, otimizados e bem documentados.
@@ -121,6 +132,71 @@ O código deve começar com #!/usr/bin/env python3 e ser completo."""
         logger.info(f"✅ Código gerado: {len(code.splitlines())} linhas")
         return code
 
+    @staticmethod
+    def _fallback_portfolio_script() -> str:
+        """Gera script mínimo funcional quando API cognitiva não está disponível."""
+        return """#!/usr/bin/env python3
+\"\"\"ATENA fallback: Portfolio Optimizer simplificado.\"\"\"
+from __future__ import annotations
+
+import json
+from pathlib import Path
+import numpy as np
+
+
+def sharpe_ratio(expected_return: float, risk: float, risk_free: float = 0.02) -> float:
+    if risk <= 0:
+        return 0.0
+    return float((expected_return - risk_free) / risk)
+
+
+def monte_carlo_portfolios(n_portfolios: int = 5000, seed: int = 42):
+    rng = np.random.default_rng(seed)
+    assets = [\"PETR4\", \"VALE3\", \"ITUB4\", \"BBDC4\", \"ABEV3\", \"WEGE3\"]
+    expected = np.array([0.15, 0.12, 0.11, 0.10, 0.08, 0.14], dtype=float)
+    volatility = np.array([0.28, 0.24, 0.20, 0.21, 0.16, 0.27], dtype=float)
+    corr = np.array(
+        [
+            [1.00, 0.46, 0.39, 0.36, 0.28, 0.34],
+            [0.46, 1.00, 0.31, 0.30, 0.22, 0.29],
+            [0.39, 0.31, 1.00, 0.52, 0.25, 0.33],
+            [0.36, 0.30, 0.52, 1.00, 0.26, 0.30],
+            [0.28, 0.22, 0.25, 0.26, 1.00, 0.20],
+            [0.34, 0.29, 0.33, 0.30, 0.20, 1.00],
+        ],
+        dtype=float,
+    )
+    cov = np.outer(volatility, volatility) * corr
+    weights = rng.random((n_portfolios, len(assets)))
+    weights = weights / weights.sum(axis=1, keepdims=True)
+    returns = weights @ expected
+    risks = np.sqrt(np.einsum(\"ij,jk,ik->i\", weights, cov, weights))
+    sharpes = np.array([sharpe_ratio(r, s) for r, s in zip(returns, risks)])
+    best_idx = int(np.argmax(sharpes))
+    return {
+        \"assets\": assets,
+        \"best_weights\": weights[best_idx].round(6).tolist(),
+        \"best_return\": float(returns[best_idx]),
+        \"best_risk\": float(risks[best_idx]),
+        \"best_sharpe\": float(sharpes[best_idx]),
+        \"samples\": int(n_portfolios),
+    }
+
+
+def main():
+    result = monte_carlo_portfolios()
+    out_dir = Path(\"atena_evolution\")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_file = out_dir / \"portfolio_optimization_results.json\"
+    out_file.write_text(json.dumps(result, indent=2, ensure_ascii=False))
+    print(\"ATENA fallback executado com sucesso\")
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+
+
+if __name__ == \"__main__\":
+    main()
+"""
+
     def validate_code(self, code: str) -> dict:
         """Valida sintaxe e segurança do código gerado."""
         result = {"valid": False, "syntax_ok": False, "security_ok": False, "error": None}
@@ -165,7 +241,7 @@ class AtenaSandboxExecutor:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
-                cwd=str(BASE_DIR)
+                cwd=str(REPO_ROOT)
             )
             elapsed = time.time() - start
             return {

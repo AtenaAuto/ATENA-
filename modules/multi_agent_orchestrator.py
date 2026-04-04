@@ -2,7 +2,7 @@ import logging
 import threading
 import time
 from typing import Dict, List, Any, Callable, Optional
-from queue import Queue
+from queue import Queue, Empty
 from atena_control_bridge import AtenaControlBridge
 
 logger = logging.getLogger(__name__)
@@ -35,6 +35,7 @@ class MultiAgentOrchestrator:
         self.task_queue = Queue()
         self._stop_event = threading.Event()
         self._worker_thread: Optional[threading.Thread] = None
+        self.max_retries = 3
 
     def register_agent(self, agent: Agent):
         if agent.agent_id in self.agents:
@@ -55,6 +56,7 @@ class MultiAgentOrchestrator:
                 task = self.task_queue.get(timeout=1)
                 logger.info(f"Orquestrador: Nova tarefa na fila: {task.get('description', 'Sem descrição')}")
                 assigned = False
+                task.setdefault("_retries", 0)
                 for agent_id, agent in self.agents.items():
                     if agent.status == "idle" and all(cap in agent.capabilities for cap in task.get("required_capabilities", [])):
                         try:
@@ -64,14 +66,37 @@ class MultiAgentOrchestrator:
                         except Exception:
                             # Se o agente falhar, tentar outro ou re-enfileirar
                             logger.warning(f"Agente {agent_id} falhou na tarefa, tentando outro ou re-enfileirando.")
-                            self.task_queue.put(task) # Re-enfileira
+                            task["_retries"] += 1
+                            if task["_retries"] <= self.max_retries:
+                                self.task_queue.put(task)
+                            else:
+                                logger.error(
+                                    "Tarefa descartada após %s tentativas: %s",
+                                    self.max_retries,
+                                    task.get("description", "Sem descrição")
+                                )
                             break
                 if not assigned:
-                    logger.warning(f"Nenhum agente disponível ou capaz para a tarefa: {task.get('description', 'Sem descrição')}. Re-enfileirando.")
-                    self.task_queue.put(task) # Re-enfileira se nenhum agente puder lidar com ela
+                    task["_retries"] += 1
+                    if task["_retries"] <= self.max_retries:
+                        logger.warning(
+                            "Nenhum agente disponível/capaz para tarefa: %s. Tentativa %s/%s.",
+                            task.get('description', 'Sem descrição'),
+                            task["_retries"],
+                            self.max_retries
+                        )
+                        self.task_queue.put(task)
+                    else:
+                        logger.error(
+                            "Tarefa sem agente compatível foi descartada após %s tentativas: %s",
+                            self.max_retries,
+                            task.get('description', 'Sem descrição')
+                        )
                 self.task_queue.task_done()
-            except Exception:
-                pass # Fila vazia ou evento de parada
+            except Empty:
+                continue
+            except Exception as exc:
+                logger.exception("Erro inesperado no worker do orquestrador: %s", exc)
 
     def start(self):
         if self._worker_thread is None or not self._worker_thread.is_alive():
@@ -92,6 +117,7 @@ class MultiAgentOrchestrator:
 
 # Exemplo de uso (para testes)
 if __name__ == "__main__":
+    import random
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s — %(message)s")
 
     def code_generation_agent_handler(task: Dict[str, Any]) -> str:

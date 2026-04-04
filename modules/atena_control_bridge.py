@@ -2,11 +2,15 @@ import os
 import json
 import logging
 from typing import Dict, Any
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 class AtenaControlBridge:
-    def __init__(self, state_file: str = "/home/ubuntu/atena_repo/atena_state.json"):
+    def __init__(self, state_file: str | None = None):
+        if state_file is None:
+            repo_root = Path(__file__).resolve().parent.parent
+            state_file = str(repo_root / "atena_evolution" / "atena_state.json")
         self.state_file = state_file
         self._ensure_state_file()
 
@@ -28,6 +32,7 @@ class AtenaControlBridge:
     def set_state(self, state: Dict[str, Any]):
         """Atualiza o estado do sistema."""
         try:
+            os.makedirs(os.path.dirname(self.state_file), exist_ok=True)
             with open(self.state_file, 'w') as f:
                 json.dump(state, f, indent=4)
         except Exception as e:

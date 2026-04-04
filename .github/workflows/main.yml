@@ -19,7 +19,7 @@ on:
         default: '30'
         type: choice
         options:
-          - '5000'
+          - '2500'
           - '600'
           - '700'
           - '800'

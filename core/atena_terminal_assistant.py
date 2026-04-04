@@ -15,6 +15,9 @@ import time
 import sys
 import os
 import logging
+import json
+import socket
+import webbrowser
 from dataclasses import dataclass, field
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
@@ -23,6 +26,9 @@ from typing import Optional
 
 ROOT = Path(__file__).resolve().parent.parent
 INVOKE_SCRIPT = ROOT / "protocols" / "atena_invoke.py"
+DASHBOARD_SCRIPT = ROOT / "core" / "atena_local_dashboard.py"
+DASHBOARD_PORT = int(os.getenv("ATENA_DASHBOARD_PORT", "8765"))
+DASHBOARD_STATE_FILE = ROOT / "atena_evolution" / "assistant_dashboard_state.json"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -46,6 +52,7 @@ def utc_now_iso() -> str:
 
 
 def run_evolution_cycle(state: EvolutionState) -> None:
+    open_dashboard()
     with state.lock:
         state.cycles += 1
         state.last_started_at = utc_now_iso()
@@ -68,6 +75,8 @@ def run_evolution_cycle(state: EvolutionState) -> None:
             state.last_finished_at = utc_now_iso()
             state.last_success = False
             state.last_error = str(exc)
+    finally:
+        write_dashboard_state(state)
 
 
 def evolution_worker(state: EvolutionState, interval_seconds: int) -> None:
@@ -95,6 +104,7 @@ Comandos:
   /task <instrução>     pede para ATENA pensar em uma tarefa (resposta textual)
   /feedback <0-1>       reforça aprendizado da última resposta (ex: /feedback 0.95)
   /run <cmd>            executa comando shell local (use com cuidado)
+  /dashboard            abre/mostra dashboard local com chat da ATENA
   /exit                 encerra o modo assistant
 """
     )
@@ -155,6 +165,53 @@ def suppress_noisy_runtime():
         logging.getLogger(name).setLevel(level)
 
 
+def _is_port_open(host: str, port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.25)
+        return sock.connect_ex((host, port)) == 0
+
+
+def dashboard_url() -> str:
+    return f"http://127.0.0.1:{DASHBOARD_PORT}"
+
+
+def ensure_dashboard_running() -> None:
+    if _is_port_open("127.0.0.1", DASHBOARD_PORT):
+        return
+    subprocess.Popen(
+        ["python3", str(DASHBOARD_SCRIPT), "--port", str(DASHBOARD_PORT)],
+        cwd=str(ROOT),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    for _ in range(20):
+        if _is_port_open("127.0.0.1", DASHBOARD_PORT):
+            return
+        time.sleep(0.1)
+
+
+def open_dashboard() -> None:
+    ensure_dashboard_running()
+    try:
+        webbrowser.open(dashboard_url())
+    except Exception:
+        pass
+
+
+def write_dashboard_state(state: EvolutionState) -> None:
+    DASHBOARD_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with state.lock:
+        payload = {
+            "cycles": state.cycles,
+            "last_started_at": state.last_started_at,
+            "last_finished_at": state.last_finished_at,
+            "last_success": state.last_success,
+            "last_error": state.last_error,
+        }
+    DASHBOARD_STATE_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def main() -> int:
     print(
         """
@@ -197,6 +254,8 @@ def main() -> int:
                     spinner.stop("pronto")
             local_ready = True
     state = EvolutionState()
+    write_dashboard_state(state)
+    ensure_dashboard_running()
     interval_seconds = 600
     worker = threading.Thread(target=evolution_worker, args=(state, interval_seconds), daemon=True)
     worker.start()
@@ -221,8 +280,13 @@ def main() -> int:
                         print(f"last_error={state.last_error}")
                 continue
             if raw == "/evolve":
+                open_dashboard()
                 state.wake_event.set()
                 print("✅ Ciclo de evolução solicitado em background.")
+                continue
+            if raw == "/dashboard":
+                open_dashboard()
+                print(f"✅ Dashboard local: {dashboard_url()}")
                 continue
             if raw == "/model":
                 print(f"Modelo atual: {router.current()}")

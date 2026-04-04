@@ -21,6 +21,7 @@ COMMANDS = {
     "pipeline": ROOT / "core" / "atena_pipeline.py",
     "learn-status": ROOT / "core" / "atena_learning_status.py",
     "push-safe": ROOT / "core" / "atena_push_safe.py",
+    "dashboard": ROOT / "core" / "atena_local_dashboard.py",
 }
 
 ALIASES = {
@@ -60,6 +61,7 @@ def render_help() -> None:
         table.add_row("./atena pipeline", "Pipeline: web -> análise -> relatório")
         table.add_row("./atena learn-status", "Mostra memória de aprendizado persistida")
         table.add_row("./atena push-safe", "Push apenas após doctor --full aprovado")
+        table.add_row("./atena dashboard", "Dashboard local com chat estilo assistant")
         table.add_row("./atena atena-like", "Alias do modo assistant")
         table.add_row("./atena help", "Exibe esta ajuda")
         console.print(table)
@@ -80,6 +82,7 @@ def render_help() -> None:
         print("  ./atena pipeline        # web -> análise -> relatório")
         print("  ./atena learn-status    # status do aprendizado persistente")
         print("  ./atena push-safe       # push condicionado a aprovação")
+        print("  ./atena dashboard       # dashboard local com chat")
         print("  ./atena atena-like      # alias do assistant")
         print("  ./atena help            # ajuda")
 

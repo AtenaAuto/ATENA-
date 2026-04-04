@@ -66,11 +66,13 @@ Isso inicia o núcleo principal da ATENA.
 ./atena pipeline # Pipeline web->análise->relatório automatizado
 ./atena learn-status # Ver aprendizado persistido da ATENA
 ./atena push-safe    # Só libera push após doctor --full aprovado
+./atena dashboard    # Dashboard local com chat estilo "manus"
 ./atena atena-like # Alias do modo assistant
 ./atena help     # Ajuda
 ```
 
 No modo `assistant`, a ATENA mantém um worker de evolução em segundo plano e permite conversar/executar tarefas no mesmo terminal.
+O dashboard local pode ser aberto com `./atena dashboard` ou `/dashboard` no assistant (chat web + status dos ciclos).
 O launcher agora usa uma interface mais bonita em estilo CLI moderno (com tabela de comandos quando disponível).
 Durante carregamento e geração de respostas, o modo assistant exibe um spinner visual da ATENA-Like para feedback em tempo real.
 O comando `/feedback <0-1>` permite reforçar a memória da última resposta para aprendizado contínuo baseado em avaliação.

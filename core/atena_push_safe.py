@@ -10,9 +10,27 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+GENERATED_FILES = [
+    ROOT / "atena_evolution" / "doctor_report.json",
+    ROOT / "atena_evolution" / "atena_state.json",
+    ROOT / "atena_evolution" / "mission_advanced_script_report.json",
+    ROOT / "atena_evolution" / "portfolio_optimization_results.json",
+    ROOT / "modules" / "atena_advanced_portfolio_optimizer.py",
+]
+
 
 def run(cmd: list[str], timeout: int = 240) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, timeout=timeout, check=False)
+
+def cleanup_generated_artifacts():
+    # restaura arquivo tracked alterado pelo invoke
+    run(["git", "checkout", "--", "modules/atena_advanced_portfolio_optimizer.py"])
+    for path in GENERATED_FILES:
+        if path.exists() and not path.name == "atena_advanced_portfolio_optimizer.py":
+            try:
+                path.unlink()
+            except Exception:
+                pass
 
 
 def main() -> int:
@@ -28,6 +46,8 @@ def main() -> int:
     if doctor.returncode != 0:
         print("❌ Doctor não aprovou. Push bloqueado.")
         return 1
+
+    cleanup_generated_artifacts()
 
     status = run(["git", "status", "--porcelain"])
     dirty = bool(status.stdout.strip())

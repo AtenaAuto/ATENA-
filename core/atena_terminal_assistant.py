@@ -13,7 +13,10 @@ import subprocess
 import threading
 import time
 import sys
+import os
+import logging
 from dataclasses import dataclass, field
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -128,6 +131,30 @@ class AtenaSpinner:
         print(f"\r✅ {self.message}: {done_message}." + " " * 12)
 
 
+@contextmanager
+def suppress_noisy_runtime():
+    """
+    Silencia ruído de bibliotecas enquanto o spinner está ativo.
+    Evita "poluição visual" no terminal durante processamento.
+    """
+    noisy = [
+        "AtenaUltraBrain",
+        "httpx",
+        "huggingface_hub",
+        "transformers",
+    ]
+    previous = {}
+    for name in noisy:
+        lg = logging.getLogger(name)
+        previous[name] = lg.level
+        lg.setLevel(logging.ERROR)
+    with open(os.devnull, "w", encoding="utf-8") as null:
+        with redirect_stdout(null), redirect_stderr(null):
+            yield
+    for name, level in previous.items():
+        logging.getLogger(name).setLevel(level)
+
+
 def main() -> int:
     print(
         """
@@ -144,22 +171,30 @@ def main() -> int:
     print("Digite /help para ver os comandos.")
 
     router = AtenaLLMRouter()
+    # Mantém o terminal limpo no modo assistant.
+    logging.getLogger("AtenaUltraBrain").setLevel(logging.ERROR)
+    logging.getLogger("httpx").setLevel(logging.ERROR)
+    logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
+    logging.getLogger("transformers").setLevel(logging.ERROR)
     local_ready = False
     last_prompt: Optional[str] = None
     last_response: Optional[str] = None
 
-    def warmup_llm():
+    def warmup_llm(show_spinner: bool = True):
         nonlocal local_ready
         if local_ready:
             return
         if router.cfg.provider == "local":
-            spinner = AtenaSpinner("Inicializando cérebro local da ATENA-Like")
-            spinner.start()
+            spinner = AtenaSpinner("Inicializando cérebro local da ATENA-Like") if show_spinner else None
+            if spinner:
+                spinner.start()
             try:
                 # força lazy init local
-                router.generate("teste rápido", context="warmup")
+                with suppress_noisy_runtime():
+                    router.generate("teste rápido", context="warmup")
             finally:
-                spinner.stop("pronto")
+                if spinner:
+                    spinner.stop("pronto")
             local_ready = True
     state = EvolutionState()
     interval_seconds = 600
@@ -236,8 +271,9 @@ def main() -> int:
                 spinner.start()
                 try:
                     if router.cfg.provider == "local":
-                        warmup_llm()
-                    answer = router.generate(task, context="Modo assistant no terminal")
+                        warmup_llm(show_spinner=False)
+                    with suppress_noisy_runtime():
+                        answer = router.generate(task, context="Modo assistant no terminal")
                 finally:
                     spinner.stop("resposta gerada")
                 router.learn_from_feedback(
@@ -274,8 +310,9 @@ def main() -> int:
             spinner.start()
             try:
                 if router.cfg.provider == "local":
-                    warmup_llm()
-                answer = router.generate(raw, context="Conversa livre no terminal")
+                    warmup_llm(show_spinner=False)
+                with suppress_noisy_runtime():
+                    answer = router.generate(raw, context="Conversa livre no terminal")
             finally:
                 spinner.stop("resposta gerada")
             router.learn_from_feedback(

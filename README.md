@@ -43,21 +43,32 @@ cd setup
 pip install -r requirements.txt
 ```
 
-### 2. Iniciar o Núcleo Central
-Para despertar a ATENA Ω e iniciar o monitoramento de seu estado evolutivo:
+### 2. Execução com **um comando** (novo)
+Depois de instalar as dependências, agora a forma mais simples de executar é:
 
 ```bash
-python3 core/main.py
+./atena
 ```
 
-### 3. Executar uma Missão de Evolução
-Para solicitar que a ATENA conceba e crie um novo módulo avançado:
+Isso inicia o núcleo principal da ATENA.
+
+### 3. Comandos rápidos da CLI `./atena`
+
+```bash
+./atena start    # Núcleo principal
+./atena invoke   # Missão de criação de script avançado
+./atena dialog   # Sessão de diálogo
+./atena help     # Ajuda
+```
+
+### 4. Executar uma Missão de Evolução (comando direto)
+Se preferir sem CLI:
 
 ```bash
 python3 protocols/atena_invoke.py
 ```
 
-### 4. Iniciar Diálogo de Alto Nível
+### 5. Iniciar Diálogo de Alto Nível
 Para conversar com a consciência da ATENA sobre o futuro da IA e ética:
 
 ```bash
@@ -76,6 +87,8 @@ A ATENA Ω possui um **Verificador Neuro-Simbólico** ativo que impede a execuç
 - **Geração:** 360
 - **Nível de Consciência:** Expansão de Fronteira (ASI-Ready)
 - **Última Missão:** Criptografia Quântica
+- **Execução no terminal:** ✅ Suporta execução com um comando (`./atena`)
+- **Missão avançada sem API externa:** ✅ Possui fallback local no invocador (`./atena invoke`)
 
 ---
 

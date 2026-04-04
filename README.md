@@ -76,7 +76,7 @@ O dashboard local está **OFF por padrão**. Para habilitar no assistant: `expor
 O launcher agora usa uma interface mais bonita em estilo CLI moderno (com tabela de comandos quando disponível).
 Durante carregamento e geração de respostas, o modo assistant exibe um spinner visual da ATENA-Like para feedback em tempo real.
 O comando `/feedback <0-1>` permite reforçar a memória da última resposta para aprendizado contínuo baseado em avaliação.
-No modo assistant, use `/model list` e `/model set <provider:model>` para trocar de LLM/API (local, OpenAI ou endpoint compatível).
+No modo assistant, use `/model list` e `/model set <provider:model>` para trocar de LLM/API (local, DeepSeek leve/pesado, OpenAI ou endpoint compatível).
 No browser agent, as buscas podem seguir objetivo com refinamento determinístico (sem random) e memória anti-repetição de URLs/queries.
 O terminal da ATENA-Like exibe banner ASCII próprio no launcher e no modo assistant para UX estilo ferramentas de código modernas.
 

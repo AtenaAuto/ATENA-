@@ -5,8 +5,10 @@
 from __future__ import annotations
 
 import os
+import json
 from dataclasses import dataclass
 from typing import Optional
+from urllib import request, error
 
 from core.atena_local_lm import AtenaUltraBrain
 
@@ -18,7 +20,7 @@ except Exception:  # noqa: BLE001
 
 @dataclass
 class LLMConfig:
-    provider: str = "local"  # local | openai | compat
+    provider: str = "local"  # local | openai | compat | deepseek
     model: str = "local-simbrain"
     base_url: Optional[str] = None
 
@@ -31,6 +33,11 @@ class AtenaLLMRouter:
 
     def list_options(self) -> list[str]:
         opts = ["local:local-simbrain (sempre disponível)"]
+        if os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY"):
+            opts.append("deepseek:light (deepseek-chat)")
+            opts.append("deepseek:heavy (deepseek-reasoner)")
+        else:
+            opts.append("deepseek indisponível (faltando DEEPSEEK_API_KEY ou OPENAI_API_KEY)")
         if OpenAI is not None and os.getenv("OPENAI_API_KEY"):
             opts.append("openai:<model> (usa OPENAI_API_KEY)")
             opts.append("compat:<model> (usa OPENAI_API_KEY + ATENA_OPENAI_BASE_URL)")
@@ -55,6 +62,20 @@ class AtenaLLMRouter:
             self.cfg = LLMConfig(provider="local", model="local-simbrain")
             return True, "backend local ativado"
 
+        if provider == "deepseek":
+            api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                return False, "DEEPSEEK_API_KEY (ou OPENAI_API_KEY) não configurada"
+            model_norm = model.lower()
+            if model_norm in {"", "light", "leve", "chat"}:
+                model_name = "deepseek-chat"
+            elif model_norm in {"heavy", "pesado", "reasoner"}:
+                model_name = "deepseek-reasoner"
+            else:
+                model_name = model
+            self.cfg = LLMConfig(provider="deepseek", model=model_name, base_url="https://api.deepseek.com/v1")
+            return True, f"backend deepseek ativado com modelo {model_name}"
+
         if provider in {"openai", "compat"}:
             if OpenAI is None:
                 return False, "pacote openai não instalado"
@@ -78,6 +99,8 @@ class AtenaLLMRouter:
     def generate(self, prompt: str, context: str = "") -> str:
         if self.cfg.provider == "local":
             return self._get_local_brain().think(prompt, context=context)
+        if self.cfg.provider == "deepseek":
+            return self._generate_deepseek(prompt, context=context)
 
         # openai/compat
         response = self._openai_client.chat.completions.create(
@@ -90,6 +113,37 @@ class AtenaLLMRouter:
             max_tokens=900,
         )
         return (response.choices[0].message.content or "").strip()
+
+    def _generate_deepseek(self, prompt: str, context: str = "") -> str:
+        api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            return "❌ DEEPSEEK_API_KEY não configurada."
+        payload = {
+            "model": self.cfg.model,
+            "messages": [
+                {"role": "system", "content": "Você é ATENA-Like, assistente técnico de terminal."},
+                {"role": "user", "content": f"Contexto: {context}\n\nPrompt: {prompt}"},
+            ],
+            "temperature": 0.3,
+            "max_tokens": 900,
+        }
+        req = request.Request(
+            url=f"{self.cfg.base_url or 'https://api.deepseek.com/v1'}/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with request.urlopen(req, timeout=90) as resp:  # noqa: S310
+                data = json.loads(resp.read().decode("utf-8"))
+            return (data.get("choices", [{}])[0].get("message", {}).get("content") or "").strip()
+        except error.HTTPError as exc:
+            return f"❌ DeepSeek HTTP {exc.code}"
+        except Exception as exc:  # noqa: BLE001
+            return f"❌ Falha DeepSeek: {exc}"
 
     def learn_from_feedback(self, prompt: str, response: str, success: bool, score: float) -> None:
         if self.cfg.provider == "local":

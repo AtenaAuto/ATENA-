@@ -102,7 +102,7 @@ Comandos:
   /evolve               dispara um ciclo de evolução imediatamente
   /model                mostra backend/modelo atual
   /model list           mostra opções de LLM/provider
-  /model set <spec>     troca backend (ex: local | openai:gpt-4.1-mini | compat:claude-3-5-sonnet)
+  /model set <spec>     troca backend (ex: local | deepseek:light | deepseek:heavy | openai:gpt-4.1-mini)
   /task <instrução>     pede para ATENA pensar em uma tarefa (resposta textual)
   /feedback <0-1>       reforça aprendizado da última resposta (ex: /feedback 0.95)
   /run <cmd>            executa comando shell local (use com cuidado)

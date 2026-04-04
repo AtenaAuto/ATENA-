@@ -58,8 +58,11 @@ Isso inicia o núcleo principal da ATENA.
 ./atena start    # Núcleo principal
 ./atena invoke   # Missão de criação de script avançado
 ./atena dialog   # Sessão de diálogo
+./atena assistant # Conversa + tarefas + evolução em background
 ./atena help     # Ajuda
 ```
+
+No modo `assistant`, a ATENA mantém um worker de evolução em segundo plano e permite conversar/executar tarefas no mesmo terminal.
 
 ### 4. Executar uma Missão de Evolução (comando direto)
 Se preferir sem CLI:
@@ -89,6 +92,7 @@ A ATENA Ω possui um **Verificador Neuro-Simbólico** ativo que impede a execuç
 - **Última Missão:** Criptografia Quântica
 - **Execução no terminal:** ✅ Suporta execução com um comando (`./atena`)
 - **Missão avançada sem API externa:** ✅ Possui fallback local no invocador (`./atena invoke`)
+- **Modo assistente contínuo:** ✅ Conversa e tarefas com evolução em background (`./atena assistant`)
 
 ---
 

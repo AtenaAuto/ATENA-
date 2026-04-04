@@ -12,6 +12,7 @@ Uso:
   ./atena start           # inicia o núcleo principal
   ./atena invoke          # executa missão de criação de script avançado
   ./atena dialog          # inicia sessão de diálogo
+  ./atena assistant       # conversa + tarefas com evolução em background
   ./atena help            # mostra esta ajuda
 EOF
 }
@@ -27,6 +28,9 @@ case "$command" in
     ;;
   dialog)
     exec python3 "$ROOT_DIR/protocols/atena_dialogue_session.py"
+    ;;
+  assistant)
+    exec python3 "$ROOT_DIR/core/atena_terminal_assistant.py"
     ;;
   help|-h|--help)
     usage

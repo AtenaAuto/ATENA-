@@ -13,7 +13,7 @@ class HyperEvolutionEngine:
     Permite que a Atena crie novos módulos, modifique sua própria função de recompensa
     e realize testes adversários em seu WorldModel.
     """
-    def __init__(self, base_dir: str = "/home/ubuntu/atena_agi"):
+    def __init__(self, base_dir: str = "/home/ubuntu/ATENA"):
         self.base_dir = base_dir
         self.modules_dir = os.path.join(base_dir, "modules")
         self.evolution_dir = os.path.join(base_dir, "atena_evolution")

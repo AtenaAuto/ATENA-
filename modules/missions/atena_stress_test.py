@@ -4,6 +4,7 @@ import logging
 import json
 from datetime import datetime
 from modules.hyper_evolution import HyperEvolutionEngine
+from protocols.atena_tot_mission import run_tot_mission
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] atena - %(message)s')
@@ -19,6 +20,9 @@ def run_agi_stress_test():
     print("="*60)
     
     engine = HyperEvolutionEngine()
+    
+    tot_test_status = "FALHA"
+    tot_solution = "N/A"
     
     # 1. Teste de Auto-Geração de Módulos
     print("\n[1/4] Testando Auto-Geração de Módulos...")
@@ -61,11 +65,28 @@ def run_agi_stress_test():
         "agi_level": "Singularity-Ready",
         "modules_generated": len(topics),
         "adversarial_pass_rate": "66.6%",
-        "meta_reward_status": "Active"
+        "meta_reward_status": "Active",
+        "tot_test_status": tot_test_status,
+        "tot_solution_preview": tot_solution[:200] if tot_solution != "N/A" else tot_solution
     }
+    # Garante que o diretório de evolução existe
+    os.makedirs("atena_evolution", exist_ok=True)
     with open("atena_evolution/agi_stress_test_report.json", "w") as f:
         json.dump(report, f, indent=2)
     print("  - Relatório de estresse salvo em atena_evolution/agi_stress_test_report.json")
+
+    # 5. Teste do Motor Tree-of-Thoughts
+    print("\n[5/5] Testando Motor Tree-of-Thoughts...")
+    try:
+        problem_tot = "Como a ATENA pode otimizar sua própria arquitetura para maior eficiência energética e cognitiva?"
+        solution_tot, _ = run_tot_mission(problem_tot)
+        tot_solution = solution_tot
+        tot_test_status = "APROVADO"
+        print(f"  - Teste ToT: {tot_test_status}")
+        print(f"  - Solução ToT gerada: {solution_tot[:100]}...")
+    except Exception as e:
+        print(f"  - Teste ToT: FALHA - {e}")
+        tot_test_status = "FALHA"
     
     print("\n" + "="*60)
     print("🔱 TESTE DE ESTRESSE CONCLUÍDO COM SUCESSO!")

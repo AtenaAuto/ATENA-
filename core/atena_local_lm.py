@@ -55,6 +55,7 @@ class AtenaCognitiveConfig:
     # Modelo Local (Codegen ou StarCoder)
     base_model_name: str = "Salesforce/codegen-350M-mono"
     device: str = "cuda" if os.environ.get("USE_CUDA") == "1" else "cpu"
+    enable_transformers: bool = os.environ.get("ATENA_ENABLE_HEAVY_LOCAL_LM", "0") == "1"
     
     # Memória e RAG
     vector_dim: int = 384  # Dimensão padrão para BGE-small
@@ -141,6 +142,13 @@ class AtenaUltraBrain:
 
     def _init_model(self):
         """Inicializa o modelo local com suporte a falhas."""
+        if not self.cfg.enable_transformers:
+            logger.info(
+                "Modo local leve ativo (ATENA_ENABLE_HEAVY_LOCAL_LM!=1). "
+                "Usando SimBrain heurístico para respostas rápidas."
+            )
+            self.has_transformers = False
+            return
         try:
             from transformers import AutoModelForCausalLM, AutoTokenizer
             import torch
@@ -186,7 +194,7 @@ class AtenaUltraBrain:
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs,
-                max_new_tokens=self.cfg.max_tokens,
+                max_new_tokens=min(self.cfg.max_tokens, 256),
                 temperature=self.cfg.temperature,
                 top_p=self.cfg.top_p,
                 do_sample=True,

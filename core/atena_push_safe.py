@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Push seguro da ATENA: só envia se `doctor --full` aprovar."""
+
+from __future__ import annotations
+
+import argparse
+import subprocess
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def run(cmd: list[str], timeout: int = 240) -> subprocess.CompletedProcess:
+    return subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, timeout=timeout, check=False)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="ATENA Push Safe")
+    parser.add_argument("--branch", default="work", help="branch local para push")
+    parser.add_argument("--remote", default="origin", help="remote git")
+    parser.add_argument("--execute", action="store_true", help="executa push real (sem essa flag é dry-run)")
+    args = parser.parse_args()
+
+    print("🔒 Validando qualidade antes do push...")
+    doctor = run(["./atena", "doctor", "--full"], timeout=600)
+    print(doctor.stdout[:1200])
+    if doctor.returncode != 0:
+        print("❌ Doctor não aprovou. Push bloqueado.")
+        return 1
+
+    status = run(["git", "status", "--porcelain"])
+    dirty = bool(status.stdout.strip())
+    if dirty:
+        print("❌ Repositório com mudanças não commitadas. Push bloqueado.")
+        return 1
+
+    push_cmd = ["git", "push", args.remote, args.branch]
+    push_main_cmd = ["git", "push", args.remote, f"{args.branch}:main"]
+    print("✅ Aprovação concluída. Comandos prontos:")
+    print("   " + " ".join(push_cmd))
+    print("   " + " ".join(push_main_cmd))
+
+    if not args.execute:
+        print("ℹ️ Dry-run: use --execute para enviar de fato.")
+        return 0
+
+    r1 = run(push_cmd)
+    print(r1.stdout[:500] + r1.stderr[:500])
+    if r1.returncode != 0:
+        return r1.returncode
+    r2 = run(push_main_cmd)
+    print(r2.stdout[:500] + r2.stderr[:500])
+    return r2.returncode
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

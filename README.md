@@ -64,6 +64,8 @@ Isso inicia o núcleo principal da ATENA.
 ./atena fix      # Auto-correções básicas do ambiente
 ./atena skills   # Descobrir e validar skills (inclui referências Claude)
 ./atena pipeline # Pipeline web->análise->relatório automatizado
+./atena learn-status # Ver aprendizado persistido da ATENA
+./atena push-safe    # Só libera push após doctor --full aprovado
 ./atena atena-like # Alias do modo assistant
 ./atena help     # Ajuda
 ```

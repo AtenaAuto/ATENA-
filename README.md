@@ -77,6 +77,7 @@ O launcher agora usa uma interface mais bonita em estilo CLI moderno (com tabela
 Durante carregamento e geração de respostas, o modo assistant exibe um spinner visual da ATENA-Like para feedback em tempo real.
 O comando `/feedback <0-1>` permite reforçar a memória da última resposta para aprendizado contínuo baseado em avaliação.
 No modo assistant, use `/model list` e `/model set <provider:model>` para trocar de LLM/API (local, DeepSeek leve/pesado, OpenAI ou endpoint compatível).
+Para usar **DeepSeek-R1 local (sem API key)** no estilo workflow do GitHub Actions, exporte `LLM_MODEL_NAME` (ex.: `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B`) e rode a ATENA com transformers habilitado.
 No browser agent, as buscas podem seguir objetivo com refinamento determinístico (sem random) e memória anti-repetição de URLs/queries.
 O terminal da ATENA-Like exibe banner ASCII próprio no launcher e no modo assistant para UX estilo ferramentas de código modernas.
 

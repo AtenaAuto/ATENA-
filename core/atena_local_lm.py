@@ -52,10 +52,13 @@ class AtenaCognitiveConfig:
     model_dir: Path = Path("./atena_brain/models")
     memory_dir: Path = Path("./atena_brain/memory")
     
-    # Modelo Local (Codegen ou StarCoder)
-    base_model_name: str = "Salesforce/codegen-350M-mono"
+    # Modelo Local (fallback default + suporte ao DeepSeek-R1 via workflow env LLM_MODEL_NAME)
+    base_model_name: str = os.environ.get("LLM_MODEL_NAME", "Salesforce/codegen-350M-mono")
     device: str = "cuda" if os.environ.get("USE_CUDA") == "1" else "cpu"
-    enable_transformers: bool = os.environ.get("ATENA_ENABLE_HEAVY_LOCAL_LM", "0") == "1"
+    enable_transformers: bool = (
+        os.environ.get("ATENA_ENABLE_HEAVY_LOCAL_LM", "0") == "1"
+        or bool(os.environ.get("LLM_MODEL_NAME"))
+    )
     
     # Memória e RAG
     vector_dim: int = 384  # Dimensão padrão para BGE-small
@@ -152,6 +155,7 @@ class AtenaUltraBrain:
         try:
             from transformers import AutoModelForCausalLM, AutoTokenizer
             import torch
+            logger.info(f"Carregando modelo local transformers: {self.cfg.base_model_name}")
             
             self.tokenizer = AutoTokenizer.from_pretrained(self.cfg.base_model_name)
             self.model = AutoModelForCausalLM.from_pretrained(

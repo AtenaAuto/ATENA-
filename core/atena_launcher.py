@@ -28,12 +28,21 @@ ALIASES = {
 
 
 def render_help() -> None:
+    banner = r"""
+    █████╗ ████████╗███████╗███╗   ██╗ █████╗
+   ██╔══██╗╚══██╔══╝██╔════╝████╗  ██║██╔══██╗
+   ███████║   ██║   █████╗  ██╔██╗ ██║███████║
+   ██╔══██║   ██║   ██╔══╝  ██║╚██╗██║██╔══██║
+   ██║  ██║   ██║   ███████╗██║ ╚████║██║  ██║
+   ╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═══╝╚═╝  ╚═╝
+    """
     try:
         from rich.console import Console
         from rich.table import Table
 
         console = Console()
-        console.print("\n[bold cyan]🔱 ATENA-Like CLI[/bold cyan]\n")
+        console.print("\n[bold cyan]🔱 ATENA-Like CLI[/bold cyan]")
+        console.print(f"[bold green]{banner}[/bold green]")
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("Comando")
         table.add_column("Descrição")
@@ -53,6 +62,7 @@ def render_help() -> None:
         console.print("\n[dim]Dica: use /help dentro do modo assistant.[/dim]\n")
     except Exception:
         print("🔱 ATENA-Like CLI\n")
+        print(banner)
         print("Uso:")
         print("  ./atena                 # inicia o núcleo principal")
         print("  ./atena start           # núcleo principal")

@@ -73,6 +73,7 @@ O launcher agora usa uma interface mais bonita em estilo CLI moderno (com tabela
 Durante carregamento e geração de respostas, o modo assistant exibe um spinner visual da ATENA-Like para feedback em tempo real.
 O comando `/feedback <0-1>` permite reforçar a memória da última resposta para aprendizado contínuo baseado em avaliação.
 No browser agent, as buscas podem seguir objetivo com refinamento determinístico (sem random) e memória anti-repetição de URLs/queries.
+O terminal da ATENA-Like exibe banner ASCII próprio no launcher e no modo assistant para UX estilo ferramentas de código modernas.
 
 ### 4. Executar uma Missão de Evolução (comando direto)
 Se preferir sem CLI:

@@ -206,7 +206,146 @@ class AtenaUltraBrain:
     def _simulate_thinking(self, prompt: str) -> str:
         """Fallback quando o modelo pesado não está disponível."""
         # Simulação de lógica para manter o workflow rodando em ambientes limitados
-        if "sort" in prompt.lower():
+        prompt_l = prompt.lower()
+        if "pygame" in prompt_l or ("jogo" in prompt_l and "python" in prompt_l):
+            return '''import pygame
+import random
+import sys
+
+WIDTH, HEIGHT = 900, 600
+FPS = 60
+PLAYER_SPEED = 6
+ENEMY_SPEED = 4
+TARGET_SCORE = 20
+MAX_LIVES = 3
+
+pygame.init()
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Atena Runner")
+clock = pygame.time.Clock()
+font = pygame.font.SysFont("consolas", 28)
+big_font = pygame.font.SysFont("consolas", 52)
+
+
+def draw_text(text, fnt, color, x, y):
+    surf = fnt.render(text, True, color)
+    screen.blit(surf, (x, y))
+
+
+def menu():
+    while True:
+        screen.fill((12, 16, 30))
+        draw_text("ATENA RUNNER", big_font, (130, 220, 255), 270, 180)
+        draw_text("ENTER = Jogar | ESC = Sair", font, (210, 210, 220), 250, 300)
+        pygame.display.flip()
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if e.type == pygame.KEYDOWN:
+                if e.key == pygame.K_RETURN:
+                    return
+                if e.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    sys.exit()
+
+
+def run_game():
+    player = pygame.Rect(80, HEIGHT // 2 - 25, 45, 45)
+    enemies = []
+    score = 0
+    lives = MAX_LIVES
+    spawn_timer = 0
+
+    while True:
+        dt = clock.tick(FPS) / 1000.0
+        spawn_timer += dt
+
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_UP] or keys[pygame.K_w]:
+            player.y -= int(PLAYER_SPEED)
+        if keys[pygame.K_DOWN] or keys[pygame.K_s]:
+            player.y += int(PLAYER_SPEED)
+        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+            player.x -= int(PLAYER_SPEED)
+        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+            player.x += int(PLAYER_SPEED)
+        player.clamp_ip(screen.get_rect())
+
+        if spawn_timer >= 0.6:
+            spawn_timer = 0
+            h = random.randint(24, 64)
+            y = random.randint(0, HEIGHT - h)
+            enemies.append(pygame.Rect(WIDTH + 10, y, random.randint(30, 60), h))
+
+        for enemy in enemies:
+            enemy.x -= ENEMY_SPEED
+
+        alive_enemies = []
+        for enemy in enemies:
+            if enemy.right < 0:
+                score += 1
+            else:
+                alive_enemies.append(enemy)
+        enemies = alive_enemies
+
+        for enemy in enemies:
+            if player.colliderect(enemy):
+                lives -= 1
+                enemies.remove(enemy)
+                if lives <= 0:
+                    return False, score
+
+        if score >= TARGET_SCORE:
+            return True, score
+
+        screen.fill((15, 20, 35))
+        pygame.draw.rect(screen, (120, 220, 255), player, border_radius=8)
+        for enemy in enemies:
+            pygame.draw.rect(screen, (255, 90, 90), enemy, border_radius=6)
+        draw_text(f"Score: {score}/{TARGET_SCORE}", font, (240, 240, 245), 20, 20)
+        draw_text(f"Vidas: {lives}", font, (240, 240, 245), 20, 55)
+        pygame.display.flip()
+
+
+def game_over(victory, score):
+    while True:
+        screen.fill((10, 12, 22))
+        title = "VITÓRIA!" if victory else "DERROTA!"
+        color = (120, 255, 160) if victory else (255, 110, 110)
+        draw_text(title, big_font, color, 320, 190)
+        draw_text(f"Pontuação final: {score}", font, (220, 220, 230), 300, 280)
+        draw_text("R = Reiniciar | ESC = Sair", font, (220, 220, 230), 260, 340)
+        pygame.display.flip()
+
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if e.type == pygame.KEYDOWN:
+                if e.key == pygame.K_r:
+                    return
+                if e.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    sys.exit()
+
+
+def main():
+    while True:
+        menu()
+        victory, score = run_game()
+        game_over(victory, score)
+
+
+if __name__ == "__main__":
+    main()
+'''
+        if "sort" in prompt_l:
             return "def quicksort(arr):\n    if len(arr) <= 1: return arr\n    pivot = arr[len(arr)//2]\n    left = [x for x in arr if x < pivot]\n    middle = [x for x in arr if x == pivot]\n    right = [x for x in arr if x > pivot]\n    return quicksort(left) + middle + quicksort(right)"
         return f"# [Atena SimBrain] Processando tarefa: {prompt}\n# Resultado gerado via heurística cognitiva."
 

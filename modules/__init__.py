@@ -28,6 +28,7 @@ _REGISTRY: Dict[str, str] = {
     "ProcessActuator": ".process_actuator",
     "Services": ".services",
     "SystemActuator": ".system_actuator",
+    "AtenaCodex": ".atena_codex",
 }
 
 def _load_module(name: str) -> Any:

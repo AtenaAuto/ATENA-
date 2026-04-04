@@ -28,6 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 INVOKE_SCRIPT = ROOT / "protocols" / "atena_invoke.py"
 DASHBOARD_SCRIPT = ROOT / "core" / "atena_local_dashboard.py"
 DASHBOARD_PORT = int(os.getenv("ATENA_DASHBOARD_PORT", "8765"))
+ENABLE_DASHBOARD = os.getenv("ATENA_DASHBOARD_ENABLED", "0") == "1"
 DASHBOARD_STATE_FILE = ROOT / "atena_evolution" / "assistant_dashboard_state.json"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -52,7 +53,8 @@ def utc_now_iso() -> str:
 
 
 def run_evolution_cycle(state: EvolutionState) -> None:
-    open_dashboard()
+    if ENABLE_DASHBOARD:
+        open_dashboard()
     with state.lock:
         state.cycles += 1
         state.last_started_at = utc_now_iso()
@@ -176,6 +178,8 @@ def dashboard_url() -> str:
 
 
 def ensure_dashboard_running() -> None:
+    if not ENABLE_DASHBOARD:
+        return
     if _is_port_open("127.0.0.1", DASHBOARD_PORT):
         return
     subprocess.Popen(
@@ -192,6 +196,8 @@ def ensure_dashboard_running() -> None:
 
 
 def open_dashboard() -> None:
+    if not ENABLE_DASHBOARD:
+        return
     ensure_dashboard_running()
     try:
         webbrowser.open(dashboard_url())
@@ -254,8 +260,9 @@ def main() -> int:
                     spinner.stop("pronto")
             local_ready = True
     state = EvolutionState()
-    write_dashboard_state(state)
-    ensure_dashboard_running()
+    if ENABLE_DASHBOARD:
+        write_dashboard_state(state)
+        ensure_dashboard_running()
     interval_seconds = 600
     worker = threading.Thread(target=evolution_worker, args=(state, interval_seconds), daemon=True)
     worker.start()
@@ -280,11 +287,15 @@ def main() -> int:
                         print(f"last_error={state.last_error}")
                 continue
             if raw == "/evolve":
-                open_dashboard()
+                if ENABLE_DASHBOARD:
+                    open_dashboard()
                 state.wake_event.set()
                 print("✅ Ciclo de evolução solicitado em background.")
                 continue
             if raw == "/dashboard":
+                if not ENABLE_DASHBOARD:
+                    print("⚠️ Dashboard local está OFF. Para habilitar: export ATENA_DASHBOARD_ENABLED=1")
+                    continue
                 open_dashboard()
                 print(f"✅ Dashboard local: {dashboard_url()}")
                 continue

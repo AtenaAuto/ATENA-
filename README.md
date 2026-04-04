@@ -72,7 +72,7 @@ Isso inicia o núcleo principal da ATENA.
 ```
 
 No modo `assistant`, a ATENA mantém um worker de evolução em segundo plano e permite conversar/executar tarefas no mesmo terminal.
-O dashboard local pode ser aberto com `./atena dashboard` ou `/dashboard` no assistant (chat web + status dos ciclos).
+O dashboard local está **OFF por padrão**. Para habilitar no assistant: `export ATENA_DASHBOARD_ENABLED=1` e então use `/dashboard` (chat web + status dos ciclos).
 O launcher agora usa uma interface mais bonita em estilo CLI moderno (com tabela de comandos quando disponível).
 Durante carregamento e geração de respostas, o modo assistant exibe um spinner visual da ATENA-Like para feedback em tempo real.
 O comando `/feedback <0-1>` permite reforçar a memória da última resposta para aprendizado contínuo baseado em avaliação.

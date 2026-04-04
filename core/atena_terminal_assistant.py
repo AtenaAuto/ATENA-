@@ -87,6 +87,7 @@ Comandos:
   /status               mostra status da evolução em background
   /evolve               dispara um ciclo de evolução imediatamente
   /task <instrução>     pede para ATENA pensar em uma tarefa (resposta textual)
+  /feedback <0-1>       reforça aprendizado da última resposta (ex: /feedback 0.95)
   /run <cmd>            executa comando shell local (use com cuidado)
   /exit                 encerra o modo assistant
 """
@@ -130,6 +131,8 @@ def main() -> int:
     print("Digite /help para ver os comandos.")
 
     brain: Optional[AtenaUltraBrain] = None
+    last_prompt: Optional[str] = None
+    last_response: Optional[str] = None
 
     def get_brain() -> AtenaUltraBrain:
         nonlocal brain
@@ -169,6 +172,30 @@ def main() -> int:
                 state.wake_event.set()
                 print("✅ Ciclo de evolução solicitado em background.")
                 continue
+            if raw.startswith("/feedback "):
+                score_txt = raw[len("/feedback ") :].strip()
+                if not score_txt:
+                    print("Informe uma nota entre 0 e 1. Ex: /feedback 0.9")
+                    continue
+                try:
+                    score = float(score_txt)
+                except ValueError:
+                    print("Nota inválida. Use um número entre 0 e 1.")
+                    continue
+                if score < 0 or score > 1:
+                    print("Nota fora do intervalo. Use entre 0 e 1.")
+                    continue
+                if not last_prompt or not last_response:
+                    print("Não há resposta anterior para aprender ainda.")
+                    continue
+                get_brain().learn_from_feedback(
+                    prompt=last_prompt,
+                    response=last_response,
+                    success=score >= 0.6,
+                    score=score,
+                )
+                print(f"🧠 Feedback aplicado (score={score:.2f}) na memória da ATENA-Like.")
+                continue
             if raw.startswith("/task "):
                 task = raw[len("/task ") :].strip()
                 if not task:
@@ -180,6 +207,14 @@ def main() -> int:
                     answer = get_brain().think(task, context="Modo assistant no terminal")
                 finally:
                     spinner.stop("resposta gerada")
+                get_brain().learn_from_feedback(
+                    prompt=task,
+                    response=answer,
+                    success=True,
+                    score=0.75,
+                )
+                last_prompt = task
+                last_response = answer
                 print("\n" + answer[:4000])
                 continue
             if raw.startswith("/run "):
@@ -208,6 +243,14 @@ def main() -> int:
                 answer = get_brain().think(raw, context="Conversa livre no terminal")
             finally:
                 spinner.stop("resposta gerada")
+            get_brain().learn_from_feedback(
+                prompt=raw,
+                response=answer,
+                success=True,
+                score=0.7,
+            )
+            last_prompt = raw
+            last_response = answer
             print("\n" + answer[:4000])
     except (EOFError, KeyboardInterrupt):
         print("\nEncerrando ATENA Ω Assistant...")

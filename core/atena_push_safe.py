@@ -19,8 +19,10 @@ GENERATED_FILES = [
 ]
 GENERATED_DIRS = [
     ROOT / "core" / "__pycache__",
-    ROOT / "protocols" / "__pycache__",
     ROOT / "skills" / "neural-reality-sync" / "scripts" / "__pycache__",
+]
+GENERATED_EXTRA_FILES = [
+    ROOT / "protocols" / "__pycache__" / "atena_invoke.cpython-310.pyc",
 ]
 
 
@@ -42,6 +44,12 @@ def cleanup_generated_artifacts():
                 import shutil
 
                 shutil.rmtree(directory)
+            except Exception:
+                pass
+    for path in GENERATED_EXTRA_FILES:
+        if path.exists():
+            try:
+                path.unlink()
             except Exception:
                 pass
 

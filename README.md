@@ -63,6 +63,7 @@ Isso inicia o núcleo principal da ATENA.
 ./atena doctor --full # Healthcheck completo (inclui runtime smoke)
 ./atena fix      # Auto-correções básicas do ambiente
 ./atena skills   # Descobrir e validar skills (inclui referências Claude)
+./atena pipeline # Pipeline web->análise->relatório automatizado
 ./atena atena-like # Alias do modo assistant
 ./atena help     # Ajuda
 ```

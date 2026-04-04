@@ -18,6 +18,7 @@ COMMANDS = {
     "doctor": ROOT / "core" / "atena_doctor.py",
     "fix": ROOT / "core" / "atena_fix.py",
     "skills": ROOT / "core" / "atena_skills.py",
+    "pipeline": ROOT / "core" / "atena_pipeline.py",
 }
 
 ALIASES = {
@@ -45,6 +46,7 @@ def render_help() -> None:
         table.add_row("./atena doctor --full", "Diagnóstico completo (runtime)")
         table.add_row("./atena fix", "Auto-correções básicas do ambiente")
         table.add_row("./atena skills", "Descoberta + validação das skills")
+        table.add_row("./atena pipeline", "Pipeline: web -> análise -> relatório")
         table.add_row("./atena atena-like", "Alias do modo assistant")
         table.add_row("./atena help", "Exibe esta ajuda")
         console.print(table)
@@ -61,6 +63,7 @@ def render_help() -> None:
         print("  ./atena doctor --full   # diagnóstico completo")
         print("  ./atena fix             # auto-correções básicas")
         print("  ./atena skills          # descoberta/validação de skills")
+        print("  ./atena pipeline        # web -> análise -> relatório")
         print("  ./atena atena-like      # alias do assistant")
         print("  ./atena help            # ajuda")
 

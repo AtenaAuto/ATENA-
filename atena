@@ -2,44 +2,4 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-usage() {
-  cat <<'EOF'
-🔱 ATENA Ω CLI
-
-Uso:
-  ./atena                 # inicia o núcleo principal (modo padrão)
-  ./atena start           # inicia o núcleo principal
-  ./atena invoke          # executa missão de criação de script avançado
-  ./atena dialog          # inicia sessão de diálogo
-  ./atena assistant       # conversa + tarefas com evolução em background
-  ./atena atena-like      # alias do modo assistant
-  ./atena help            # mostra esta ajuda
-EOF
-}
-
-command="${1:-start}"
-
-case "$command" in
-  start)
-    exec python3 "$ROOT_DIR/core/main.py"
-    ;;
-  invoke)
-    exec python3 "$ROOT_DIR/protocols/atena_invoke.py"
-    ;;
-  dialog)
-    exec python3 "$ROOT_DIR/protocols/atena_dialogue_session.py"
-    ;;
-  assistant|atena-like|like)
-    exec python3 "$ROOT_DIR/core/atena_terminal_assistant.py"
-    ;;
-  help|-h|--help)
-    usage
-    ;;
-  *)
-    echo "Comando inválido: $command" >&2
-    echo >&2
-    usage
-    exit 2
-    ;;
-esac
+exec python3 "$ROOT_DIR/core/atena_launcher.py" "$@"

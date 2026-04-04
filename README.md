@@ -64,6 +64,7 @@ Isso inicia o núcleo principal da ATENA.
 ```
 
 No modo `assistant`, a ATENA mantém um worker de evolução em segundo plano e permite conversar/executar tarefas no mesmo terminal.
+O launcher agora usa uma interface mais bonita em estilo CLI moderno (com tabela de comandos quando disponível).
 
 ### 4. Executar uma Missão de Evolução (comando direto)
 Se preferir sem CLI:

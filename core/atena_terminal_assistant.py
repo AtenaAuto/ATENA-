@@ -23,7 +23,7 @@ INVOKE_SCRIPT = ROOT / "protocols" / "atena_invoke.py"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from core.atena_local_lm import AtenaUltraBrain
+from core.atena_llm_router import AtenaLLMRouter
 
 
 @dataclass
@@ -86,6 +86,9 @@ Comandos:
   /help                 mostra ajuda
   /status               mostra status da evolução em background
   /evolve               dispara um ciclo de evolução imediatamente
+  /model                mostra backend/modelo atual
+  /model list           mostra opções de LLM/provider
+  /model set <spec>     troca backend (ex: local | openai:gpt-4.1-mini | compat:claude-3-5-sonnet)
   /task <instrução>     pede para ATENA pensar em uma tarefa (resposta textual)
   /feedback <0-1>       reforça aprendizado da última resposta (ex: /feedback 0.95)
   /run <cmd>            executa comando shell local (use com cuidado)
@@ -140,20 +143,24 @@ def main() -> int:
     print("Evolução em segundo plano: ATIVA.")
     print("Digite /help para ver os comandos.")
 
-    brain: Optional[AtenaUltraBrain] = None
+    router = AtenaLLMRouter()
+    local_ready = False
     last_prompt: Optional[str] = None
     last_response: Optional[str] = None
 
-    def get_brain() -> AtenaUltraBrain:
-        nonlocal brain
-        if brain is None:
+    def warmup_llm():
+        nonlocal local_ready
+        if local_ready:
+            return
+        if router.cfg.provider == "local":
             spinner = AtenaSpinner("Inicializando cérebro local da ATENA-Like")
             spinner.start()
             try:
-                brain = AtenaUltraBrain()
+                # força lazy init local
+                router.generate("teste rápido", context="warmup")
             finally:
                 spinner.stop("pronto")
-        return brain
+            local_ready = True
     state = EvolutionState()
     interval_seconds = 600
     worker = threading.Thread(target=evolution_worker, args=(state, interval_seconds), daemon=True)
@@ -182,6 +189,20 @@ def main() -> int:
                 state.wake_event.set()
                 print("✅ Ciclo de evolução solicitado em background.")
                 continue
+            if raw == "/model":
+                print(f"Modelo atual: {router.current()}")
+                continue
+            if raw == "/model list":
+                print("Opções de modelo/provider:")
+                for opt in router.list_options():
+                    print(f"- {opt}")
+                continue
+            if raw.startswith("/model set "):
+                spec = raw[len("/model set ") :].strip()
+                ok, msg = router.set_backend(spec)
+                print(("✅ " if ok else "❌ ") + msg)
+                local_ready = False
+                continue
             if raw.startswith("/feedback "):
                 score_txt = raw[len("/feedback ") :].strip()
                 if not score_txt:
@@ -198,7 +219,7 @@ def main() -> int:
                 if not last_prompt or not last_response:
                     print("Não há resposta anterior para aprender ainda.")
                     continue
-                get_brain().learn_from_feedback(
+                router.learn_from_feedback(
                     prompt=last_prompt,
                     response=last_response,
                     success=score >= 0.6,
@@ -214,10 +235,12 @@ def main() -> int:
                 spinner = AtenaSpinner("ATENA-Like pensando na tarefa")
                 spinner.start()
                 try:
-                    answer = get_brain().think(task, context="Modo assistant no terminal")
+                    if router.cfg.provider == "local":
+                        warmup_llm()
+                    answer = router.generate(task, context="Modo assistant no terminal")
                 finally:
                     spinner.stop("resposta gerada")
-                get_brain().learn_from_feedback(
+                router.learn_from_feedback(
                     prompt=task,
                     response=answer,
                     success=True,
@@ -250,10 +273,12 @@ def main() -> int:
             spinner = AtenaSpinner("ATENA-Like elaborando resposta")
             spinner.start()
             try:
-                answer = get_brain().think(raw, context="Conversa livre no terminal")
+                if router.cfg.provider == "local":
+                    warmup_llm()
+                answer = router.generate(raw, context="Conversa livre no terminal")
             finally:
                 spinner.stop("resposta gerada")
-            get_brain().learn_from_feedback(
+            router.learn_from_feedback(
                 prompt=raw,
                 response=answer,
                 success=True,

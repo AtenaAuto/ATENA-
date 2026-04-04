@@ -93,6 +93,37 @@ Comandos:
     )
 
 
+class AtenaSpinner:
+    """Spinner simples para indicar processamento da ATENA no terminal."""
+
+    def __init__(self, message: str = "ATENA processando"):
+        self.message = message
+        self._running = False
+        self._thread: Optional[threading.Thread] = None
+        self._frames = ["◐", "◓", "◑", "◒"]
+
+    def start(self):
+        if self._running:
+            return
+        self._running = True
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def _run(self):
+        idx = 0
+        while self._running:
+            frame = self._frames[idx % len(self._frames)]
+            print(f"\r{frame} {self.message}...", end="", flush=True)
+            time.sleep(0.12)
+            idx += 1
+
+    def stop(self, done_message: str = "concluído"):
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=1)
+        print(f"\r✅ {self.message}: {done_message}." + " " * 12)
+
+
 def main() -> int:
     print("🔱 ATENA-Like Assistant iniciada.")
     print("Evolução em segundo plano: ATIVA.")
@@ -103,8 +134,12 @@ def main() -> int:
     def get_brain() -> AtenaUltraBrain:
         nonlocal brain
         if brain is None:
-            print("🧠 Inicializando cérebro local da ATENA...")
-            brain = AtenaUltraBrain()
+            spinner = AtenaSpinner("Inicializando cérebro local da ATENA-Like")
+            spinner.start()
+            try:
+                brain = AtenaUltraBrain()
+            finally:
+                spinner.stop("pronto")
         return brain
     state = EvolutionState()
     interval_seconds = 600
@@ -139,7 +174,12 @@ def main() -> int:
                 if not task:
                     print("Informe uma instrução após /task.")
                     continue
-                answer = get_brain().think(task, context="Modo assistant no terminal")
+                spinner = AtenaSpinner("ATENA-Like pensando na tarefa")
+                spinner.start()
+                try:
+                    answer = get_brain().think(task, context="Modo assistant no terminal")
+                finally:
+                    spinner.stop("resposta gerada")
                 print("\n" + answer[:4000])
                 continue
             if raw.startswith("/run "):
@@ -162,7 +202,12 @@ def main() -> int:
                     print(f"Falha ao executar comando: {exc}")
                 continue
 
-            answer = get_brain().think(raw, context="Conversa livre no terminal")
+            spinner = AtenaSpinner("ATENA-Like elaborando resposta")
+            spinner.start()
+            try:
+                answer = get_brain().think(raw, context="Conversa livre no terminal")
+            finally:
+                spinner.stop("resposta gerada")
             print("\n" + answer[:4000])
     except (EOFError, KeyboardInterrupt):
         print("\nEncerrando ATENA Ω Assistant...")

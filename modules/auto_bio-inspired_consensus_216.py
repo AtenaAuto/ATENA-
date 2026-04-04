@@ -5,7 +5,7 @@
 import logging
 logger = logging.getLogger(__name__)
 
-class Bio-InspiredConsensusModule:
+class BioInspiredConsensusModule:
     """Implementação autônoma para Bio-Inspired Consensus."""
     def __init__(self):
         self.state = {}

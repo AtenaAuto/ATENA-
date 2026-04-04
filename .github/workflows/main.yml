@@ -2,7 +2,7 @@ name: 🧬 ATENA Ω - Evolução Divina v4.2 (DeepSeek-R1 Edition)
 
 on:
   schedule:
-    - cron: '*/30 * * * *' # Executa a cada 30 minutos (sujeito à fila do GitHub)
+    - cron: '*/30 * * * *'
   workflow_dispatch:
     inputs:
       model_size:
@@ -19,10 +19,11 @@ on:
         default: '30'
         type: choice
         options:
-          - '2500'
+          - '30'
           - '600'
           - '700'
           - '800'
+          - '2500'
       mode:
         description: 'Modo de evolução'
         required: true
@@ -41,7 +42,7 @@ jobs:
   evoluir:
     name: 🧠 Evolução Neural (${{ matrix.model_size }})
     runs-on: ubuntu-latest
-    timeout-minutes: 25 # Aumentado levemente para segurança
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -52,7 +53,6 @@ jobs:
       MODEL_SIZE: ${{ github.event.inputs.model_size || matrix.model_size }}
       GENERATIONS: ${{ github.event.inputs.generations || '30' }}
       MODE: ${{ github.event.inputs.mode || 'auto' }}
-      LLM_MODEL_NAME: ${{ (github.event.inputs.model_size || matrix.model_size) == '7B' && 'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B' || 'deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B' }}
 
     steps:
     - name: 📥 Checkout
@@ -72,28 +72,30 @@ jobs:
 
     - name: 📂 Preparar Estrutura
       run: |
-        mkdir -p atena_evolution/code atena_evolution/knowledge atena_evolution/logs
+        mkdir -p atena_evolution/knowledge atena_evolution/logs atena_evolution/code
 
     - name: 🧠 Baixar Evolução Anterior (Persistência)
+      id: download-brain
       uses: actions/download-artifact@v4
-      continue-on-error: true # Importante: evita erro na primeira execução do repositório
+      continue-on-error: true
       with:
         name: atena-brain-${{ env.MODEL_SIZE }}
         path: atena_evolution/
+      # O continue-on-error garante que se o artefato não existir (1ª run), o workflow não pare.
 
     - name: 🔮 Executar ATENA Core
       run: |
-        echo "🚀 Retomando/Iniciando motor com DeepSeek-R1-${{ env.MODEL_SIZE }}..."
-        # O script core/main.py deve carregar o knowledge.db se ele existir na pasta
-        python core/main.py --auto --cycles ${{ env.GENERATIONS }}
+        echo "🚀 Iniciando motor DeepSeek-R1-${{ env.MODEL_SIZE }}..."
+        # Certifique-se que o main.py busca o DB em atena_evolution/knowledge/
+        python core/main.py --auto --cycles ${{ env.GENERATIONS }} --mode ${{ env.MODE }}
 
     - name: ⬆️ Salvar Evolução Atualizada
-      if: always()
+      if: always() # Salva mesmo se o Core falhar, para não perder logs
       uses: actions/upload-artifact@v4
       with:
         name: atena-brain-${{ env.MODEL_SIZE }}
         path: |
-          atena_evolution/knowledge/knowledge.db
+          atena_evolution/knowledge/
           atena_evolution/logs/
         retention-days: 3
-        overwrite: true # Garante que o artefato mais recente seja o que será baixado no próximo ciclo
+        overwrite: true

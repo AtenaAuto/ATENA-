@@ -9,3 +9,4 @@ mlflow
 wandb
 optuna
 redis
+openai>=1.0.0

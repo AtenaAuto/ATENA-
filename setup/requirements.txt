@@ -28,3 +28,4 @@ chromadb
 faiss-cpu
 python-dotenv
 colorama
+openai>=1.0.0

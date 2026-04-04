@@ -1,5 +1,9 @@
+import logging
+import subprocess
 import platform
 from .base import BaseActuator
+
+logger = logging.getLogger("atena.notification")
 
 class NotificationActuator(BaseActuator):
     """Envia notificaes para o sistema operacional."""

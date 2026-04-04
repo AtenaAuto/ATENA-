@@ -41,7 +41,7 @@ jobs:
   evoluir:
     name: 🧠 Evolução Neural (${{ matrix.model_size }})
     runs-on: ubuntu-latest
-    timeout-minutes: 25 # Aumentado levemente para segurança
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -62,21 +62,30 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
 
     - name: 🔧 Instalar dependências
       run: |
         sudo apt-get update -qq
         sudo apt-get install -y sqlite3
         python -m pip install --upgrade pip
-        python -m pip install requests torch transformers accelerate faiss-cpu astor
+        if [ -f setup/requirements.txt ]; then
+          python -m pip install -r setup/requirements.txt
+        else
+          python -m pip install requests torch transformers accelerate faiss-cpu astor sentence-transformers aiosqlite aiohttp
+        fi
 
     - name: 📂 Preparar Estrutura
       run: |
         mkdir -p atena_evolution/code atena_evolution/knowledge atena_evolution/logs
+        # Garantir que o diretório modules esteja no lugar certo para o core/main.py
+        if [ ! -d core/modules ]; then
+          cp -r modules core/ || true
+        fi
 
     - name: 🧠 Baixar Evolução Anterior (Persistência)
       uses: actions/download-artifact@v4
-      continue-on-error: true # Importante: evita erro na primeira execução do repositório
+      continue-on-error: true
       with:
         name: atena-brain-${{ env.MODEL_SIZE }}
         path: atena_evolution/
@@ -84,7 +93,8 @@ jobs:
     - name: 🔮 Executar ATENA Core
       run: |
         echo "🚀 Retomando/Iniciando motor com DeepSeek-R1-${{ env.MODEL_SIZE }}..."
-        # O script core/main.py deve carregar o knowledge.db se ele existir na pasta
+        # Adiciona o diretório raiz ao PYTHONPATH para que os módulos sejam encontrados
+        export PYTHONPATH=$PYTHONPATH:$(pwd):$(pwd)/core
         python core/main.py --auto --cycles ${{ env.GENERATIONS }}
 
     - name: ⬆️ Salvar Evolução Atualizada
@@ -93,7 +103,7 @@ jobs:
       with:
         name: atena-brain-${{ env.MODEL_SIZE }}
         path: |
-          atena_evolution/knowledge/knowledge.db
+          atena_evolution/knowledge/
           atena_evolution/logs/
         retention-days: 3
-        overwrite: true # Garante que o artefato mais recente seja o que será baixado no próximo ciclo
+        overwrite: true

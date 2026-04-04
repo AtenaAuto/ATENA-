@@ -16,6 +16,7 @@ COMMANDS = {
     "dialog": ROOT / "protocols" / "atena_dialogue_session.py",
     "assistant": ROOT / "core" / "atena_terminal_assistant.py",
     "doctor": ROOT / "core" / "atena_doctor.py",
+    "fix": ROOT / "core" / "atena_fix.py",
 }
 
 ALIASES = {
@@ -40,6 +41,8 @@ def render_help() -> None:
         table.add_row("./atena dialog", "Sessão de diálogo")
         table.add_row("./atena assistant", "Modo assistente com evolução em background")
         table.add_row("./atena doctor", "Diagnóstico rápido (estilo healthcheck)")
+        table.add_row("./atena doctor --full", "Diagnóstico completo (runtime)")
+        table.add_row("./atena fix", "Auto-correções básicas do ambiente")
         table.add_row("./atena atena-like", "Alias do modo assistant")
         table.add_row("./atena help", "Exibe esta ajuda")
         console.print(table)
@@ -53,6 +56,8 @@ def render_help() -> None:
         print("  ./atena dialog          # sessão de diálogo")
         print("  ./atena assistant       # assistente + evolução")
         print("  ./atena doctor          # diagnóstico rápido")
+        print("  ./atena doctor --full   # diagnóstico completo")
+        print("  ./atena fix             # auto-correções básicas")
         print("  ./atena atena-like      # alias do assistant")
         print("  ./atena help            # ajuda")
 
@@ -78,7 +83,7 @@ def main(argv: list[str]) -> int:
         render_help()
         return 2
 
-    result = subprocess.run([sys.executable, str(script)], cwd=str(ROOT))
+    result = subprocess.run([sys.executable, str(script), *argv[2:]], cwd=str(ROOT))
     return result.returncode
 
 

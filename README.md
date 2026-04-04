@@ -60,6 +60,8 @@ Isso inicia o núcleo principal da ATENA.
 ./atena dialog   # Sessão de diálogo
 ./atena assistant # Conversa + tarefas + evolução em background
 ./atena doctor   # Healthcheck rápido (CLI, skills, compilações)
+./atena doctor --full # Healthcheck completo (inclui runtime smoke)
+./atena fix      # Auto-correções básicas do ambiente
 ./atena atena-like # Alias do modo assistant
 ./atena help     # Ajuda
 ```

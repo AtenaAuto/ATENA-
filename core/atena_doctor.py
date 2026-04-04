@@ -8,6 +8,7 @@ import json
 import platform
 import subprocess
 import sys
+import argparse
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -23,13 +24,18 @@ class Check:
     timeout: int = 20
 
 
-CHECKS = [
+BASE_CHECKS = [
     Check("Launcher help", ["./atena", "help"], timeout=15),
     Check("Compile core launcher", [sys.executable, "-m", "py_compile", "core/atena_launcher.py"], timeout=20),
     Check("Compile assistant", [sys.executable, "-m", "py_compile", "core/atena_terminal_assistant.py"], timeout=20),
     Check("Compile invoke", [sys.executable, "-m", "py_compile", "protocols/atena_invoke.py"], timeout=20),
     Check("Skill shell lint", ["bash", "-n", "skills/atena-orchestrator/scripts/run_atena.sh"], timeout=10),
     Check("Skill python lint", [sys.executable, "-m", "py_compile", "skills/neural-reality-sync/scripts/sync_engine.py"], timeout=10),
+]
+
+FULL_EXTRA_CHECKS = [
+    Check("Core help", [sys.executable, "core/main.py", "--help"], timeout=25),
+    Check("Invoke fallback smoke", ["./atena", "invoke"], timeout=35),
 ]
 
 
@@ -82,7 +88,15 @@ def print_report(results: list[dict]) -> None:
 
 
 def main() -> int:
-    results = [run_check(c) for c in CHECKS]
+    parser = argparse.ArgumentParser(description="ATENA Doctor")
+    parser.add_argument("--full", action="store_true", help="Inclui checks mais pesados de runtime")
+    args = parser.parse_args()
+
+    checks = list(BASE_CHECKS)
+    if args.full:
+        checks.extend(FULL_EXTRA_CHECKS)
+
+    results = [run_check(c) for c in checks]
     print_report(results)
     out = ROOT / "atena_evolution" / "doctor_report.json"
     out.parent.mkdir(parents=True, exist_ok=True)

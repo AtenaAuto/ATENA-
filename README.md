@@ -49,6 +49,7 @@ pip install -r requirements.txt
 | `./atena research-lab` | Gera proposta avançada de evolução |
 | `./atena genius` | Planejamento multiobjetivo |
 | `./atena code-build --type <site\|api\|cli> --name <projeto>` | Gera projeto inicial automaticamente |
+| `./atena telemetry-report` | Consolida métricas de missão (telemetria) |
 
 ## Fluxo recomendado para produção
 

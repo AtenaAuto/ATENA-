@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -14,10 +15,13 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from modules.atena_codex import AtenaCodex
+from modules.atena_telemetry_hub import AtenaTelemetryHub, TelemetryEvent
 
 
 def main() -> int:
+    t0 = time.perf_counter()
     codex = AtenaCodex(root_path=str(ROOT))
+    telemetry = AtenaTelemetryHub(ROOT)
 
     autopilot = codex.run_advanced_autopilot(
         objective="Gate essencial de estabilidade e segurança antes de evolução contínua",
@@ -93,6 +97,19 @@ def main() -> int:
     print(f"Autopilot: {autopilot.get('status')} | Smoke: {smoke.get('status')} ({smoke.get('passed')}/{smoke.get('total_checks')})")
     print(f"Relatório: {md_path.relative_to(ROOT)}")
     print(f"Artefato: {json_path.relative_to(ROOT)}")
+    telemetry.log_event(
+        TelemetryEvent(
+            mission="guardian",
+            status="ok" if guardian_ok else "fail",
+            latency_ms=(time.perf_counter() - t0) * 1000.0,
+            metadata={
+                "autopilot_status": autopilot.get("status"),
+                "smoke_status": smoke.get("status"),
+                "smoke_passed": smoke.get("passed"),
+                "smoke_total": smoke.get("total_checks"),
+            },
+        )
+    )
     return 0 if guardian_ok else 2
 
 

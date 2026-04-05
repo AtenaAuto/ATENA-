@@ -73,6 +73,7 @@ Isso inicia o núcleo principal da ATENA.
 ./atena genius # Missão genial: síntese estratégica multiobjetivo
 ./atena guardian # Gate essencial: validação total antes de evoluir
 ./atena production-ready # Gate final de produção (doctor + guardian)
+./atena code-build --type site --name meu_site # Cria site/app/software inicial automaticamente
 ./atena atena-like # Alias do modo assistant
 ./atena help     # Ajuda
 ```
@@ -124,6 +125,7 @@ A ATENA Ω possui um **Verificador Neuro-Simbólico** ativo que impede a execuç
 - **Missão Genial:** ✅ Plano estratégico 72h com ranking multiobjetivo (`./atena genius`)
 - **Guardian Gate (essencial):** ✅ Só evolui sem bloqueios críticos (`./atena guardian`)
 - **Production Gate:** ✅ Release só com doctor+guardian aprovados (`./atena production-ready`)
+- **Módulo Programação:** ✅ Gera site/API/CLI automaticamente (`./atena code-build --type <site|api|cli> --name <projeto>`)
 
 ---
 

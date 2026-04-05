@@ -1,0 +1,1 @@
+document.getElementById('helloBtn').addEventListener('click',()=>{document.getElementById('output').textContent='✅ ATENA gerou e executou a base do site com sucesso!';});

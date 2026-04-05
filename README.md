@@ -63,6 +63,8 @@ Se qualquer etapa falhar, corrigir antes de promover alterações.
 
 No modo `assistant`, use `/model list` e `/model set <provider:model>` com providers `local`, `deepseek`, `openai`, `anthropic` e `compat` (OpenAI-compatible).
 
+No terminal assistant (estilo Claude Code), você também pode usar `/tools`, `/review`, `/commit <mensagem>`, `/init-context` e sair com `:q`.
+
 ## CI
 
 O repositório inclui workflow de gate em `.github/workflows/production-gate.yml`, executado em `push`/`pull_request` para `main`.

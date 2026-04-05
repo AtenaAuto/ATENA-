@@ -110,6 +110,10 @@ Comandos:
   /history [n]          mostra últimas interações (padrão: 8)
   /save <arquivo>       salva a última resposta em arquivo
   /git                  mostra status git curto do repositório
+  /review               mostra resumo de mudanças (status + diff stat)
+  /commit <mensagem>    cria commit git rápido pelo assistant
+  /tools                lista ferramentas/comandos operacionais disponíveis
+  /init-context         cria template de contexto de sessão em docs/
   /feedback <0-1>       reforça aprendizado da última resposta (ex: /feedback 0.95)
   /run <cmd>            executa comando shell local (use com cuidado)
   /shell <cmd>          alias de /run
@@ -138,7 +142,7 @@ def git_branch() -> str:
 
 def prompt_label(model: str) -> str:
     ts = datetime.now().strftime("%H:%M")
-    return f"ATENA[{git_branch()}|{model}|{ts}]> "
+    return f"⟪ATENA⟫[{git_branch()}|{model}|{ts}] » "
 
 
 class AtenaSpinner:
@@ -304,6 +308,8 @@ def main() -> int:
                 continue
             if raw == "/exit":
                 break
+            if raw == ":q":
+                break
             if raw == "/help":
                 print_help()
                 continue
@@ -417,6 +423,68 @@ def main() -> int:
                     print(st.stdout.strip() or "working tree limpa ✅")
                 except Exception as exc:  # noqa: BLE001
                     print(f"Falha ao consultar git: {exc}")
+                continue
+            if raw == "/review":
+                try:
+                    st = subprocess.run(
+                        ["git", "status", "--short"],
+                        cwd=str(ROOT),
+                        capture_output=True,
+                        text=True,
+                        timeout=20,
+                    )
+                    ds = subprocess.run(
+                        ["git", "diff", "--stat"],
+                        cwd=str(ROOT),
+                        capture_output=True,
+                        text=True,
+                        timeout=20,
+                    )
+                    print("== git status --short ==")
+                    print(st.stdout.strip() or "working tree limpa ✅")
+                    print("\n== git diff --stat ==")
+                    print(ds.stdout.strip() or "sem diff")
+                except Exception as exc:  # noqa: BLE001
+                    print(f"Falha ao revisar mudanças: {exc}")
+                continue
+            if raw.startswith("/commit "):
+                message = raw[len("/commit ") :].strip()
+                if not message:
+                    print("Uso: /commit <mensagem>")
+                    continue
+                try:
+                    proc = subprocess.run(
+                        ["git", "commit", "-m", message],
+                        cwd=str(ROOT),
+                        capture_output=True,
+                        text=True,
+                        timeout=40,
+                    )
+                    if proc.returncode == 0:
+                        print(proc.stdout.strip() or "✅ Commit criado.")
+                    else:
+                        print(proc.stdout.strip())
+                        print(proc.stderr.strip() or "❌ Falha ao criar commit.")
+                except Exception as exc:  # noqa: BLE001
+                    print(f"Falha no commit: {exc}")
+                continue
+            if raw == "/tools":
+                print("Ferramentas no assistant:")
+                print("- /model list | /model set <provider:model>")
+                print("- /task | /plan | /history | /save")
+                print("- /git | /review | /commit <mensagem>")
+                print("- /run <cmd> | /shell <cmd>")
+                print("- /evolve | /status | /dashboard")
+                continue
+            if raw == "/init-context":
+                path = ROOT / "docs" / "SESSION_CONTEXT.md"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if not path.exists():
+                    path.write_text(
+                        "# Session Context\\n\\n## Objetivo\\n-\\n\\n## Restrições\\n-\\n\\n## Próximos passos\\n-\\n",
+                        encoding="utf-8",
+                    )
+                print(f"✅ Template de contexto disponível em: {path}")
                 continue
             if raw.startswith("/task "):
                 task = raw[len("/task ") :].strip()

@@ -3,7 +3,7 @@ import threading
 import time
 from typing import Dict, List, Any, Callable, Optional
 from queue import Queue, Empty
-from atena_control_bridge import AtenaControlBridge
+from .atena_control_bridge import AtenaControlBridge
 
 logger = logging.getLogger(__name__)
 

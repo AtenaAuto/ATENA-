@@ -1,7 +1,6 @@
 import logging
 import asyncio
 import json
-from playwright.async_api import async_playwright, Page, Browser
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 from datetime import datetime
@@ -10,9 +9,10 @@ logger = logging.getLogger(__name__)
 
 class AtenaBrowserAgent:
     def __init__(self):
-        self.browser: Optional[Browser] = None
-        self.page: Optional[Page] = None
+        self.browser: Optional[Any] = None
+        self.page: Optional[Any] = None
         self.context: Optional[Any] = None # BrowserContext
+        self.playwright: Optional[Any] = None
         self.memory_path = Path("atena_evolution/states/browser_learning_memory.json")
         self.learning_memory = self._load_learning_memory()
 
@@ -97,6 +97,8 @@ class AtenaBrowserAgent:
     async def launch(self, headless: bool = True):
         """Inicia o navegador Chromium."""
         logger.info(f"Lançando navegador (headless={headless})...")
+        from playwright.async_api import async_playwright
+
         self.playwright = await async_playwright().start()
         self.browser = await self.playwright.chromium.launch(headless=headless)
         self.context = await self.browser.new_context(ignore_https_errors=True)

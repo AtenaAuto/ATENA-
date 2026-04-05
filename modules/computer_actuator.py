@@ -20,6 +20,13 @@ logger = logging.getLogger(__name__)
 class ComputerActuator(BaseActuator):
     """Atuador que fornece capacidades de interação direta com o computador."""
 
+    def _check_dependencies(self) -> None:
+        """Valida dependências mínimas para operação do atuador."""
+        if shutil.which("sh") is None and shutil.which("bash") is None:
+            raise RuntimeError("Shell do sistema não encontrado (sh/bash).")
+        # psutil já foi importado no topo; aqui validamos disponibilidade funcional.
+        _ = psutil.cpu_count()
+
     def __init__(self):
         super().__init__()
         self.os_info = {

@@ -64,9 +64,11 @@ Isso inicia o núcleo principal da ATENA.
 ./atena fix      # Auto-correções básicas do ambiente
 ./atena skills   # Descobrir e validar skills (inclui referências Claude)
 ./atena pipeline # Pipeline web->análise->relatório automatizado
+./atena research-lab # Gera proposta avançada de evolução arquitetural
 ./atena learn-status # Ver aprendizado persistido da ATENA
 ./atena push-safe    # Só libera push após doctor --full aprovado
 ./atena dashboard    # Dashboard local com chat estilo "manus"
+./atena codex-advanced # Missão avançada de autopilot com AtenaCodex
 ./atena atena-like # Alias do modo assistant
 ./atena help     # Ajuda
 ```
@@ -110,6 +112,9 @@ A ATENA Ω possui um **Verificador Neuro-Simbólico** ativo que impede a execuç
 - **Execução no terminal:** ✅ Suporta execução com um comando (`./atena`)
 - **Missão avançada sem API externa:** ✅ Possui fallback local no invocador (`./atena invoke`)
 - **Modo assistente contínuo (ATENA-Like):** ✅ Conversa e tarefas com evolução em background (`./atena assistant` ou `./atena atena-like`)
+- **Missão de proposta avançada (Research Lab):** ✅ Blueprint de feature de fronteira (`./atena research-lab`)
+- **Funções avançadas recomendadas:** ✅ Backlog técnico priorizado em `docs/FUNCOES_AVANCADAS_RECOMENDADAS_ATENA_2026-04-05.md`
+- **Missão avançada com AtenaCodex:** ✅ Diagnóstico estratégico + plano de ação + relatório versionado (`./atena codex-advanced`)
 
 ---
 

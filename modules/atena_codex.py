@@ -174,6 +174,89 @@ class AtenaCodex:
         logger.info("[AtenaCodex] diagnóstico concluído com status=%s", status)
         return diagnostic
 
+    def run_advanced_autopilot(
+        self,
+        objective: str = "Elevar confiabilidade do runtime da ATENA",
+        include_commands: bool = True,
+        timeout_seconds: int = 120,
+    ) -> Dict[str, Any]:
+        """
+        Executa um ciclo avançado orientado por objetivo usando AtenaCodex.
+
+        Fluxo:
+        1) Diagnóstico do ambiente
+        2) Priorização de riscos (módulos essenciais faltantes + comandos que falharam)
+        3) Geração de plano de ação em etapas
+        4) Persistência de relatório no diretório atena_evolution/
+        """
+        diagnostic = self.run_full_diagnostic(
+            include_commands=include_commands,
+            timeout_seconds=timeout_seconds,
+        )
+
+        essential_missing = [
+            item["name"]
+            for item in diagnostic["modules"]["essential"]
+            if not item.get("ok", False)
+        ]
+        command_failures = [
+            item
+            for item in diagnostic.get("commands", [])
+            if item.get("returncode", 1) != 0
+        ]
+
+        risk_score = min(1.0, (len(essential_missing) * 0.12) + (len(command_failures) * 0.18))
+        confidence = max(0.0, 1.0 - risk_score)
+
+        action_plan: List[Dict[str, Any]] = []
+        if essential_missing:
+            action_plan.append(
+                {
+                    "priority": "P0",
+                    "title": "Restaurar módulos essenciais faltantes",
+                    "details": f"Instalar/validar: {', '.join(essential_missing)}",
+                }
+            )
+        if command_failures:
+            action_plan.append(
+                {
+                    "priority": "P0",
+                    "title": "Corrigir comandos locais com falha",
+                    "details": [f["command"] for f in command_failures],
+                }
+            )
+        if not action_plan:
+            action_plan.append(
+                {
+                    "priority": "P1",
+                    "title": "Ambiente estável",
+                    "details": "Prosseguir para missões de evolução e benchmarks.",
+                }
+            )
+
+        result = {
+            "objective": objective,
+            "status": diagnostic["status"],
+            "risk_score": round(risk_score, 3),
+            "confidence": round(confidence, 3),
+            "missing_essential_modules": essential_missing,
+            "failing_commands_count": len(command_failures),
+            "action_plan": action_plan,
+            "diagnostic": diagnostic,
+            "generated_at": datetime.utcnow().isoformat() + "Z",
+        }
+
+        evolution_dir = self.root_path / "atena_evolution"
+        evolution_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        report_path = evolution_dir / f"codex_autopilot_report_{timestamp}.json"
+        with open(report_path, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+
+        result["report_path"] = str(report_path)
+        logger.info("[AtenaCodex] autopilot avançado concluído. report=%s", report_path)
+        return result
+
     @staticmethod
     def _check_single_module(module_name: str) -> CheckResult:
         # Mapeamento de nomes de pacotes pip para nomes de importação

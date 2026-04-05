@@ -19,9 +19,11 @@ COMMANDS = {
     "fix": ROOT / "core" / "atena_fix.py",
     "skills": ROOT / "core" / "atena_skills.py",
     "pipeline": ROOT / "core" / "atena_pipeline.py",
+    "research-lab": ROOT / "protocols" / "atena_research_lab_mission.py",
     "learn-status": ROOT / "core" / "atena_learning_status.py",
     "push-safe": ROOT / "core" / "atena_push_safe.py",
     "dashboard": ROOT / "core" / "atena_local_dashboard.py",
+    "codex-advanced": ROOT / "protocols" / "atena_codex_advanced_mission.py",
 }
 
 ALIASES = {
@@ -59,9 +61,11 @@ def render_help() -> None:
         table.add_row("./atena fix", "Auto-correções básicas do ambiente")
         table.add_row("./atena skills", "Descoberta + validação das skills")
         table.add_row("./atena pipeline", "Pipeline: web -> análise -> relatório")
+        table.add_row("./atena research-lab", "Gera proposta avançada para evolução da ATENA")
         table.add_row("./atena learn-status", "Mostra memória de aprendizado persistida")
         table.add_row("./atena push-safe", "Push apenas após doctor --full aprovado")
         table.add_row("./atena dashboard", "Dashboard local com chat estilo assistant")
+        table.add_row("./atena codex-advanced", "Missão avançada usando módulo AtenaCodex")
         table.add_row("./atena atena-like", "Alias do modo assistant")
         table.add_row("./atena help", "Exibe esta ajuda")
         console.print(table)
@@ -80,9 +84,11 @@ def render_help() -> None:
         print("  ./atena fix             # auto-correções básicas")
         print("  ./atena skills          # descoberta/validação de skills")
         print("  ./atena pipeline        # web -> análise -> relatório")
+        print("  ./atena research-lab    # proposta avançada de evolução")
         print("  ./atena learn-status    # status do aprendizado persistente")
         print("  ./atena push-safe       # push condicionado a aprovação")
         print("  ./atena dashboard       # dashboard local com chat")
+        print("  ./atena codex-advanced  # missão avançada com AtenaCodex")
         print("  ./atena atena-like      # alias do assistant")
         print("  ./atena help            # ajuda")
 

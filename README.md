@@ -64,6 +64,11 @@ Se qualquer etapa falhar, corrigir antes de promover alterações.
 
 O repositório inclui workflow de gate em `.github/workflows/production-gate.yml`, executado em `push`/`pull_request` para `main`.
 
+
+## Análise estratégica
+
+Ver análise e roadmap recomendado em `docs/ANALISE_COMPLETA_ATENA_RECOMENDACOES_2026-04-05.md`.
+
 ## Licença
 
 Consulte `LICENSE`.

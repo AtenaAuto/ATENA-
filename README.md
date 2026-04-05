@@ -48,7 +48,7 @@ pip install -r requirements.txt
 | `./atena codex-advanced` | Missão de diagnóstico estratégico |
 | `./atena research-lab` | Gera proposta avançada de evolução |
 | `./atena genius` | Planejamento multiobjetivo |
-| `./atena code-build --type <site\|api\|cli> --name <projeto>` | Gera projeto inicial automaticamente |
+| `./atena code-build --type <site\|api\|cli> --name <projeto> [--template basic\|landing-page\|portfolio\|dashboard\|blog]` | Gera projeto inicial automaticamente |
 | `./atena telemetry-report` | Consolida métricas de missão (telemetria) |
 
 ## Fluxo recomendado para produção
@@ -60,6 +60,12 @@ pip install -r requirements.txt
 ```
 
 Se qualquer etapa falhar, corrigir antes de promover alterações.
+
+### Exemplo de geração de site mais completo
+
+```bash
+./atena code-build --type site --name minha_landing --template landing-page
+```
 
 No modo `assistant`, use `/model list` e `/model set <provider:model>` com providers `local`, `deepseek`, `openai`, `anthropic` e `compat` (OpenAI-compatible).
 

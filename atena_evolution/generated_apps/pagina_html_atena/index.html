@@ -1,18 +1,50 @@
 <!doctype html>
-<html lang="pt-BR"> 
+<html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>pagina_html_atena — Site gerado pela ATENA</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>pagina_html_atena • Landing Page</title>
+  <meta name="description" content="Projeto Landing Page gerado automaticamente pela ATENA." />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <header class="topbar">
+    <strong>pagina_html_atena</strong>
+    <nav>
+      <a href="index.html">Início</a>
+      <a href="about.html">Sobre</a>
+      <a href="contact.html">Contato</a>
+    </nav>
+  </header>
+
   <main>
-    <h1>pagina_html_atena</h1>
-    <p>Site inicial gerado automaticamente pelo módulo de programação da ATENA.</p>
-    <button id="helloBtn">Testar interação</button>
-    <p id="output"></p>
+    <section class="hero">
+      <p class="tag">Template: Landing Page</p>
+      <h1>pagina_html_atena</h1>
+      <p>Projeto gerado pela ATENA com estrutura pronta para customização rápida.</p>
+      <button id="helloBtn">Testar interação</button>
+      <p id="output" class="output"></p>
+    </section>
+
+    <section class="cards">
+      <article class="card">
+        <h2>Rápido para iniciar</h2>
+        <p>Comece pelo conteúdo da seção principal e personalize cores e textos.</p>
+      </article>
+      <article class="card">
+        <h2>Estrutura multipágina</h2>
+        <p>Inclui páginas de início, sobre e contato já conectadas via navegação.</p>
+      </article>
+      <article class="card">
+        <h2>Pronto para evolução</h2>
+        <p>Use como base para acoplar API, analytics e deploy em produção.</p>
+      </article>
+    </section>
   </main>
+
+  <footer>
+    <small>Gerado por ATENA Code Module · template Landing Page</small>
+  </footer>
   <script src="app.js"></script>
 </body>
 </html>

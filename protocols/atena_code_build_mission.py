@@ -19,15 +19,22 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="ATENA Code Build Mission")
     parser.add_argument("--type", dest="project_type", choices=["site", "api", "cli"], default="site")
     parser.add_argument("--name", dest="project_name", default="atena_app")
+    parser.add_argument(
+        "--template",
+        choices=["basic", "landing-page", "portfolio", "dashboard", "blog"],
+        default="basic",
+        help="Template visual para tipo site",
+    )
     args = parser.parse_args()
 
     builder = AtenaCodeModule(ROOT)
-    result = builder.build(args.project_type, args.project_name)
+    result = builder.build(args.project_type, args.project_name, template=args.template)
 
     if result.ok:
         print("🧠💻 ATENA Code Module")
         print(f"Projeto: {result.project_name}")
         print(f"Tipo: {result.project_type}")
+        print(f"Template: {result.template}")
         print(f"Saída: {result.output_dir}")
         print("Status: sucesso")
         return 0

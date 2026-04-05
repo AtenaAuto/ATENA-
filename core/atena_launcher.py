@@ -27,6 +27,7 @@ COMMANDS = {
     "modules-smoke": ROOT / "protocols" / "atena_module_smoke_mission.py",
     "genius": ROOT / "protocols" / "atena_genius_mission.py",
     "guardian": ROOT / "protocols" / "atena_guardian_mission.py",
+    "production-ready": ROOT / "protocols" / "atena_production_mission.py",
 }
 
 ALIASES = {
@@ -72,6 +73,7 @@ def render_help() -> None:
         table.add_row("./atena modules-smoke", "Executa smoke test módulo por módulo")
         table.add_row("./atena genius", "Executa missão genial multiobjetivo")
         table.add_row("./atena guardian", "Gate essencial: autopilot + smoke + blockers")
+        table.add_row("./atena production-ready", "Gate final: doctor + guardian")
         table.add_row("./atena atena-like", "Alias do modo assistant")
         table.add_row("./atena help", "Exibe esta ajuda")
         console.print(table)
@@ -98,6 +100,7 @@ def render_help() -> None:
         print("  ./atena modules-smoke   # smoke test módulo por módulo")
         print("  ./atena genius          # missão genial multiobjetivo")
         print("  ./atena guardian        # gate essencial de prontidão")
+        print("  ./atena production-ready # gate final de produção")
         print("  ./atena atena-like      # alias do assistant")
         print("  ./atena help            # ajuda")
 

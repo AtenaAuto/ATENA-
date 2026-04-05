@@ -72,6 +72,7 @@ Isso inicia o núcleo principal da ATENA.
 ./atena modules-smoke # Executa smoke test de módulos (1 por 1)
 ./atena genius # Missão genial: síntese estratégica multiobjetivo
 ./atena guardian # Gate essencial: validação total antes de evoluir
+./atena production-ready # Gate final de produção (doctor + guardian)
 ./atena atena-like # Alias do modo assistant
 ./atena help     # Ajuda
 ```
@@ -122,6 +123,7 @@ A ATENA Ω possui um **Verificador Neuro-Simbólico** ativo que impede a execuç
 - **Validação módulo a módulo:** ✅ Smoke suite com internet/search/computer checks (`./atena modules-smoke`)
 - **Missão Genial:** ✅ Plano estratégico 72h com ranking multiobjetivo (`./atena genius`)
 - **Guardian Gate (essencial):** ✅ Só evolui sem bloqueios críticos (`./atena guardian`)
+- **Production Gate:** ✅ Release só com doctor+guardian aprovados (`./atena production-ready`)
 
 ---
 

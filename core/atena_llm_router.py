@@ -20,7 +20,7 @@ except Exception:  # noqa: BLE001
 
 @dataclass
 class LLMConfig:
-    provider: str = "local"  # local | openai | compat | deepseek
+    provider: str = "local"  # local | openai | compat | deepseek | anthropic
     model: str = "local-simbrain"
     base_url: Optional[str] = None
 
@@ -43,6 +43,10 @@ class AtenaLLMRouter:
             opts.append("compat:<model> (usa OPENAI_API_KEY + ATENA_OPENAI_BASE_URL)")
         else:
             opts.append("openai/compat indisponível (faltando pacote openai ou OPENAI_API_KEY)")
+        if os.getenv("ANTHROPIC_API_KEY"):
+            opts.append("anthropic:<model> (usa ANTHROPIC_API_KEY)")
+        else:
+            opts.append("anthropic indisponível (faltando ANTHROPIC_API_KEY)")
         return opts
 
     def current(self) -> str:
@@ -89,6 +93,15 @@ class AtenaLLMRouter:
             self.cfg = LLMConfig(provider=provider, model=model, base_url=base_url)
             return True, f"backend {provider} ativado com modelo {model}"
 
+        if provider == "anthropic":
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            if not api_key:
+                return False, "ANTHROPIC_API_KEY não configurada"
+            if not model:
+                return False, "informe modelo no formato anthropic:modelo"
+            self.cfg = LLMConfig(provider="anthropic", model=model, base_url="https://api.anthropic.com/v1")
+            return True, f"backend anthropic ativado com modelo {model}"
+
         return False, f"provider desconhecido: {provider}"
 
     def _get_local_brain(self) -> AtenaUltraBrain:
@@ -101,6 +114,8 @@ class AtenaLLMRouter:
             return self._get_local_brain().think(prompt, context=context)
         if self.cfg.provider == "deepseek":
             return self._generate_deepseek(prompt, context=context)
+        if self.cfg.provider == "anthropic":
+            return self._generate_anthropic(prompt, context=context)
 
         # openai/compat
         response = self._openai_client.chat.completions.create(
@@ -144,6 +159,45 @@ class AtenaLLMRouter:
             return f"❌ DeepSeek HTTP {exc.code}"
         except Exception as exc:  # noqa: BLE001
             return f"❌ Falha DeepSeek: {exc}"
+
+    def _generate_anthropic(self, prompt: str, context: str = "") -> str:
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            return "❌ ANTHROPIC_API_KEY não configurada."
+        payload = {
+            "model": self.cfg.model,
+            "max_tokens": 900,
+            "temperature": 0.3,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": f"Contexto: {context}\n\nPrompt: {prompt}",
+                }
+            ],
+        }
+        req = request.Request(
+            url=f"{self.cfg.base_url or 'https://api.anthropic.com/v1'}/messages",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with request.urlopen(req, timeout=90) as resp:  # noqa: S310
+                data = json.loads(resp.read().decode("utf-8"))
+            content = data.get("content", [])
+            if content and isinstance(content, list):
+                first = content[0]
+                if isinstance(first, dict):
+                    return (first.get("text") or "").strip()
+            return ""
+        except error.HTTPError as exc:
+            return f"❌ Anthropic HTTP {exc.code}"
+        except Exception as exc:  # noqa: BLE001
+            return f"❌ Falha Anthropic: {exc}"
 
     def learn_from_feedback(self, prompt: str, response: str, success: bool, score: float) -> None:
         if self.cfg.provider == "local":

@@ -61,6 +61,8 @@ pip install -r requirements.txt
 
 Se qualquer etapa falhar, corrigir antes de promover alterações.
 
+No modo `assistant`, use `/model list` e `/model set <provider:model>` com providers `local`, `deepseek`, `openai`, `anthropic` e `compat` (OpenAI-compatible).
+
 ## CI
 
 O repositório inclui workflow de gate em `.github/workflows/production-gate.yml`, executado em `push`/`pull_request` para `main`.

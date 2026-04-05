@@ -257,6 +257,141 @@ class AtenaCodex:
         logger.info("[AtenaCodex] autopilot avançado concluído. report=%s", report_path)
         return result
 
+    def run_module_smoke_suite(self, timeout_seconds: int = 25) -> Dict[str, Any]:
+        """
+        Executa smoke tests dos módulos da ATENA um por um em subprocessos isolados.
+
+        Também inclui verificações extras para:
+        - conectividade básica de internet
+        - import do módulo de busca web
+        - import do módulo de automação de computador
+        """
+        modules_dir = self.root_path / "modules"
+        module_targets = sorted(
+            p.stem
+            for p in modules_dir.glob("*.py")
+            if p.name != "__init__.py"
+        )
+
+        results: List[Dict[str, Any]] = []
+        for module_name in module_targets:
+            cmd = [
+                sys.executable,
+                "-c",
+                f"import importlib; importlib.import_module('modules.{module_name}'); print('OK:{module_name}')",
+            ]
+            try:
+                proc = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout_seconds,
+                    check=False,
+                    cwd=str(self.root_path),
+                )
+                results.append(
+                    {
+                        "type": "module_import",
+                        "target": f"modules.{module_name}",
+                        "ok": proc.returncode == 0,
+                        "returncode": proc.returncode,
+                        "stdout": proc.stdout.strip(),
+                        "stderr": proc.stderr.strip(),
+                    }
+                )
+            except subprocess.TimeoutExpired:
+                results.append(
+                    {
+                        "type": "module_import",
+                        "target": f"modules.{module_name}",
+                        "ok": False,
+                        "returncode": -1,
+                        "stdout": "",
+                        "stderr": f"timeout>{timeout_seconds}s",
+                    }
+                )
+
+        extra_checks = [
+            {
+                "name": "internet_connectivity",
+                "cmd": [
+                    sys.executable,
+                    "-c",
+                    "import urllib.request; urllib.request.urlopen('https://www.google.com', timeout=8); print('internet:ok')",
+                ],
+            },
+            {
+                "name": "internet_search_module_import",
+                "cmd": [
+                    sys.executable,
+                    "-c",
+                    "import atena_google_search; print('atena_google_search:ok')",
+                ],
+            },
+            {
+                "name": "computer_control_module_import",
+                "cmd": [
+                    sys.executable,
+                    "-c",
+                    "import importlib; importlib.import_module('modules.computer_actuator'); print('computer_actuator:ok')",
+                ],
+            },
+        ]
+
+        for check in extra_checks:
+            try:
+                proc = subprocess.run(
+                    check["cmd"],
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout_seconds,
+                    check=False,
+                    cwd=str(self.root_path),
+                )
+                results.append(
+                    {
+                        "type": "extra_check",
+                        "target": check["name"],
+                        "ok": proc.returncode == 0,
+                        "returncode": proc.returncode,
+                        "stdout": proc.stdout.strip(),
+                        "stderr": proc.stderr.strip(),
+                    }
+                )
+            except subprocess.TimeoutExpired:
+                results.append(
+                    {
+                        "type": "extra_check",
+                        "target": check["name"],
+                        "ok": False,
+                        "returncode": -1,
+                        "stdout": "",
+                        "stderr": f"timeout>{timeout_seconds}s",
+                    }
+                )
+
+        passed = sum(1 for r in results if r["ok"])
+        total = len(results)
+        failed = total - passed
+
+        summary = {
+            "status": "ok" if failed == 0 else "partial",
+            "total_checks": total,
+            "passed": passed,
+            "failed": failed,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "results": results,
+        }
+
+        evolution_dir = self.root_path / "atena_evolution"
+        evolution_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        report_path = evolution_dir / f"module_smoke_suite_{timestamp}.json"
+        with open(report_path, "w", encoding="utf-8") as f:
+            json.dump(summary, f, ensure_ascii=False, indent=2)
+        summary["report_path"] = str(report_path)
+        return summary
+
     @staticmethod
     def _check_single_module(module_name: str) -> CheckResult:
         # Mapeamento de nomes de pacotes pip para nomes de importação

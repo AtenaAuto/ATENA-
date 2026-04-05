@@ -69,6 +69,7 @@ Isso inicia o núcleo principal da ATENA.
 ./atena push-safe    # Só libera push após doctor --full aprovado
 ./atena dashboard    # Dashboard local com chat estilo "manus"
 ./atena codex-advanced # Missão avançada de autopilot com AtenaCodex
+./atena modules-smoke # Executa smoke test de módulos (1 por 1)
 ./atena atena-like # Alias do modo assistant
 ./atena help     # Ajuda
 ```
@@ -115,6 +116,7 @@ A ATENA Ω possui um **Verificador Neuro-Simbólico** ativo que impede a execuç
 - **Missão de proposta avançada (Research Lab):** ✅ Blueprint de feature de fronteira (`./atena research-lab`)
 - **Funções avançadas recomendadas:** ✅ Backlog técnico priorizado em `docs/FUNCOES_AVANCADAS_RECOMENDADAS_ATENA_2026-04-05.md`
 - **Missão avançada com AtenaCodex:** ✅ Diagnóstico estratégico + plano de ação + relatório versionado (`./atena codex-advanced`)
+- **Validação módulo a módulo:** ✅ Smoke suite com internet/search/computer checks (`./atena modules-smoke`)
 
 ---
 

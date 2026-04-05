@@ -29,6 +29,26 @@ cd setup
 pip install -r requirements.txt
 ```
 
+## Setup rápido no Android (Termux)
+
+```bash
+pkg install -y git
+curl -fsSL https://raw.githubusercontent.com/AtenaAuto/ATENA-/main/setup/setup_termux_android.sh | bash
+```
+
+Ou, se já clonou o repositório:
+
+```bash
+bash setup/setup_termux_android.sh
+```
+
+Depois exporte sua chave e rode o assistant:
+
+```bash
+export DASHSCOPE_API_KEY="SUA_CHAVE_QWEN"
+./atena assistant
+```
+
 ## Execução rápida
 
 ```bash

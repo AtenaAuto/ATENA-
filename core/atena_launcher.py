@@ -25,6 +25,7 @@ COMMANDS = {
     "dashboard": ROOT / "core" / "atena_local_dashboard.py",
     "codex-advanced": ROOT / "protocols" / "atena_codex_advanced_mission.py",
     "modules-smoke": ROOT / "protocols" / "atena_module_smoke_mission.py",
+    "genius": ROOT / "protocols" / "atena_genius_mission.py",
 }
 
 ALIASES = {
@@ -68,6 +69,7 @@ def render_help() -> None:
         table.add_row("./atena dashboard", "Dashboard local com chat estilo assistant")
         table.add_row("./atena codex-advanced", "Missão avançada usando módulo AtenaCodex")
         table.add_row("./atena modules-smoke", "Executa smoke test módulo por módulo")
+        table.add_row("./atena genius", "Executa missão genial multiobjetivo")
         table.add_row("./atena atena-like", "Alias do modo assistant")
         table.add_row("./atena help", "Exibe esta ajuda")
         console.print(table)
@@ -92,6 +94,7 @@ def render_help() -> None:
         print("  ./atena dashboard       # dashboard local com chat")
         print("  ./atena codex-advanced  # missão avançada com AtenaCodex")
         print("  ./atena modules-smoke   # smoke test módulo por módulo")
+        print("  ./atena genius          # missão genial multiobjetivo")
         print("  ./atena atena-like      # alias do assistant")
         print("  ./atena help            # ajuda")
 

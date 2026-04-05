@@ -50,6 +50,7 @@ pip install -r requirements.txt
 | `./atena genius` | Planejamento multiobjetivo |
 | `./atena code-build --type <site\|api\|cli> --name <projeto> [--template basic\|landing-page\|portfolio\|dashboard\|blog]` | Gera projeto inicial automaticamente |
 | `./atena telemetry-report` | Consolida métricas de missão (telemetria) |
+| `./atena professional-launch --segment "<segmento>" --pilots <n>` | Gera plano de divulgação e adoção profissional |
 
 ## Fluxo recomendado para produção
 
@@ -65,6 +66,12 @@ Se qualquer etapa falhar, corrigir antes de promover alterações.
 
 ```bash
 ./atena code-build --type site --name minha_landing --template landing-page
+```
+
+### Exemplo de plano de lançamento profissional
+
+```bash
+./atena professional-launch --segment "software houses e squads de produto" --pilots 5
 ```
 
 No modo `assistant`, use `/model list` e `/model set <provider:model>` com providers `local`, `deepseek`, `openai`, `anthropic` e `compat` (OpenAI-compatible).

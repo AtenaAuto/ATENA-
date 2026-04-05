@@ -18,6 +18,9 @@ except Exception:  # noqa: BLE001
     OpenAI = None
 
 
+DEFAULT_QWEN_MODEL = os.getenv("ATENA_QWEN_MODEL") or "qwen-turbo"
+
+
 @dataclass
 class LLMConfig:
     provider: str = "local"  # local | openai | compat | deepseek | anthropic | qwen
@@ -35,7 +38,7 @@ class AtenaLLMRouter:
     def _auto_select_default_backend(self) -> None:
         """Seleciona backend remoto por padrão quando chaves estão disponíveis."""
         if os.getenv("DASHSCOPE_API_KEY") and OpenAI is not None:
-            self.set_backend("qwen:qwen-plus")
+            self.set_backend(f"qwen:{DEFAULT_QWEN_MODEL}")
 
     def list_options(self) -> list[str]:
         opts = ["local:local-simbrain (sempre disponível)"]
@@ -109,7 +112,7 @@ class AtenaLLMRouter:
             api_key = os.getenv("DASHSCOPE_API_KEY") or os.getenv("OPENAI_API_KEY")
             if not api_key:
                 return False, "DASHSCOPE_API_KEY (ou OPENAI_API_KEY) não configurada"
-            model_name = model or "qwen-plus"
+            model_name = model or DEFAULT_QWEN_MODEL
             base_url = os.getenv("ATENA_QWEN_BASE_URL") or "https://dashscope.aliyuncs.com/compatible-mode/v1"
             self._openai_client = OpenAI(api_key=api_key, base_url=base_url)
             self.cfg = LLMConfig(provider="qwen", model=model_name, base_url=base_url)

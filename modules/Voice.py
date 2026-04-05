@@ -536,7 +536,10 @@ class CommandInterpreter:
         for intent, patterns in self._compiled.items():
             matches = sum(1 for p in patterns if p.search(text_lower))
             if matches > 0:
-                confidence = min(1.0, matches / len(patterns))
+                # Escalonamento para comandos curtos de voz:
+                # um único match já deve ultrapassar o threshold padrão.
+                coverage = matches / max(1, len(patterns))
+                confidence = min(1.0, 0.55 + 0.45 * coverage)
                 scores[intent] = confidence
         
         if not scores:

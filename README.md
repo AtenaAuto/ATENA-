@@ -80,6 +80,7 @@ O dashboard local está **OFF por padrão**. Para habilitar no assistant: `expor
 O launcher agora usa uma interface mais bonita em estilo CLI moderno (com tabela de comandos quando disponível).
 Durante carregamento e geração de respostas, o modo assistant exibe um spinner visual da ATENA-Like para feedback em tempo real.
 O comando `/feedback <0-1>` permite reforçar a memória da última resposta para aprendizado contínuo baseado em avaliação.
+O terminal assistant agora tem UX estilo Claude Code com prompt contextual (branch/modelo/hora), `/plan`, `/history`, `/save`, `/context`, `/git`, `/shell` e `/clear`.
 No modo assistant, use `/model list` e `/model set <provider:model>` para trocar de LLM/API (local, DeepSeek leve/pesado, OpenAI ou endpoint compatível).
 Para usar **DeepSeek-R1 local (sem API key)** no estilo workflow do GitHub Actions, exporte `LLM_MODEL_NAME` (ex.: `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B`) e rode a ATENA com transformers habilitado.
 No browser agent, as buscas podem seguir objetivo com refinamento determinístico (sem random) e memória anti-repetição de URLs/queries.

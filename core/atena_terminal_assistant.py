@@ -98,18 +98,47 @@ def print_help() -> None:
         """
 Comandos:
   /help                 mostra ajuda
+  /clear                limpa a tela
   /status               mostra status da evolução em background
+  /context              mostra contexto atual (cwd, branch git, modelo)
   /evolve               dispara um ciclo de evolução imediatamente
   /model                mostra backend/modelo atual
   /model list           mostra opções de LLM/provider
   /model set <spec>     troca backend (ex: local | deepseek:light | deepseek:heavy | openai:gpt-4.1-mini)
   /task <instrução>     pede para ATENA pensar em uma tarefa (resposta textual)
+  /plan <objetivo>      gera plano estruturado em etapas para execução
+  /history [n]          mostra últimas interações (padrão: 8)
+  /save <arquivo>       salva a última resposta em arquivo
+  /git                  mostra status git curto do repositório
   /feedback <0-1>       reforça aprendizado da última resposta (ex: /feedback 0.95)
   /run <cmd>            executa comando shell local (use com cuidado)
+  /shell <cmd>          alias de /run
   /dashboard            abre/mostra dashboard local com chat da ATENA
   /exit                 encerra o modo assistant
 """
     )
+
+
+def clear_screen() -> None:
+    os.system("cls" if os.name == "nt" else "clear")
+
+
+def git_branch() -> str:
+    try:
+        out = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=str(ROOT),
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        return out or "-"
+    except Exception:
+        return "-"
+
+
+def prompt_label(model: str) -> str:
+    ts = datetime.now().strftime("%H:%M")
+    return f"ATENA[{git_branch()}|{model}|{ts}]> "
 
 
 class AtenaSpinner:
@@ -242,6 +271,7 @@ def main() -> int:
     local_ready = False
     last_prompt: Optional[str] = None
     last_response: Optional[str] = None
+    history: list[dict] = []
 
     def warmup_llm(show_spinner: bool = True):
         nonlocal local_ready
@@ -269,13 +299,22 @@ def main() -> int:
 
     try:
         while True:
-            raw = input("\nATENA> ").strip()
+            raw = input("\n" + prompt_label(router.current())).strip()
             if not raw:
                 continue
             if raw == "/exit":
                 break
             if raw == "/help":
                 print_help()
+                continue
+            if raw == "/clear":
+                clear_screen()
+                continue
+            if raw == "/context":
+                print(f"cwd={ROOT}")
+                print(f"branch={git_branch()}")
+                print(f"model={router.current()}")
+                print(f"dashboard={'ON' if ENABLE_DASHBOARD else 'OFF'}")
                 continue
             if raw == "/status":
                 with state.lock:
@@ -337,6 +376,48 @@ def main() -> int:
                 )
                 print(f"🧠 Feedback aplicado (score={score:.2f}) na memória da ATENA-Like.")
                 continue
+            if raw.startswith("/history"):
+                parts = raw.split()
+                limit = 8
+                if len(parts) > 1:
+                    try:
+                        limit = max(1, min(50, int(parts[1])))
+                    except ValueError:
+                        print("Uso: /history [n]")
+                        continue
+                if not history:
+                    print("Sem histórico de interação ainda.")
+                    continue
+                print(f"Últimas {min(limit, len(history))} interações:")
+                for item in history[-limit:]:
+                    print(f"- {item['at']} | prompt={item['prompt'][:80]!r} | resposta_chars={item['response_chars']}")
+                continue
+            if raw.startswith("/save "):
+                target = raw[len("/save ") :].strip()
+                if not target:
+                    print("Uso: /save <arquivo>")
+                    continue
+                if not last_response:
+                    print("Não há resposta para salvar ainda.")
+                    continue
+                path = (ROOT / target).resolve() if not os.path.isabs(target) else Path(target)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(last_response, encoding="utf-8")
+                print(f"✅ Resposta salva em: {path}")
+                continue
+            if raw == "/git":
+                try:
+                    st = subprocess.run(
+                        ["git", "status", "--short"],
+                        cwd=str(ROOT),
+                        capture_output=True,
+                        text=True,
+                        timeout=20,
+                    )
+                    print(st.stdout.strip() or "working tree limpa ✅")
+                except Exception as exc:  # noqa: BLE001
+                    print(f"Falha ao consultar git: {exc}")
+                continue
             if raw.startswith("/task "):
                 task = raw[len("/task ") :].strip()
                 if not task:
@@ -357,7 +438,44 @@ def main() -> int:
                     success=True,
                     score=0.75,
                 )
+                history.append(
+                    {
+                        "at": datetime.now().isoformat(timespec="seconds"),
+                        "prompt": task,
+                        "response_chars": len(answer),
+                    }
+                )
                 last_prompt = task
+                last_response = answer
+                print("\n" + answer[:4000])
+                continue
+            if raw.startswith("/plan "):
+                goal = raw[len("/plan ") :].strip()
+                if not goal:
+                    print("Informe um objetivo após /plan.")
+                    continue
+                planner_prompt = (
+                    "Crie um plano técnico enxuto com: Objetivo, Premissas, "
+                    "Etapas numeradas, Riscos, Critérios de pronto e Próximo comando."
+                    f"\nObjetivo: {goal}"
+                )
+                spinner = AtenaSpinner("ATENA-Like criando plano")
+                spinner.start()
+                try:
+                    if router.cfg.provider == "local":
+                        warmup_llm(show_spinner=False)
+                    with suppress_noisy_runtime():
+                        answer = router.generate(planner_prompt, context="Modo planejamento estruturado")
+                finally:
+                    spinner.stop("plano gerado")
+                history.append(
+                    {
+                        "at": datetime.now().isoformat(timespec="seconds"),
+                        "prompt": f"/plan {goal}",
+                        "response_chars": len(answer),
+                    }
+                )
+                last_prompt = planner_prompt
                 last_response = answer
                 print("\n" + answer[:4000])
                 continue
@@ -365,6 +483,27 @@ def main() -> int:
                 cmd = raw[len("/run ") :].strip()
                 if not cmd:
                     print("Informe um comando após /run.")
+                    continue
+                try:
+                    completed = subprocess.run(
+                        shlex.split(cmd),
+                        cwd=str(ROOT),
+                        capture_output=True,
+                        text=True,
+                        timeout=120,
+                    )
+                    print(completed.stdout[:3000])
+                    if completed.returncode != 0:
+                        print(completed.stderr[:1500])
+                except Exception as exc:  # noqa: BLE001
+                    print(f"Falha ao executar comando: {exc}")
+                continue
+            if raw.startswith("/shell "):
+                raw = "/run " + raw[len("/shell ") :].strip()
+                # cai no fluxo padrão de /run
+                cmd = raw[len("/run ") :].strip()
+                if not cmd:
+                    print("Informe um comando após /shell.")
                     continue
                 try:
                     completed = subprocess.run(
@@ -395,6 +534,13 @@ def main() -> int:
                 response=answer,
                 success=True,
                 score=0.7,
+            )
+            history.append(
+                {
+                    "at": datetime.now().isoformat(timespec="seconds"),
+                    "prompt": raw,
+                    "response_chars": len(answer),
+                }
             )
             last_prompt = raw
             last_response = answer

@@ -30,6 +30,12 @@ class AtenaLLMRouter:
         self.cfg = LLMConfig()
         self._local_brain: Optional[AtenaUltraBrain] = None
         self._openai_client = None
+        self._auto_select_default_backend()
+
+    def _auto_select_default_backend(self) -> None:
+        """Seleciona backend remoto por padrão quando chaves estão disponíveis."""
+        if os.getenv("DASHSCOPE_API_KEY") and OpenAI is not None:
+            self.set_backend("qwen:qwen-plus")
 
     def list_options(self) -> list[str]:
         opts = ["local:local-simbrain (sempre disponível)"]

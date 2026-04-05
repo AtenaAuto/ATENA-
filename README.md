@@ -82,6 +82,7 @@ Se qualquer etapa falhar, corrigir antes de promover alterações.
 ```
 
 No modo `assistant`, use `/model list` e `/model set <provider:model>` com providers `local`, `deepseek`, `openai`, `anthropic`, `qwen` e `compat` (OpenAI-compatible).
+Se `DASHSCOPE_API_KEY` estiver definida, o assistant já inicializa automaticamente em `qwen:qwen-plus` (você ainda pode trocar com `/model set`).
 
 No terminal assistant (estilo Claude Code), você também pode usar `/tools`, `/review`, `/commit <mensagem>`, `/init-context` e sair com `:q`.
 Para onboarding mais rápido, use `/quickstart` e depois `/new <objetivo>` para gerar um brief técnico acionável.

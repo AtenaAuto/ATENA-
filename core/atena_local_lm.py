@@ -261,6 +261,71 @@ Execute: `./atena professional-launch --segment "software houses e squads de pro
 **Próximo comando**
 `./atena guardian`
 """
+        if "python" in prompt_l or "script" in prompt_l or "código" in prompt_l or "codigo" in prompt_l:
+            if "csv" in prompt_l and "json" in prompt_l and ("média" in prompt_l or "media" in prompt_l):
+                return '''```python
+#!/usr/bin/env python3
+import csv
+import json
+from pathlib import Path
+from statistics import mean
+
+
+def summarize_csv(input_path: str, output_path: str) -> None:
+    rows = []
+    with open(input_path, "r", encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            rows.append(row)
+
+    if not rows:
+        summary = {"rows": 0, "numeric_columns": {}}
+    else:
+        numeric_values = {}
+        for col in rows[0].keys():
+            values = []
+            for row in rows:
+                value = row.get(col, "").strip()
+                if value == "":
+                    continue
+                try:
+                    values.append(float(value))
+                except ValueError:
+                    values = []
+                    break
+            if values:
+                numeric_values[col] = {
+                    "count": len(values),
+                    "mean": mean(values),
+                    "min": min(values),
+                    "max": max(values),
+                }
+
+        summary = {
+            "rows": len(rows),
+            "numeric_columns": numeric_values,
+        }
+
+    Path(output_path).write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+if __name__ == "__main__":
+    summarize_csv("input.csv", "summary.json")
+    print("Resumo salvo em summary.json")
+```'''
+            return '''```python
+#!/usr/bin/env python3
+
+def main():
+    print("Script Python gerado pela ATENA. Ajuste a lógica para o seu caso de uso.")
+
+
+if __name__ == "__main__":
+    main()
+```'''
         if "pygame" in prompt_l or ("jogo" in prompt_l and "python" in prompt_l):
             return '''import pygame
 import random

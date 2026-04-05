@@ -71,6 +71,7 @@ Isso inicia o núcleo principal da ATENA.
 ./atena codex-advanced # Missão avançada de autopilot com AtenaCodex
 ./atena modules-smoke # Executa smoke test de módulos (1 por 1)
 ./atena genius # Missão genial: síntese estratégica multiobjetivo
+./atena guardian # Gate essencial: validação total antes de evoluir
 ./atena atena-like # Alias do modo assistant
 ./atena help     # Ajuda
 ```
@@ -120,6 +121,7 @@ A ATENA Ω possui um **Verificador Neuro-Simbólico** ativo que impede a execuç
 - **Missão avançada com AtenaCodex:** ✅ Diagnóstico estratégico + plano de ação + relatório versionado (`./atena codex-advanced`)
 - **Validação módulo a módulo:** ✅ Smoke suite com internet/search/computer checks (`./atena modules-smoke`)
 - **Missão Genial:** ✅ Plano estratégico 72h com ranking multiobjetivo (`./atena genius`)
+- **Guardian Gate (essencial):** ✅ Só evolui sem bloqueios críticos (`./atena guardian`)
 
 ---
 

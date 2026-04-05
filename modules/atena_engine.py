@@ -10,7 +10,9 @@ NOTA: Este arquivo foi corrigido pois o original importava 'task_manager'
 
 import logging
 import asyncio
+import json
 from typing import Dict, Any, Optional
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +21,33 @@ class AtenaCore:
     """Motor de evolução auxiliar — integra com o core principal (main.py)."""
 
     def __init__(self):
-        self.generation: int = 0
-        self.best_score: float = 0.0
+        self.state_file = Path("./atena_evolution/engine_state.json")
+        self.state_file.parent.mkdir(parents=True, exist_ok=True)
+        loaded = self._load_state()
+        self.generation: int = int(loaded.get("generation", 0))
+        self.best_score: float = float(loaded.get("best_score", 0.0))
         self._results: list = []
+        logger.info(
+            "[AtenaCore] Estado carregado | generation=%s best_score=%.4f",
+            self.generation,
+            self.best_score,
+        )
+
+    def _load_state(self) -> Dict[str, Any]:
+        if not self.state_file.exists():
+            return {}
+        try:
+            return json.loads(self.state_file.read_text(encoding="utf-8"))
+        except Exception as exc:
+            logger.warning("[AtenaCore] Falha ao carregar estado persistido: %s", exc)
+            return {}
+
+    def _save_state(self) -> None:
+        payload = {
+            "generation": self.generation,
+            "best_score": self.best_score,
+        }
+        self.state_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
     async def evolve_one_cycle(self) -> Dict[str, Any]:
         """Executa um ciclo de evolução."""
@@ -36,6 +62,7 @@ class AtenaCore:
                 "score": self.best_score,
             }
             self._results.append(result)
+            self._save_state()
             logger.info(f"[AtenaCore] ✅ Ciclo #{self.generation} concluído")
             return result
         except Exception as e:

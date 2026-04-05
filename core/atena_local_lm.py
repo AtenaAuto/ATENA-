@@ -211,6 +211,56 @@ class AtenaUltraBrain:
         """Fallback quando o modelo pesado não está disponível."""
         # Simulação de lógica para manter o workflow rodando em ambientes limitados
         prompt_l = prompt.lower()
+        if any(k in prompt_l for k in ["recomenda", "recomend", "sugere", "sugest"]):
+            if any(k in prompt_l for k in ["profissional", "produção", "producao", "divulg"]):
+                return """### Recomendações da ATENA para uso profissional (prioridade)
+1. **Segurança e conformidade (P0)**
+   - Adicionar RBAC (papéis), trilha de auditoria e mascaramento de segredos em logs.
+   - Publicar checklist de segurança para pré-release.
+
+2. **Observabilidade operacional (P0)**
+   - Consolidar métricas por missão (latência, falhas, sucesso por comando).
+   - Criar dashboard semanal com tendência e alertas de regressão.
+
+3. **Onboarding enterprise (P0)**
+   - Entregar setup one-command + validação inicial com `doctor`, `guardian` e `production-ready`.
+   - Incluir runbook de incidentes e rollback.
+
+4. **Experiência de assistant (P1)**
+   - Criar templates de `/plan` para cenários reais: release, incident, hardening, migração.
+   - Permitir export de plano em Markdown para documentação do time.
+
+5. **Prova de valor comercial (P1)**
+   - Criar benchmark com “tempo economizado” e “falhas evitadas”.
+   - Publicar 2–3 casos de uso com ROI e arquitetura adotada.
+
+**Próximo passo recomendado**
+Execute: `./atena professional-launch --segment "software houses e squads de produto" --pilots 5`
+"""
+            return """### Recomendações da ATENA
+1. Defina objetivo e critérios de pronto.
+2. Crie plano em etapas com riscos e mitigação.
+3. Valide rapidamente com smoke/doctor.
+4. Meça resultado com telemetria.
+5. Padronize runbook para repetição segura.
+"""
+        if any(k in prompt_l for k in ["plano", "roadmap", "30 dias", "etapas"]):
+            return f"""### Plano técnico sugerido
+**Objetivo:** {prompt}
+
+**Etapas**
+1. Diagnóstico inicial e baseline.
+2. Implementação incremental por prioridade.
+3. Validação contínua com gates.
+4. Medição de impacto e ajustes.
+
+**Riscos**
+- Escopo grande sem priorização.
+- Falta de métricas de sucesso.
+
+**Próximo comando**
+`./atena guardian`
+"""
         if "pygame" in prompt_l or ("jogo" in prompt_l and "python" in prompt_l):
             return '''import pygame
 import random

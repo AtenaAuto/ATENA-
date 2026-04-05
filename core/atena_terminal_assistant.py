@@ -97,7 +97,9 @@ def print_help() -> None:
     print(
         """
 Comandos:
-  /help                 mostra ajuda
+  /help | ?             mostra ajuda
+  /quickstart           mostra fluxo guiado estilo "Claude Code" para começar rápido
+  /new <objetivo>       cria um brief técnico inicial (objetivo + plano + próximos comandos)
   /clear                limpa a tela
   /status               mostra status da evolução em background
   /context              mostra contexto atual (cwd, branch git, modelo)
@@ -118,9 +120,65 @@ Comandos:
   /run <cmd>            executa comando shell local (use com cuidado)
   /shell <cmd>          alias de /run
   /dashboard            abre/mostra dashboard local com chat da ATENA
-  /exit                 encerra o modo assistant
+  /exit | exit | quit   encerra o modo assistant
 """
     )
+
+
+def print_quickstart() -> None:
+    print(
+        """
+🚀 Quickstart ATENA (estilo Claude Code)
+1) Entender estado do projeto
+   - /context
+   - /review
+
+2) Definir objetivo técnico
+   - /new <objetivo>
+
+3) Planejar e executar
+   - /plan <objetivo>
+   - /task <instrução objetiva>
+
+4) Validar e versionar
+   - /run ./atena go-no-go
+   - /commit <mensagem>
+"""
+    )
+
+
+def build_local_brief(goal: str) -> str:
+    return f"""### Brief técnico inicial
+**Objetivo**
+- {goal}
+
+**Escopo**
+- Definir MVP com entregáveis claros.
+- Integrar validação com `doctor`, `modules-smoke` e `production-ready`.
+
+**Entregáveis**
+1. Especificação técnica curta (arquitetura e interfaces).
+2. Implementação incremental em pequenos commits.
+3. Relatório Go/No-Go final antes de divulgar.
+
+**Riscos**
+- Escopo excessivo sem priorização.
+- Dependências externas não configuradas.
+
+**Checklist de validação**
+- [ ] `./atena doctor`
+- [ ] `./atena modules-smoke`
+- [ ] `./atena production-ready`
+- [ ] `./atena go-no-go`
+
+**Próximos comandos**
+```bash
+./atena doctor
+./atena modules-smoke
+./atena production-ready
+./atena go-no-go
+```
+"""
 
 
 def clear_screen() -> None:
@@ -306,12 +364,13 @@ def main() -> int:
             raw = input("\n" + prompt_label(router.current())).strip()
             if not raw:
                 continue
-            if raw == "/exit":
+            if raw in {"/exit", ":q", "exit", "quit"}:
                 break
-            if raw == ":q":
-                break
-            if raw == "/help":
+            if raw in {"/help", "?"}:
                 print_help()
+                continue
+            if raw == "/quickstart":
+                print_quickstart()
                 continue
             if raw == "/clear":
                 clear_screen()
@@ -470,7 +529,9 @@ def main() -> int:
                 continue
             if raw == "/tools":
                 print("Ferramentas no assistant:")
+                print("- /help | ? | /quickstart")
                 print("- /model list | /model set <provider:model>")
+                print("- /new <objetivo> | /plan <objetivo>")
                 print("- /task | /plan | /history | /save")
                 print("- /git | /review | /commit <mensagem>")
                 print("- /run <cmd> | /shell <cmd>")
@@ -544,6 +605,39 @@ def main() -> int:
                     }
                 )
                 last_prompt = planner_prompt
+                last_response = answer
+                print("\n" + answer[:4000])
+                continue
+            if raw.startswith("/new "):
+                goal = raw[len("/new ") :].strip()
+                if not goal:
+                    print("Uso: /new <objetivo>")
+                    continue
+                brief_prompt = (
+                    "Crie um brief técnico curto e acionável com os tópicos: "
+                    "Objetivo, Escopo, Entregáveis, Riscos, Checklist de Validação e "
+                    "Comandos imediatos para execução no terminal."
+                    f"\nObjetivo: {goal}"
+                )
+                spinner = AtenaSpinner("ATENA-Like criando brief técnico")
+                spinner.start()
+                try:
+                    if router.cfg.provider == "local":
+                        warmup_llm(show_spinner=False)
+                    with suppress_noisy_runtime():
+                        answer = router.generate(brief_prompt, context="Modo quickstart /new")
+                finally:
+                    spinner.stop("brief gerado")
+                if "Processando tarefa:" in answer and "heurística cognitiva" in answer:
+                    answer = build_local_brief(goal)
+                history.append(
+                    {
+                        "at": datetime.now().isoformat(timespec="seconds"),
+                        "prompt": f"/new {goal}",
+                        "response_chars": len(answer),
+                    }
+                )
+                last_prompt = brief_prompt
                 last_response = answer
                 print("\n" + answer[:4000])
                 continue

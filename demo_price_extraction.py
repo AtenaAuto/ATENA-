@@ -4,12 +4,12 @@ import time
 import logging
 import asyncio
 
-# Adiciona o caminho dos módulos para importação
-sys.path.append(os.path.join(os.getcwd(), 'modules'))
-sys.path.append(os.path.join(os.getcwd(), 'core'))
+ROOT = os.path.dirname(os.path.abspath(__file__))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
 
-from multi_agent_orchestrator import MultiAgentOrchestrator, Agent
-from atena_browser_agent import AtenaBrowserAgent
+from modules.multi_agent_orchestrator import MultiAgentOrchestrator, Agent
+from modules.atena_browser_agent import AtenaBrowserAgent
 
 # Configuração de logging
 logging.basicConfig(

@@ -3,10 +3,11 @@ import os
 import time
 import logging
 
-# Adiciona o caminho dos módulos para importação
-sys.path.append(os.path.join(os.getcwd(), 'modules'))
+ROOT = os.path.dirname(os.path.abspath(__file__))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
 
-from multi_agent_orchestrator import MultiAgentOrchestrator, Agent
+from modules.multi_agent_orchestrator import MultiAgentOrchestrator, Agent
 
 # Configuração de logging para ver a delegação em tempo real
 logging.basicConfig(

@@ -20,7 +20,7 @@ except Exception:  # noqa: BLE001
 
 @dataclass
 class LLMConfig:
-    provider: str = "local"  # local | openai | compat | deepseek | anthropic
+    provider: str = "local"  # local | openai | compat | deepseek | anthropic | qwen
     model: str = "local-simbrain"
     base_url: Optional[str] = None
 
@@ -47,6 +47,10 @@ class AtenaLLMRouter:
             opts.append("anthropic:<model> (usa ANTHROPIC_API_KEY)")
         else:
             opts.append("anthropic indisponível (faltando ANTHROPIC_API_KEY)")
+        if OpenAI is not None and (os.getenv("DASHSCOPE_API_KEY") or os.getenv("OPENAI_API_KEY")):
+            opts.append("qwen:<model> (usa DASHSCOPE_API_KEY ou OPENAI_API_KEY)")
+        else:
+            opts.append("qwen indisponível (faltando openai pkg ou DASHSCOPE_API_KEY)")
         return opts
 
     def current(self) -> str:
@@ -92,6 +96,18 @@ class AtenaLLMRouter:
             self._openai_client = OpenAI(api_key=api_key, base_url=base_url)
             self.cfg = LLMConfig(provider=provider, model=model, base_url=base_url)
             return True, f"backend {provider} ativado com modelo {model}"
+
+        if provider == "qwen":
+            if OpenAI is None:
+                return False, "pacote openai não instalado"
+            api_key = os.getenv("DASHSCOPE_API_KEY") or os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                return False, "DASHSCOPE_API_KEY (ou OPENAI_API_KEY) não configurada"
+            model_name = model or "qwen-plus"
+            base_url = os.getenv("ATENA_QWEN_BASE_URL") or "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            self._openai_client = OpenAI(api_key=api_key, base_url=base_url)
+            self.cfg = LLMConfig(provider="qwen", model=model_name, base_url=base_url)
+            return True, f"backend qwen ativado com modelo {model_name}"
 
         if provider == "anthropic":
             api_key = os.getenv("ANTHROPIC_API_KEY")

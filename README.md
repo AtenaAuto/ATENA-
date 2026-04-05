@@ -51,6 +51,7 @@ pip install -r requirements.txt
 | `./atena code-build --type <site\|api\|cli> --name <projeto> [--template basic\|landing-page\|portfolio\|dashboard\|blog]` | Gera projeto inicial automaticamente |
 | `./atena telemetry-report` | Consolida métricas de missão (telemetria) |
 | `./atena professional-launch --segment "<segmento>" --pilots <n>` | Gera plano de divulgação e adoção profissional |
+| `./atena go-no-go` | Executa checklist de 5 testes para validação pré-divulgação |
 
 ## Fluxo recomendado para produção
 
@@ -72,6 +73,12 @@ Se qualquer etapa falhar, corrigir antes de promover alterações.
 
 ```bash
 ./atena professional-launch --segment "software houses e squads de produto" --pilots 5
+```
+
+### Exemplo de varredura Go/No-Go (5 itens)
+
+```bash
+./atena go-no-go
 ```
 
 No modo `assistant`, use `/model list` e `/model set <provider:model>` com providers `local`, `deepseek`, `openai`, `anthropic` e `compat` (OpenAI-compatible).

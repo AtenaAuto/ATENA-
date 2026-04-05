@@ -31,6 +31,7 @@ COMMANDS = {
     "code-build": ROOT / "protocols" / "atena_code_build_mission.py",
     "telemetry-report": ROOT / "protocols" / "atena_telemetry_report_mission.py",
     "professional-launch": ROOT / "protocols" / "atena_professional_launch_mission.py",
+    "go-no-go": ROOT / "protocols" / "atena_go_no_go_mission.py",
 }
 
 ALIASES = {
@@ -80,6 +81,7 @@ def render_help() -> None:
         table.add_row("./atena code-build", "Módulo programação: cria site/api/cli (templates para site)")
         table.add_row("./atena telemetry-report", "Consolida métricas das missões")
         table.add_row("./atena professional-launch", "Cria plano de lançamento profissional (GTM + operação)")
+        table.add_row("./atena go-no-go", "Executa checklist com 5 testes de prontidão para divulgação")
         table.add_row("./atena atena-like", "Alias do modo assistant")
         table.add_row("./atena help", "Exibe esta ajuda")
         console.print(table)
@@ -110,6 +112,7 @@ def render_help() -> None:
         print("  ./atena code-build       # gera app/site/software (site com templates)")
         print("  ./atena telemetry-report # relatório de telemetria")
         print("  ./atena professional-launch # plano de lançamento profissional")
+        print("  ./atena go-no-go         # checklist com 5 testes de prontidão")
         print("  ./atena atena-like      # alias do assistant")
         print("  ./atena help            # ajuda")
 

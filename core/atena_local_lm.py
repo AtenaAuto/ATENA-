@@ -153,6 +153,14 @@ class AtenaUltraBrain:
             self.has_transformers = False
             return
         try:
+            os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+            os.environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
+            os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+            try:
+                from huggingface_hub.utils import disable_progress_bars
+                disable_progress_bars()
+            except Exception:
+                pass
             from transformers import AutoModelForCausalLM, AutoTokenizer
             import torch
             logger.info(f"Carregando modelo local transformers: {self.cfg.base_model_name}")

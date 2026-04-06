@@ -239,7 +239,7 @@ class AtenaSpinner:
         idx = 0
         while self._running:
             frame = self._frames[idx % len(self._frames)]
-            print(f"\r{frame} {self.message}...", end="", flush=True)
+            print(f"\r{frame} {self.message}", end="", flush=True)
             time.sleep(0.12)
             idx += 1
 
@@ -247,7 +247,7 @@ class AtenaSpinner:
         self._running = False
         if self._thread:
             self._thread.join(timeout=1)
-        print(f"\r✅ {self.message}: {done_message}." + " " * 12)
+        print(f"\r✅ {self.message}: {done_message}." + " " * 20)
 
 
 @contextmanager
@@ -260,6 +260,7 @@ def suppress_noisy_runtime():
         "AtenaUltraBrain",
         "httpx",
         "huggingface_hub",
+        "huggingface_hub.utils._http",
         "transformers",
     ]
     previous = {}
@@ -361,7 +362,8 @@ def main() -> int:
             if spinner:
                 spinner.start()
             try:
-                ok, prep_msg = router.prepare_free_local_model()
+                with suppress_noisy_runtime():
+                    ok, prep_msg = router.prepare_free_local_model()
                 if not ok:
                     print(f"\n⚠️ {prep_msg}")
                 else:

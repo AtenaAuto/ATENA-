@@ -28,6 +28,17 @@ from core.atena_mission_runner import run_async_mission
 from core.atena_runtime_contracts import MissionOutcome
 from core.atena_telemetry import emit_event
 
+ATENA_RELEVANCE_TERMS = {
+    "atena",
+    "atenaauto",
+    "agent",
+    "ai",
+    "automation",
+    "orchestrator",
+    "pipeline",
+    "github",
+}
+
 
 def analyze_text(text: str) -> dict:
     tokens = [t.strip(".,:;!?()[]{}\"'").lower() for t in text.split()]
@@ -82,6 +93,19 @@ def fetch_text_via_http(url: str) -> tuple[bool, str]:
         return True, text
     except Exception:
         return False, ""
+
+
+def score_source_relevance(source: str, text: str, objective: str) -> float:
+    sample = f"{source} {objective} {text[:3000]}".lower()
+    score = 0.0
+    for term in ATENA_RELEVANCE_TERMS:
+        if term in sample:
+            score += 0.11
+    if "github.com/atenaauto/atena-" in sample:
+        score += 0.35
+    if "the-athena-codex" in sample:
+        score -= 0.2
+    return round(max(0.0, min(1.0, score)), 3)
 
 
 def normalize_search_result_url(raw_url: str) -> str:
@@ -152,6 +176,7 @@ def fetch_search_links(query: str, max_links: int = 8, per_domain_limit: int = 2
 
 def collect_multi_source_text(
     sources: list[str],
+    objective: str,
     max_chars_per_source: int = 5000,
     max_total_chars: int = 20000,
 ) -> tuple[bool, str, dict]:
@@ -164,6 +189,20 @@ def collect_multi_source_text(
     for src in sources:
         ok_src, text_src = fetch_text_via_http(src)
         if ok_src and text_src:
+            relevance = score_source_relevance(src, text_src, objective)
+            if relevance < 0.30:
+                failed_sources += 1
+                source_quality.append(
+                    {
+                        "source": src,
+                        "chars": len(text_src),
+                        "words": len(text_src.split()),
+                        "quality_score": 0.0,
+                        "relevance_score": relevance,
+                        "selected": False,
+                    }
+                )
+                continue
             ok_any = True
             success_sources += 1
             chunks.append(text_src[:max_chars_per_source])
@@ -173,13 +212,24 @@ def collect_multi_source_text(
                     "chars": len(text_src),
                     "words": len(text_src.split()),
                     "quality_score": round(min(1.0, len(text_src.split()) / 1200), 3),
+                    "relevance_score": relevance,
+                    "selected": True,
                 }
             )
             if sum(len(c) for c in chunks) >= max_total_chars:
                 break
         else:
             failed_sources += 1
-            source_quality.append({"source": src, "chars": 0, "words": 0, "quality_score": 0.0})
+            source_quality.append(
+                {
+                    "source": src,
+                    "chars": 0,
+                    "words": 0,
+                    "quality_score": 0.0,
+                    "relevance_score": 0.0,
+                    "selected": False,
+                }
+            )
 
     merged = "\n".join(chunks)[:max_total_chars]
     stats = {
@@ -225,7 +275,7 @@ async def run_pipeline(objective: str, base_query: str) -> dict:
                 sources = links
             elif target_url not in sources:
                 sources.append(target_url)
-            ok, text, collection_stats = collect_multi_source_text(sources)
+            ok, text, collection_stats = collect_multi_source_text(sources, objective=objective)
         except Exception:
             mode = "http_fallback"
             screenshot_name = None
@@ -234,7 +284,7 @@ async def run_pipeline(objective: str, base_query: str) -> dict:
                 sources = links
             elif target_url not in sources:
                 sources.append(target_url)
-            ok, text, collection_stats = collect_multi_source_text(sources)
+            ok, text, collection_stats = collect_multi_source_text(sources, objective=objective)
 
         analysis = analyze_text(text[:12000]) if text else {"chars": 0, "words": 0, "top_terms": []}
         score = 0.85 if ok and analysis["words"] > 20 else 0.35
@@ -279,6 +329,31 @@ def save_reports(report: dict):
     out_json.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
     terms = "\n".join([f"- {k}: {v}" for k, v in report["analysis"]["top_terms"]])
+    source_quality = report.get("collection", {}).get("source_quality", [])
+    selected_sources = [s for s in source_quality if s.get("selected")]
+    top_source = "-"
+    if selected_sources:
+        ranked = sorted(
+            selected_sources,
+            key=lambda x: (x.get("relevance_score", 0.0), x.get("quality_score", 0.0)),
+            reverse=True,
+        )
+        best = ranked[0]
+        top_source = (
+            f"{best.get('source')} (relevance={best.get('relevance_score')}, "
+            f"quality={best.get('quality_score')})"
+        )
+
+    executive_summary = (
+        f"Pipeline executado em modo **{report.get('mode', 'n/a')}** com "
+        f"**{report.get('collection', {}).get('successful_sources', 0)}** fontes úteis. "
+        f"A melhor fonte foi: {top_source}."
+    )
+    recommended_actions = [
+        "Revisar top termos para detectar foco técnico real vs. ruído de navegação.",
+        "Executar nova coleta com query mais específica quando houver poucas fontes úteis.",
+        "Promover apenas insights com relevance_score >= 0.30 para decisões de produto.",
+    ]
     md = f"""# ATENA Pipeline Report
 
 - Timestamp: {report['timestamp']}
@@ -292,11 +367,20 @@ def save_reports(report: dict):
 - Fontes com falha: {report.get('collection', {}).get('failed_sources', 0)}
 - Palavras analisadas: {report['analysis']['words']}
 
+## Resumo executivo
+{executive_summary}
+
 ## Fontes
 {chr(10).join([f"- {s}" for s in report.get("sources", [])]) if report.get("sources") else "- (sem fontes)"}
 
+## Qualidade das fontes
+{chr(10).join([f"- {q.get('source')}: selected={q.get('selected')} | relevance={q.get('relevance_score')} | quality={q.get('quality_score')}" for q in source_quality]) if source_quality else "- (sem métricas de qualidade)"}
+
 ## Top termos
 {terms if terms else '- (sem termos)'}
+
+## Recomendações profissionais
+{chr(10).join([f"- {r}" for r in recommended_actions])}
 
 ## Artefato visual
 `{report['screenshot'] or 'não disponível (fallback HTTP)'}`

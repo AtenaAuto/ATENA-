@@ -15,6 +15,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from modules.atena_code_module import AtenaCodeModule
+from core.atena_mission_runner import run_mission
+from core.atena_runtime_contracts import MissionOutcome
 from core.atena_telemetry import emit_event
 
 
@@ -90,28 +92,35 @@ def main() -> int:
     args = parser.parse_args()
 
     builder = AtenaCodeModule(ROOT)
-    out_dir = builder.generated_root / "".join(
-        ch for ch in args.project_name if ch.isalnum() or ch in ("-", "_")
-    ).strip("-_")
-    before = snapshot_text_files(out_dir)
     mission_id = f"code-build:{args.project_name}"
-    emit_event(
-        "code_build_start",
-        mission_id,
-        "started",
-        project_type=args.project_type,
-        template=args.template,
-    )
-    result = builder.build(args.project_type, args.project_name, template=args.template)
 
-    if result.ok:
+    def _execute() -> MissionOutcome:
+        out_dir = builder.generated_root / "".join(
+            ch for ch in args.project_name if ch.isalnum() or ch in ("-", "_")
+        ).strip("-_")
+        before = snapshot_text_files(out_dir)
+        emit_event(
+            "code_build_start",
+            mission_id,
+            "started",
+            project_type=args.project_type,
+            template=args.template,
+        )
+        result = builder.build(args.project_type, args.project_name, template=args.template)
+
+        if not result.ok:
+            emit_event("code_build_finish", mission_id, "failed", reason=result.message)
+            print(f"❌ Falha: {result.message}")
+            return MissionOutcome(mission_id=mission_id, status="failed", score=0.0, details=result.message)
+
         after = snapshot_text_files(Path(result.output_dir))
         if args.validate:
             empty_files = [name for name, content in after.items() if not content.strip()]
             if empty_files:
                 emit_event("code_build_finish", mission_id, "failed", reason="empty_files", files=empty_files)
                 print(f"❌ Falha de validação: arquivos vazios detectados: {empty_files}")
-                return 2
+                return MissionOutcome(mission_id=mission_id, status="failed", score=0.0, details="validation_failed")
+
         print("🧠💻 ATENA Code Module")
         print(f"Projeto: {result.project_name}")
         print(f"Tipo: {result.project_type}")
@@ -128,11 +137,10 @@ def main() -> int:
             output_dir=result.output_dir,
             files_generated=len(after),
         )
-        return 0
+        return MissionOutcome(mission_id=mission_id, status="ok", score=1.0, details=result.output_dir)
 
-    emit_event("code_build_finish", mission_id, "failed", reason=result.message)
-    print(f"❌ Falha: {result.message}")
-    return 2
+    outcome = run_mission(mission_id, _execute)
+    return 0 if outcome.status == "ok" else 2
 
 
 if __name__ == "__main__":

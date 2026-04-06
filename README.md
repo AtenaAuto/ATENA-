@@ -10,22 +10,20 @@ ATENA Ω é uma IA,para execução de assistentes de terminal, missões autônom
 - Python 3.10+
 - Acesso à internet para modelos remotos (opcional)
 
-### Instalação
+### Instalação. 💻 Windows
 ```bash
-# Clone o repositório
-git clone https://github.com/AtenaAuto/ATENA-.git
+# git clone [https://github.com/AtenaAuto/ATENA-.git](https://github.com/AtenaAuto/ATENA-.git)
 cd ATENA-
-
-# Instale as dependências
 cd setup
 pip install -r requirements.txt
 cd ..
-apt update
-apt install build-essential python3-dev clang libfreetype6-dev libpng-dev
 
 ```
+### Instalação 📱 Android
+```bash
+pkg update && pkg upgrade -y && pkg install git python clang make -y && git clone [https://github.com/AtenaAuto/ATENA-.git](https://github.com/AtenaAuto/ATENA-.git) && cd ATENA- && cd setup && pip install -r requirements.txt && cd ..
 
-### Execução
+### Execução 
 ```bash
 # Verifique se o ambiente está pronto
 ./atena doctor

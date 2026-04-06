@@ -12,6 +12,7 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 import re
+from urllib.parse import quote_plus
 
 import requests
 
@@ -46,12 +47,38 @@ def fetch_text_via_http(url: str) -> tuple[bool, str]:
         return False, ""
 
 
+def fetch_search_links(query: str, max_links: int = 3) -> list[str]:
+    """
+    Busca links públicos via DuckDuckGo HTML (sem API key), retornando
+    um conjunto pequeno para análise multi-fonte.
+    """
+    try:
+        search_url = f"https://duckduckgo.com/html/?q={quote_plus(query)}"
+        resp = requests.get(search_url, timeout=20)
+        if resp.status_code >= 400:
+            return []
+        html = resp.text
+        candidates = re.findall(r'href="(https?://[^"]+)"', html)
+        links: list[str] = []
+        for link in candidates:
+            if "duckduckgo.com" in link:
+                continue
+            if link not in links:
+                links.append(link)
+            if len(links) >= max_links:
+                break
+        return links
+    except Exception:
+        return []
+
+
 async def run_pipeline(objective: str, base_query: str) -> dict:
     agent = AtenaBrowserAgent()
     query = agent.next_objective_query(objective, base_query)
     target_url = "https://github.com/AtenaAuto/ATENA-"
     screenshot_name: str | None = "atena_pipeline_screenshot.png"
     mode = "browser_agent"
+    sources: list[str] = [target_url]
 
     try:
         await agent.launch(headless=True)
@@ -62,11 +89,33 @@ async def run_pipeline(objective: str, base_query: str) -> dict:
     except ModuleNotFoundError:
         mode = "http_fallback"
         screenshot_name = None
-        ok, text = fetch_text_via_http(target_url)
+        links = fetch_search_links(query, max_links=3)
+        if links:
+            sources = links
+        chunks = []
+        ok_any = False
+        for src in sources:
+            ok_src, text_src = fetch_text_via_http(src)
+            if ok_src and text_src:
+                ok_any = True
+                chunks.append(text_src[:6000])
+        ok = ok_any
+        text = "\n".join(chunks)
     except Exception:
         mode = "http_fallback"
         screenshot_name = None
-        ok, text = fetch_text_via_http(target_url)
+        links = fetch_search_links(query, max_links=3)
+        if links:
+            sources = links
+        chunks = []
+        ok_any = False
+        for src in sources:
+            ok_src, text_src = fetch_text_via_http(src)
+            if ok_src and text_src:
+                ok_any = True
+                chunks.append(text_src[:6000])
+        ok = ok_any
+        text = "\n".join(chunks)
 
     analysis = analyze_text(text[:12000]) if text else {"chars": 0, "words": 0, "top_terms": []}
     score = 0.85 if ok and analysis["words"] > 20 else 0.35
@@ -77,6 +126,7 @@ async def run_pipeline(objective: str, base_query: str) -> dict:
         "objective": objective,
         "query_used": query,
         "target_url": target_url,
+        "sources": sources,
         "mode": mode,
         "navigation_ok": ok,
         "analysis": analysis,
@@ -98,9 +148,13 @@ def save_reports(report: dict):
 - Objective: {report['objective']}
 - Query usada: `{report['query_used']}`
 - URL alvo: {report['target_url']}
+- Fontes analisadas: {len(report.get('sources', []))}
 - Modo de coleta: {report.get('mode', 'n/a')}
 - Navegação OK: {report['navigation_ok']}
 - Palavras analisadas: {report['analysis']['words']}
+
+## Fontes
+{chr(10).join([f"- {s}" for s in report.get("sources", [])]) if report.get("sources") else "- (sem fontes)"}
 
 ## Top termos
 {terms if terms else '- (sem termos)'}

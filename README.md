@@ -1,4 +1,4 @@
-# 🔱 ATENA Ω (Atena-Like)
+# 🔱 ATENA Ω (Atena-code)
 
 ATENA Ω é uma plataforma modular de IA para execução de assistentes de terminal, missões autônomas e gates de qualidade para evolução segura de sistemas. Inspirada em arquiteturas de agentes modernos, a Atena combina execução local com capacidades avançadas de orquestração.
 

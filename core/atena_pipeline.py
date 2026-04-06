@@ -28,13 +28,41 @@ from modules.atena_browser_agent import AtenaBrowserAgent
 
 def analyze_text(text: str) -> dict:
     tokens = [t.strip(".,:;!?()[]{}\"'").lower() for t in text.split()]
-    tokens = [t for t in tokens if len(t) > 3]
+    tokens = [t for t in tokens if is_valid_term(t)]
     common = Counter(tokens).most_common(15)
     return {
         "chars": len(text),
         "words": len(text.split()),
         "top_terms": common,
     }
+
+
+def is_valid_term(token: str) -> bool:
+    if len(token) <= 3 or len(token) >= 40:
+        return False
+    if token.startswith(("http://", "https://", "www.")):
+        return False
+    if token.count("_") >= 2 or token.count("-") >= 3:
+        return False
+    if re.search(r"[{}[\]<>:=]", token):
+        return False
+    if re.search(r"\d{4,}", token):
+        return False
+    return True
+
+
+def clean_extracted_text(html: str) -> str:
+    """Limpeza simples de boilerplate/JS para melhorar sinal semântico."""
+    # Remove blocos que raramente carregam conteúdo textual útil para resumo.
+    text = re.sub(r"(?is)<(script|style|noscript|svg|canvas|template)[^>]*>.*?</\1>", " ", html)
+    # Remove qualquer tag restante.
+    text = re.sub(r"(?is)<[^>]+>", " ", text)
+    # Remove URLs e blobs longos comuns de JSON/config embutidos.
+    text = re.sub(r"https?://\S+", " ", text)
+    text = re.sub(r"\b[a-z0-9_]{30,}\b", " ", text)
+    # Normaliza espaços.
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
 
 
 def fetch_text_via_http(url: str) -> tuple[bool, str]:
@@ -47,8 +75,7 @@ def fetch_text_via_http(url: str) -> tuple[bool, str]:
         if resp.status_code >= 400:
             return False, ""
         html = resp.text
-        text = re.sub(r"<[^>]+>", " ", html)
-        text = re.sub(r"\\s+", " ", text).strip()
+        text = clean_extracted_text(html)
         return True, text
     except Exception:
         return False, ""

@@ -75,4 +75,4 @@ Para garantir a estabilidade, utilize o fluxo recomendado antes de qualquer alte
 Este projeto está sob a licença definida no arquivo `LICENSE`.
 
 ---
-*Desenvolvido por AtenaAuto Team*
+*Desenvolvido por Danilo AtenaAuto Team*

@@ -35,6 +35,17 @@ if str(ROOT) not in sys.path:
 
 from core.atena_llm_router import AtenaLLMRouter
 
+try:
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.markdown import Markdown
+    HAS_RICH = True
+except Exception:
+    Console = None
+    Panel = None
+    Markdown = None
+    HAS_RICH = False
+
 
 @dataclass
 class EvolutionState:
@@ -94,6 +105,19 @@ def evolution_worker(state: EvolutionState, interval_seconds: int) -> None:
 
 
 def print_help() -> None:
+    if HAS_RICH:
+        console = Console()
+        console.print(
+            Panel.fit(
+                "[bold cyan]Comandos da ATENA[/bold cyan]\n"
+                "[green]/help[/green], [green]/quickstart[/green], [green]/task[/green], [green]/plan[/green], [green]/new[/green],\n"
+                "[green]/model[/green], [green]/model set[/green], [green]/history[/green], [green]/save[/green], [green]/git[/green],\n"
+                "[green]/review[/green], [green]/commit[/green], [green]/run[/green], [green]/shell[/green], [green]/exit[/green]\n\n"
+                "[dim]Dica: use /claude-mode on para respostas mais estruturadas.[/dim]",
+                border_style="bright_blue",
+            )
+        )
+        return
     print(
         """
 Comandos:
@@ -128,6 +152,19 @@ Comandos:
 
 
 def print_quickstart() -> None:
+    if HAS_RICH:
+        console = Console()
+        console.print(
+            Panel.fit(
+                "[bold]🚀 Quickstart (estilo Claude Code)[/bold]\n"
+                "1) [cyan]/context[/cyan] + [cyan]/review[/cyan]\n"
+                "2) [cyan]/new <objetivo>[/cyan]\n"
+                "3) [cyan]/plan <objetivo>[/cyan] e [cyan]/task <instrução>[/cyan]\n"
+                "4) [cyan]/run ./atena go-no-go[/cyan] e [cyan]/commit <mensagem>[/cyan]",
+                border_style="magenta",
+            )
+        )
+        return
     print(
         """
 🚀 Quickstart ATENA (estilo Claude Code)
@@ -216,7 +253,41 @@ def git_branch() -> str:
 
 def prompt_label(model: str) -> str:
     ts = datetime.now().strftime("%H:%M")
-    return f"⟪ATENA⟫[{git_branch()}|{model}|{ts}] » "
+    return f"ATENA ✦ [{git_branch()} • {model} • {ts}] > "
+
+
+def render_startup_banner() -> None:
+    if HAS_RICH:
+        console = Console()
+        console.print(
+            Panel.fit(
+                "[bold cyan]🔱 ATENA-Like Assistant[/bold cyan]\n"
+                "[dim]Terminal mode com estilo profissional (inspirado em Claude Code).[/dim]\n\n"
+                "• [green]/quickstart[/green] para fluxo guiado\n"
+                "• [green]/claude-mode on[/green] para respostas estruturadas\n"
+                "• [green]/help[/green] para comandos",
+                border_style="cyan",
+            )
+        )
+        return
+
+    print(
+        """
+🔱 ATENA-Like Assistant
+Terminal mode com estilo profissional.
+Use /quickstart, /claude-mode on e /help.
+"""
+    )
+
+
+def print_assistant_output(answer: str) -> None:
+    payload = answer[:4000]
+    if HAS_RICH:
+        console = Console()
+        console.print()
+        console.print(Panel(Markdown(payload), title="ATENA", border_style="green"))
+        return
+    print("\n" + payload)
 
 
 class AtenaSpinner:
@@ -356,17 +427,7 @@ def write_dashboard_state(state: EvolutionState) -> None:
 
 
 def main() -> int:
-    print(
-        """
-🔱 ATENA-Like Assistant
-    █████╗ ████████╗███████╗███╗   ██╗ █████╗
-   ██╔══██╗╚══██╔══╝██╔════╝████╗  ██║██╔══██╗
-   ███████║   ██║   █████╗  ██╔██╗ ██║███████║
-   ██╔══██║   ██║   ██╔══╝  ██║╚██╗██║██╔══██║
-   ██║  ██║   ██║   ███████╗██║ ╚████║██║  ██║
-   ╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═══╝╚═╝  ╚═╝
-"""
-    )
+    render_startup_banner()
     print("Evolução em segundo plano: ATIVA.")
     print("Digite /help para ver os comandos.")
 
@@ -649,7 +710,7 @@ def main() -> int:
                 )
                 last_prompt = task
                 last_response = answer
-                print("\n" + answer[:4000])
+                print_assistant_output(answer)
                 continue
             if raw.startswith("/plan "):
                 goal = raw[len("/plan ") :].strip()
@@ -683,7 +744,7 @@ def main() -> int:
                 )
                 last_prompt = planner_prompt
                 last_response = answer
-                print("\n" + answer[:4000])
+                print_assistant_output(answer)
                 continue
             if raw.startswith("/new "):
                 goal = raw[len("/new ") :].strip()
@@ -716,7 +777,7 @@ def main() -> int:
                 )
                 last_prompt = brief_prompt
                 last_response = answer
-                print("\n" + answer[:4000])
+                print_assistant_output(answer)
                 continue
             if raw.startswith("/run "):
                 cmd = raw[len("/run ") :].strip()
@@ -783,7 +844,7 @@ def main() -> int:
             )
             last_prompt = raw
             last_response = answer
-            print("\n" + answer[:4000])
+            print_assistant_output(answer)
     except (EOFError, KeyboardInterrupt):
         print("\nEncerrando ATENA Ω Assistant...")
     finally:

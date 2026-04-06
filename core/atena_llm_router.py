@@ -134,6 +134,15 @@ class AtenaLLMRouter:
             self._local_brain = AtenaUltraBrain()
         return self._local_brain
 
+    def prepare_free_local_model(self) -> tuple[bool, str]:
+        """
+        Prepara automaticamente um modelo local gratuito (Qwen) quando em provider local.
+        """
+        if self.cfg.provider != "local":
+            return False, "Preparação de modelo local disponível apenas para provider local."
+        brain = self._get_local_brain()
+        return brain.prepare_runtime_model()
+
     def generate(self, prompt: str, context: str = "") -> str:
         if self.cfg.provider == "local":
             return self._get_local_brain().think(prompt, context=context)

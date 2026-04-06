@@ -361,6 +361,11 @@ def main() -> int:
             if spinner:
                 spinner.start()
             try:
+                ok, prep_msg = router.prepare_free_local_model()
+                if not ok:
+                    print(f"\n⚠️ {prep_msg}")
+                else:
+                    print(f"\n✅ {prep_msg}")
                 # força lazy init local
                 with suppress_noisy_runtime():
                     router.generate("teste rápido", context="warmup")

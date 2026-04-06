@@ -168,6 +168,30 @@ class AtenaUltraBrain:
             logger.warning(f"Não foi possível carregar transformers: {e}. Usando modo simulação.")
             self.has_transformers = False
 
+    def prepare_runtime_model(self) -> Tuple[bool, str]:
+        """
+        Tenta preparar um modelo local gratuito (Qwen) para uso real.
+        Se não conseguir, mantém fallback SimBrain sem quebrar o fluxo.
+        """
+        if self.has_transformers:
+            return True, f"Modelo local pronto: {self.cfg.base_model_name}"
+
+        preferred_model = (
+            os.environ.get("LLM_MODEL_NAME")
+            or os.environ.get("ATENA_FREE_MODEL_NAME")
+            or "Qwen/Qwen2.5-0.5B-Instruct"
+        )
+        self.cfg.base_model_name = preferred_model
+        self.cfg.enable_transformers = True
+        self._init_model()
+
+        if self.has_transformers:
+            return True, f"Modelo local carregado (download/caching automático): {preferred_model}"
+        return False, (
+            "Não foi possível inicializar transformers para baixar/rodar o modelo Qwen local. "
+            "ATENA seguirá em modo SimBrain."
+        )
+
     def think(self, prompt: str, context: str = "") -> str:
         """Processa um pensamento e gera uma resposta/código."""
         # 1. Consultar Memória

@@ -13,6 +13,9 @@ from datetime import datetime
 from pathlib import Path
 import re
 from urllib.parse import quote_plus
+from urllib.parse import parse_qs
+from urllib.parse import unquote
+from urllib.parse import urlparse
 
 import requests
 
@@ -36,7 +39,11 @@ def analyze_text(text: str) -> dict:
 
 def fetch_text_via_http(url: str) -> tuple[bool, str]:
     try:
-        resp = requests.get(url, timeout=20)
+        resp = requests.get(
+            url,
+            timeout=(8, 20),
+            headers={"User-Agent": "ATENA/1.0 (+https://github.com/AtenaAuto/ATENA-)"},
+        )
         if resp.status_code >= 400:
             return False, ""
         html = resp.text
@@ -47,29 +54,101 @@ def fetch_text_via_http(url: str) -> tuple[bool, str]:
         return False, ""
 
 
-def fetch_search_links(query: str, max_links: int = 3) -> list[str]:
+def normalize_search_result_url(raw_url: str) -> str:
+    """
+    Normaliza URL de resultado da busca:
+    - resolve redirects do DDG (/l/?uddg=...)
+    - remove trackers básicos
+    """
+    url = raw_url.strip()
+    if not url:
+        return ""
+    parsed = urlparse(url)
+    if "duckduckgo.com" in parsed.netloc and parsed.path.startswith("/l/"):
+        qs = parse_qs(parsed.query)
+        if "uddg" in qs and qs["uddg"]:
+            return unquote(qs["uddg"][0])
+    return url
+
+
+def fetch_search_links(query: str, max_links: int = 8, per_domain_limit: int = 2) -> list[str]:
     """
     Busca links públicos via DuckDuckGo HTML (sem API key), retornando
-    um conjunto pequeno para análise multi-fonte.
+    uma lista de fontes para análise multi-fonte.
     """
     try:
         search_url = f"https://duckduckgo.com/html/?q={quote_plus(query)}"
-        resp = requests.get(search_url, timeout=20)
+        resp = requests.get(
+            search_url,
+            timeout=(8, 20),
+            headers={"User-Agent": "ATENA/1.0 (+https://github.com/AtenaAuto/ATENA-)"},
+        )
         if resp.status_code >= 400:
             return []
         html = resp.text
-        candidates = re.findall(r'href="(https?://[^"]+)"', html)
+        # Prioriza links de resultados reais do DDG e faz fallback para links genéricos.
+        candidates = re.findall(r'class="result__a"[^>]*href="([^"]+)"', html)
+        if not candidates:
+            candidates = re.findall(r'href="(https?://[^"]+)"', html)
+
         links: list[str] = []
-        for link in candidates:
-            if "duckduckgo.com" in link:
+        domain_count: dict[str, int] = {}
+        blocked_hosts = {"duckduckgo.com"}
+        blocked_ext = (".pdf", ".jpg", ".jpeg", ".png", ".gif", ".svg", ".zip")
+
+        for raw_link in candidates:
+            link = normalize_search_result_url(raw_link)
+            if not link.startswith(("http://", "https://")):
+                continue
+            if link.lower().endswith(blocked_ext):
+                continue
+            parsed = urlparse(link)
+            host = parsed.netloc.lower()
+            if host.startswith("www."):
+                host = host[4:]
+            if any(h in host for h in blocked_hosts):
                 continue
             if link not in links:
+                if per_domain_limit > 0 and domain_count.get(host, 0) >= per_domain_limit:
+                    continue
                 links.append(link)
+                domain_count[host] = domain_count.get(host, 0) + 1
             if len(links) >= max_links:
                 break
         return links
     except Exception:
         return []
+
+
+def collect_multi_source_text(
+    sources: list[str],
+    max_chars_per_source: int = 5000,
+    max_total_chars: int = 20000,
+) -> tuple[bool, str, dict]:
+    chunks: list[str] = []
+    ok_any = False
+    success_sources = 0
+    failed_sources = 0
+
+    for src in sources:
+        ok_src, text_src = fetch_text_via_http(src)
+        if ok_src and text_src:
+            ok_any = True
+            success_sources += 1
+            chunks.append(text_src[:max_chars_per_source])
+            if sum(len(c) for c in chunks) >= max_total_chars:
+                break
+        else:
+            failed_sources += 1
+
+    merged = "\n".join(chunks)[:max_total_chars]
+    stats = {
+        "requested_sources": len(sources),
+        "successful_sources": success_sources,
+        "failed_sources": failed_sources,
+        "collected_chars": len(merged),
+    }
+    return ok_any, merged, stats
 
 
 async def run_pipeline(objective: str, base_query: str) -> dict:
@@ -79,6 +158,12 @@ async def run_pipeline(objective: str, base_query: str) -> dict:
     screenshot_name: str | None = "atena_pipeline_screenshot.png"
     mode = "browser_agent"
     sources: list[str] = [target_url]
+    collection_stats = {
+        "requested_sources": 1,
+        "successful_sources": 0,
+        "failed_sources": 0,
+        "collected_chars": 0,
+    }
 
     try:
         await agent.launch(headless=True)
@@ -89,33 +174,21 @@ async def run_pipeline(objective: str, base_query: str) -> dict:
     except ModuleNotFoundError:
         mode = "http_fallback"
         screenshot_name = None
-        links = fetch_search_links(query, max_links=3)
+        links = fetch_search_links(query, max_links=8, per_domain_limit=2)
         if links:
             sources = links
-        chunks = []
-        ok_any = False
-        for src in sources:
-            ok_src, text_src = fetch_text_via_http(src)
-            if ok_src and text_src:
-                ok_any = True
-                chunks.append(text_src[:6000])
-        ok = ok_any
-        text = "\n".join(chunks)
+        elif target_url not in sources:
+            sources.append(target_url)
+        ok, text, collection_stats = collect_multi_source_text(sources)
     except Exception:
         mode = "http_fallback"
         screenshot_name = None
-        links = fetch_search_links(query, max_links=3)
+        links = fetch_search_links(query, max_links=8, per_domain_limit=2)
         if links:
             sources = links
-        chunks = []
-        ok_any = False
-        for src in sources:
-            ok_src, text_src = fetch_text_via_http(src)
-            if ok_src and text_src:
-                ok_any = True
-                chunks.append(text_src[:6000])
-        ok = ok_any
-        text = "\n".join(chunks)
+        elif target_url not in sources:
+            sources.append(target_url)
+        ok, text, collection_stats = collect_multi_source_text(sources)
 
     analysis = analyze_text(text[:12000]) if text else {"chars": 0, "words": 0, "top_terms": []}
     score = 0.85 if ok and analysis["words"] > 20 else 0.35
@@ -129,6 +202,7 @@ async def run_pipeline(objective: str, base_query: str) -> dict:
         "sources": sources,
         "mode": mode,
         "navigation_ok": ok,
+        "collection": collection_stats,
         "analysis": analysis,
         "screenshot": screenshot_name,
     }
@@ -151,6 +225,8 @@ def save_reports(report: dict):
 - Fontes analisadas: {len(report.get('sources', []))}
 - Modo de coleta: {report.get('mode', 'n/a')}
 - Navegação OK: {report['navigation_ok']}
+- Fontes com sucesso: {report.get('collection', {}).get('successful_sources', 0)}
+- Fontes com falha: {report.get('collection', {}).get('failed_sources', 0)}
 - Palavras analisadas: {report['analysis']['words']}
 
 ## Fontes

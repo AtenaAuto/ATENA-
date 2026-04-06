@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Logs
+*.log
+atena_evolution/*.json
+atena_evolution/*.log
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment
+.env
+.venv
+venv/
+ENV/
+
+# ATENA specific
+docs/GUARDIAN_REPORT_*.md
+docs/PRODUCTION_GATE_*.md
+docs/GO_NO_GO_REPORT_*.md
+atena_evolution/
+!atena_evolution/.gitkeep

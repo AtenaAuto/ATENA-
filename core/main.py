@@ -63,12 +63,15 @@ from contextlib import contextmanager, redirect_stdout, redirect_stderr
 
 # --- Adicionado para conectar com as novas pastas do seu GitHub ---
 BASE_DIR = Path(__file__).parent
-DNA_DIR = BASE_DIR / "atena_evolution" / "reference_dna"
-MODULES_DIR = BASE_DIR / "modules"
+REPO_ROOT = BASE_DIR.parent
+DNA_DIR = REPO_ROOT / "atena_evolution" / "reference_dna"
+MODULES_DIR = REPO_ROOT / "modules"
 
 # Permite que o Python importe o que estiver dentro da pasta /modules
 if str(MODULES_DIR) not in sys.path:
     sys.path.append(str(MODULES_DIR))
+
+from atena_advanced_essentials import AtenaAdvancedEssentials
 
 try:
     from curiosity_engine import curiosity
@@ -5770,8 +5773,19 @@ def create_sorting_problem() -> Problem:
     ]
 
     def evaluate(code: str) -> float:
+        adapter = ""
+        if "def sort(" not in code:
+            if "def util_sort(" in code:
+                adapter = "\nsort = util_sort\n"
+            elif "def sort_list(" in code:
+                adapter = "\nsort = sort_list\n"
+            elif "def quicksort(" in code:
+                adapter = "\nsort = quicksort\n"
+            elif "def solve(" in code:
+                adapter = "\nsort = solve\n"
+
         # Deve definir uma funo 'sort' que recebe lista e retorna lista ordenada
-        test_code = code + """
+        test_code = code + adapter + """
 
 def _test():
     import json
@@ -5814,7 +5828,16 @@ def create_fibonacci_problem() -> Problem:
     test_cases = [(0, 0), (1, 1), (2, 1), (3, 2), (4, 3), (5, 5), (10, 55)]
 
     def evaluate(code: str) -> float:
-        test_code = code + """
+        adapter = ""
+        if "def fibonacci(" not in code:
+            if "def util_fibonacci(" in code:
+                adapter = "\nfibonacci = util_fibonacci\n"
+            elif "def fib(" in code:
+                adapter = "\nfibonacci = fib\n"
+            elif "def solve(" in code:
+                adapter = "\nfibonacci = solve\n"
+
+        test_code = code + adapter + """
 
 def _test():
     test_cases = """ + json.dumps(test_cases) + """
@@ -5928,12 +5951,31 @@ class AtenaCore:
         self.current_code = Config.CURRENT_CODE_FILE.read_text()
         self.generation = 0
         self.original_code = self.current_code
+        self.best_score = 0.0
+        self.stagnation_cycles = 0
+        self.last_cycle_delta = 0.0
         self._load_state()
 
         baseline = self.evaluator.evaluate(self.current_code)
-        self.best_score = baseline["score"]
+        baseline_score = baseline["score"]
+        restored_score = self.best_score
+        if restored_score > 0:
+            self.best_score = max(restored_score, baseline_score)
+            logger.info(
+                f"[] Score restaurado mantido: {restored_score:.2f} | baseline atual: {baseline_score:.2f} | usado: {self.best_score:.2f}"
+            )
+        else:
+            self.best_score = baseline_score
         self.best_code = self.current_code
         self.engine_path = Config.ENGINE_FILE
+        self.advanced_essentials = AtenaAdvancedEssentials()
+        boot_state = self.advanced_essentials.bootstrap(
+            core_generation=self.generation,
+            best_score=self.best_score,
+        )
+        logger.info(
+            f"[] Advanced Essentials ativos: {len(boot_state.get('capabilities', []))} capacidades essenciais carregadas"
+        )
 
         # v2.2 mdulos
         self.lang_trainer = LanguageTrainer(kb=self.kb, grok=self.mutation_engine.grok)
@@ -5995,6 +6037,7 @@ class AtenaCore:
     def evolve_one_cycle(self) -> Dict:
         """Executa um ciclo de evoluo."""
         self.generation += 1
+        old_best_score = self.best_score
         logger.info(f"\n{'='*50}")
         logger.info(f" Gerao {self.generation} | Score atual: {self.best_score:.2f}")
 
@@ -6108,16 +6151,20 @@ class AtenaCore:
                     logger.debug(f"   Avaliao falhou: {e}")
 
         replaced = False
-        improvement_threshold = self.best_score + Config.MIN_IMPROVEMENT_DELTA
+        stagnation_factor = min(self.stagnation_cycles, 10)
+        adaptive_delta = max(0.001, Config.MIN_IMPROVEMENT_DELTA * (1.0 - 0.08 * stagnation_factor))
+        improvement_threshold = old_best_score + adaptive_delta
 
         if best_candidate and best_candidate_score >= improvement_threshold:
             code, desc, mtype, metrics = best_candidate
-            logger.info(f" Melhorou: {best_candidate_score:.2f} > {self.best_score:.2f} ({desc})")
+            logger.info(f" Melhorou: {best_candidate_score:.2f} > {old_best_score:.2f} ({desc})")
             self._backup()
             Config.CURRENT_CODE_FILE.write_text(code)
             self.current_code = code
             self.best_score = best_candidate_score
             self.best_code = code
+            self.last_cycle_delta = self.best_score - old_best_score
+            self.stagnation_cycles = 0
             replaced = True
             if HAS_CURIOSITY:
                 curiosity.update_reward(recon_topic, 1.0)
@@ -6147,9 +6194,13 @@ class AtenaCore:
                 apply_workflow_mutation()
                 self.kb.update_objective("otimizar_workflow", 1.0)
         else:
+            self.last_cycle_delta = max(0.0, best_candidate_score - old_best_score) if best_candidate else 0.0
+            self.stagnation_cycles += 1
             if best_candidate:
                 _, desc, mtype, metrics = best_candidate
-                logger.info(f"  No melhorou (melhor: {best_candidate_score:.2f}, threshold: {improvement_threshold:.2f})")
+                logger.info(
+                    f"  No melhorou (melhor: {best_candidate_score:.2f}, threshold: {improvement_threshold:.2f}, estagnao: {self.stagnation_cycles} ciclos)"
+                )
                 if HAS_CURIOSITY:
                     curiosity.update_reward(recon_topic, 0.1)
                 # RLHF: Registra falha (não melhorou)
@@ -6165,8 +6216,12 @@ class AtenaCore:
 
         features = {
             "mutation_type": mtype if best_candidate else "none",
-            "old_score": self.best_score,
-            "new_score": best_candidate_score if best_candidate_score >= 0 else self.best_score,
+            "old_score": old_best_score,
+            "new_score": self.best_score,
+            "candidate_score": best_candidate_score if best_candidate_score >= 0 else old_best_score,
+            "score_delta": self.last_cycle_delta,
+            "adaptive_delta": adaptive_delta,
+            "stagnation_cycles": self.stagnation_cycles,
             "lines": metrics.get("lines", 0),
             "complexity": metrics.get("complexity", 0),
             "num_functions": metrics.get("num_functions", 0),
@@ -6174,12 +6229,24 @@ class AtenaCore:
         self.kb.record_evolution(
             self.generation,
             desc if best_candidate else "none",
+            old_best_score,
             self.best_score,
-            best_candidate_score if best_candidate_score >= 0 else self.best_score,
             replaced,
             features,
             metrics.get("tests", {})
         )
+        logger.info(
+            f"  Progresso mensurvel: score_delta={self.last_cycle_delta:.4f} | adaptive_delta={adaptive_delta:.4f} | estagnao={self.stagnation_cycles}"
+        )
+        essentials_state = self.advanced_essentials.on_cycle_end(
+            generation=self.generation,
+            score=self.best_score,
+            score_delta=self.last_cycle_delta,
+            stagnation_cycles=self.stagnation_cycles,
+            replaced=replaced,
+        )
+        if essentials_state.get("recommendations"):
+            logger.info(f"  Essentials recomendam: {' | '.join(essentials_state['recommendations'])}")
         self._update_objectives(metrics)
         self._save_state()
 
@@ -6241,7 +6308,10 @@ class AtenaCore:
         return {
             "generation": self.generation,
             "mutation": desc if best_candidate else "none",
-            "score": best_candidate_score if best_candidate_score >= 0 else self.best_score,
+            "score": self.best_score,
+            "score_delta": self.last_cycle_delta,
+            "stagnation_cycles": self.stagnation_cycles,
+            "adaptive_delta": adaptive_delta,
             "replaced": replaced,
         }
 

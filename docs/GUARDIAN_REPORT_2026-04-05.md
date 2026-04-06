@@ -4,7 +4,7 @@
 - Guardian OK: **True**
 - Autopilot status: **ok**
 - Smoke status: **ok**
-- Smoke passed: **52 / 52**
+- Smoke passed: **54 / 54**
 
 ## Blockers
 - Nenhum blocker detectado

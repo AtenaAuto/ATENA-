@@ -1,121 +1,76 @@
-# ATENA Ω
+# 🔱 ATENA Ω (Atena-Like)
 
-ATENA Ω é uma plataforma modular para execução de assistente de terminal, missões autônomas e gates de qualidade para evolução segura do sistema.
+ATENA Ω é uma plataforma modular de IA para execução de assistentes de terminal, missões autônomas e gates de qualidade para evolução segura de sistemas. Inspirada em arquiteturas de agentes modernos, a Atena combina execução local com capacidades avançadas de orquestração.
 
-## Principais capacidades
+---
 
-- **Assistant interativo** com comandos de contexto, plano e execução local.
-- **Missões autônomas** (research, codex, guardian, genius, code-build).
-- **Validação de produção** com `doctor`, `guardian` e `production-ready`.
-- **Arquitetura modular** com componentes em `core/`, `modules/` e `protocols/`.
+## 🚀 Início Rápido
 
-## Estrutura do repositório
-
-- `core/` → launcher, assistant, doctor, pipelines e runtime principal.
-- `modules/` → módulos funcionais (browser agent, orchestrators, code module, etc.).
-- `protocols/` → entrypoints de missões executáveis via CLI.
-- `docs/` → relatórios, propostas e registros de execução.
-- `atena_evolution/` → artefatos de execução (runtime, relatórios JSON, memória).
-
-## Requisitos
-
+### Requisitos
 - Python 3.10+
-- Dependências em `setup/requirements.txt`
+- Acesso à internet para modelos remotos (opcional)
 
-Instalação:
-
+### Instalação
 ```bash
+# Clone o repositório
+git clone https://github.com/AtenaAuto/ATENA-.git
+cd ATENA-
+
+# Instale as dependências
 cd setup
 pip install -r requirements.txt
+cd ..
 ```
 
-## Setup rápido no Android (Termux)
-
+### Execução
 ```bash
-pkg install -y git
-curl -fsSL https://raw.githubusercontent.com/AtenaAuto/ATENA-/main/setup/setup_termux_android.sh | bash
-```
+# Verifique se o ambiente está pronto
+./atena doctor
 
-Ou, se já clonou o repositório:
-
-```bash
-bash setup/setup_termux_android.sh
-```
-
-Depois exporte sua chave e rode o assistant:
-
-```bash
-export DASHSCOPE_API_KEY="SUA_CHAVE_QWEN"
+# Inicie o assistente interativo
 ./atena assistant
 ```
 
-## Execução rápida
+---
 
-```bash
-./atena help
-./atena start
-```
-
-## Comandos principais
+## 🛠️ Comandos Principais
 
 | Comando | Descrição |
-|---|---|
-| `./atena assistant` | Assistente de terminal com evolução em background |
-| `./atena doctor` | Diagnóstico rápido de ambiente |
-| `./atena guardian` | Gate essencial (autopilot + smoke) |
-| `./atena production-ready` | Gate final de release (`doctor` + `guardian`) |
-| `./atena modules-smoke` | Smoke test dos módulos |
-| `./atena codex-advanced` | Missão de diagnóstico estratégico |
-| `./atena research-lab` | Gera proposta avançada de evolução |
-| `./atena genius` | Planejamento multiobjetivo |
-| `./atena code-build --type <site\|api\|cli> --name <projeto> [--template basic\|landing-page\|portfolio\|dashboard\|blog]` | Gera projeto inicial automaticamente |
-| `./atena telemetry-report` | Consolida métricas de missão (telemetria) |
-| `./atena professional-launch --segment "<segmento>" --pilots <n>` | Gera plano de divulgação e adoção profissional |
-| `./atena go-no-go` | Executa checklist de 5 testes para validação pré-divulgação |
+| :--- | :--- |
+| `./atena assistant` | Assistente de terminal interativo com evolução em background |
+| `./atena doctor` | Diagnóstico rápido de ambiente e dependências |
+| `./atena guardian` | Gate essencial de segurança (autopilot + smoke tests) |
+| `./atena production-ready` | Validação final para release (`doctor` + `guardian`) |
+| `./atena code-build` | Gerador automático de projetos (Site, API, CLI) |
+| `./atena research-lab` | Gera propostas estratégicas de evolução do sistema |
+| `./atena go-no-go` | Checklist de 5 testes para validação pré-divulgação |
 
-## Fluxo recomendado para produção
+---
 
-```bash
-./atena doctor
-./atena guardian
-./atena production-ready
-```
+## 📂 Estrutura do Projeto
 
-Se qualquer etapa falhar, corrigir antes de promover alterações.
+- **`core/`**: Núcleo do sistema, incluindo launcher, assistant e runtime principal.
+- **`modules/`**: Módulos funcionais (Browser Agent, Codex, Telemetry, etc.).
+- **`protocols/`**: Entrypoints para missões autônomas e tarefas específicas.
+- **`setup/`**: Scripts de instalação e arquivos de requisitos.
+- **`docs/`**: Documentação técnica, relatórios e roadmaps.
+- **`atena_evolution/`**: Artefatos de execução, logs e memória persistente.
 
-### Exemplo de geração de site mais completo
+---
 
-```bash
-./atena code-build --type site --name minha_landing --template landing-page
-```
+## 🛡️ Fluxo de Qualidade (CI/CD)
 
-### Exemplo de plano de lançamento profissional
+Para garantir a estabilidade, utilize o fluxo recomendado antes de qualquer alteração importante:
 
-```bash
-./atena professional-launch --segment "software houses e squads de produto" --pilots 5
-```
+1. `./atena doctor` (Verifica ambiente)
+2. `./atena guardian` (Verifica integridade e riscos)
+3. `./atena production-ready` (Validação final)
 
-### Exemplo de varredura Go/No-Go (5 itens)
+---
 
-```bash
-./atena go-no-go
-```
+## 📝 Licença
 
-No modo `assistant`, use `/model list` e `/model set <provider:model>` com providers `local`, `deepseek`, `openai`, `anthropic`, `qwen` e `compat` (OpenAI-compatible).
-Se `DASHSCOPE_API_KEY` estiver definida, o assistant já inicializa automaticamente em `qwen:qwen-turbo` (você ainda pode trocar com `/model set`).
+Este projeto está sob a licença definida no arquivo `LICENSE`.
 
-No terminal assistant (estilo Claude Code), você também pode usar `/tools`, `/review`, `/commit <mensagem>`, `/init-context` e sair com `:q`.
-Para onboarding mais rápido, use `/quickstart` e depois `/new <objetivo>` para gerar um brief técnico acionável.
-
-## CI
-
-O repositório inclui workflow de gate em `.github/workflows/production-gate.yml`, executado em `push`/`pull_request` para `main`.
-
-
-## Análise estratégica
-
-Ver análise e roadmap recomendado em `docs/ANALISE_COMPLETA_ATENA_RECOMENDACOES_2026-04-05.md`.
-
-## Licença
-
-Consulte `LICENSE`.
+---
+*Desenvolvido por AtenaAuto Team*

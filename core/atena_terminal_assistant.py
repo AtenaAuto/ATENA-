@@ -99,6 +99,8 @@ def print_help() -> None:
 Comandos:
   /help | ?             mostra ajuda
   /quickstart           mostra fluxo guiado estilo "Claude Code" para começar rápido
+  /claude-mode [on|off|status]
+                        ativa saída estruturada estilo Claude Code para /task e /plan
   /new <objetivo>       cria um brief técnico inicial (objetivo + plano + próximos comandos)
   /clear                limpa a tela
   /status               mostra status da evolução em background
@@ -179,6 +181,20 @@ def build_local_brief(goal: str) -> str:
 ./atena go-no-go
 ```
 """
+
+
+def build_claude_mode_prompt(task: str) -> str:
+    return (
+        "Responda no estilo Claude Code, de forma objetiva e executável.\n"
+        "Formato obrigatório:\n"
+        "1) Objetivo\n"
+        "2) Plano técnico (passos numerados)\n"
+        "3) Comandos exatos para executar\n"
+        "4) Código (se necessário, em bloco ```python)\n"
+        "5) Validação (checklist + comandos de teste)\n"
+        "6) Riscos e rollback\n"
+        f"\nTarefa do usuário: {task}"
+    )
 
 
 def clear_screen() -> None:
@@ -334,6 +350,7 @@ def main() -> int:
     last_prompt: Optional[str] = None
     last_response: Optional[str] = None
     history: list[dict] = []
+    claude_mode = False
 
     def warmup_llm(show_spinner: bool = True):
         nonlocal local_ready
@@ -371,6 +388,21 @@ def main() -> int:
                 continue
             if raw == "/quickstart":
                 print_quickstart()
+                continue
+            if raw.startswith("/claude-mode"):
+                arg = raw[len("/claude-mode"):].strip().lower()
+                if arg in {"", "status"}:
+                    print(f"Claude mode: {'ON' if claude_mode else 'OFF'}")
+                    continue
+                if arg == "on":
+                    claude_mode = True
+                    print("✅ Claude mode ativado.")
+                    continue
+                if arg == "off":
+                    claude_mode = False
+                    print("✅ Claude mode desativado.")
+                    continue
+                print("Uso: /claude-mode [on|off|status]")
                 continue
             if raw == "/clear":
                 clear_screen()
@@ -530,6 +562,7 @@ def main() -> int:
             if raw == "/tools":
                 print("Ferramentas no assistant:")
                 print("- /help | ? | /quickstart")
+                print("- /claude-mode [on|off|status]")
                 print("- /model list | /model set <provider:model>")
                 print("- /new <objetivo> | /plan <objetivo>")
                 print("- /task | /plan | /history | /save")
@@ -555,10 +588,14 @@ def main() -> int:
                 spinner = AtenaSpinner("ATENA-Like pensando na tarefa")
                 spinner.start()
                 try:
+                    effective_task = build_claude_mode_prompt(task) if claude_mode else task
                     if router.cfg.provider == "local":
                         warmup_llm(show_spinner=False)
                     with suppress_noisy_runtime():
-                        answer = router.generate(task, context="Modo assistant no terminal")
+                        answer = router.generate(
+                            effective_task,
+                            context="Modo assistant no terminal (claude-mode)" if claude_mode else "Modo assistant no terminal",
+                        )
                 finally:
                     spinner.stop("resposta gerada")
                 router.learn_from_feedback(
@@ -588,6 +625,10 @@ def main() -> int:
                     "Etapas numeradas, Riscos, Critérios de pronto e Próximo comando."
                     f"\nObjetivo: {goal}"
                 )
+                if claude_mode:
+                    planner_prompt = build_claude_mode_prompt(
+                        f"Criar plano de execução para: {goal}"
+                    )
                 spinner = AtenaSpinner("ATENA-Like criando plano")
                 spinner.start()
                 try:

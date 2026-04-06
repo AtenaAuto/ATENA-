@@ -1,9 +1,9 @@
-# pagina_html_atena
+# app_exemplo_atena
 
 Projeto gerado automaticamente pela ATENA.
 
 - Tipo: site
-- Template: landing-page
+- Template: dashboard
 
 ## Como rodar localmente
 

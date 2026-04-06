@@ -3,5 +3,5 @@ const output = document.getElementById("output");
 
 helloBtn?.addEventListener("click", () => {
   if (!output) return;
-  output.textContent = "🚀 Projeto pagina_html_atena (Landing Page) pronto para evoluir!";
+  output.textContent = "🚀 Projeto app_exemplo_atena (Dashboard) pronto para evoluir!";
 });

@@ -11,6 +11,9 @@ import sys
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
+import re
+
+import requests
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -30,16 +33,40 @@ def analyze_text(text: str) -> dict:
     }
 
 
+def fetch_text_via_http(url: str) -> tuple[bool, str]:
+    try:
+        resp = requests.get(url, timeout=20)
+        if resp.status_code >= 400:
+            return False, ""
+        html = resp.text
+        text = re.sub(r"<[^>]+>", " ", html)
+        text = re.sub(r"\\s+", " ", text).strip()
+        return True, text
+    except Exception:
+        return False, ""
+
+
 async def run_pipeline(objective: str, base_query: str) -> dict:
     agent = AtenaBrowserAgent()
     query = agent.next_objective_query(objective, base_query)
     target_url = "https://github.com/AtenaAuto/ATENA-"
+    screenshot_name: str | None = "atena_pipeline_screenshot.png"
+    mode = "browser_agent"
 
-    await agent.launch(headless=True)
-    ok = await agent.navigate(target_url, allow_repeat=True)
-    text = await agent.get_text_content() if ok else ""
-    await agent.take_screenshot("atena_pipeline_screenshot.png")
-    await agent.close()
+    try:
+        await agent.launch(headless=True)
+        ok = await agent.navigate(target_url, allow_repeat=True)
+        text = await agent.get_text_content() if ok else ""
+        await agent.take_screenshot(screenshot_name)
+        await agent.close()
+    except ModuleNotFoundError:
+        mode = "http_fallback"
+        screenshot_name = None
+        ok, text = fetch_text_via_http(target_url)
+    except Exception:
+        mode = "http_fallback"
+        screenshot_name = None
+        ok, text = fetch_text_via_http(target_url)
 
     analysis = analyze_text(text[:12000]) if text else {"chars": 0, "words": 0, "top_terms": []}
     score = 0.85 if ok and analysis["words"] > 20 else 0.35
@@ -50,9 +77,10 @@ async def run_pipeline(objective: str, base_query: str) -> dict:
         "objective": objective,
         "query_used": query,
         "target_url": target_url,
+        "mode": mode,
         "navigation_ok": ok,
         "analysis": analysis,
-        "screenshot": "atena_pipeline_screenshot.png",
+        "screenshot": screenshot_name,
     }
     return report
 
@@ -70,6 +98,7 @@ def save_reports(report: dict):
 - Objective: {report['objective']}
 - Query usada: `{report['query_used']}`
 - URL alvo: {report['target_url']}
+- Modo de coleta: {report.get('mode', 'n/a')}
 - Navegação OK: {report['navigation_ok']}
 - Palavras analisadas: {report['analysis']['words']}
 
@@ -77,7 +106,7 @@ def save_reports(report: dict):
 {terms if terms else '- (sem termos)'}
 
 ## Artefato visual
-`{report['screenshot']}`
+`{report['screenshot'] or 'não disponível (fallback HTTP)'}`
 """
     out_md.write_text(md, encoding="utf-8")
 

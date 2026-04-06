@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import sys
 from pathlib import Path
 from typing import Iterable
@@ -14,6 +15,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from modules.atena_code_module import AtenaCodeModule
+from core.atena_telemetry import emit_event
 
 
 def iter_project_files(output_dir: Path) -> Iterable[Path]:
@@ -40,6 +42,35 @@ def print_generated_code(output_dir: Path) -> None:
         print("- (nenhum arquivo textual encontrado para exibir)")
 
 
+def snapshot_text_files(output_dir: Path) -> dict[str, str]:
+    snap: dict[str, str] = {}
+    if not output_dir.exists():
+        return snap
+    for file_path in iter_project_files(output_dir):
+        try:
+            rel = str(file_path.relative_to(output_dir))
+            snap[rel] = file_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+    return snap
+
+
+def print_unified_diff(before: dict[str, str], after: dict[str, str]) -> None:
+    print("\n🧩 Diff dos arquivos gerados:")
+    all_files = sorted(set(before) | set(after))
+    any_diff = False
+    for rel in all_files:
+        if before.get(rel, "") == after.get(rel, ""):
+            continue
+        any_diff = True
+        old = before.get(rel, "").splitlines(keepends=True)
+        new = after.get(rel, "").splitlines(keepends=True)
+        diff = difflib.unified_diff(old, new, fromfile=f"a/{rel}", tofile=f"b/{rel}")
+        print("".join(diff).rstrip() or f"(arquivo alterado: {rel})")
+    if not any_diff:
+        print("- sem alterações de conteúdo")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="ATENA Code Build Mission")
     parser.add_argument("--type", dest="project_type", choices=["site", "api", "cli"], default="site")
@@ -50,21 +81,56 @@ def main() -> int:
         default="basic",
         help="Template visual para tipo site",
     )
+    parser.add_argument("--show-diff", action="store_true", help="Exibe diff textual dos arquivos gerados.")
+    parser.add_argument(
+        "--validate",
+        action="store_true",
+        help="Executa validação mínima (arquivos não vazios) antes de concluir.",
+    )
     args = parser.parse_args()
 
     builder = AtenaCodeModule(ROOT)
+    out_dir = builder.generated_root / "".join(
+        ch for ch in args.project_name if ch.isalnum() or ch in ("-", "_")
+    ).strip("-_")
+    before = snapshot_text_files(out_dir)
+    mission_id = f"code-build:{args.project_name}"
+    emit_event(
+        "code_build_start",
+        mission_id,
+        "started",
+        project_type=args.project_type,
+        template=args.template,
+    )
     result = builder.build(args.project_type, args.project_name, template=args.template)
 
     if result.ok:
+        after = snapshot_text_files(Path(result.output_dir))
+        if args.validate:
+            empty_files = [name for name, content in after.items() if not content.strip()]
+            if empty_files:
+                emit_event("code_build_finish", mission_id, "failed", reason="empty_files", files=empty_files)
+                print(f"❌ Falha de validação: arquivos vazios detectados: {empty_files}")
+                return 2
         print("🧠💻 ATENA Code Module")
         print(f"Projeto: {result.project_name}")
         print(f"Tipo: {result.project_type}")
         print(f"Template: {result.template}")
         print(f"Saída: {result.output_dir}")
         print("Status: sucesso")
+        if args.show_diff:
+            print_unified_diff(before, after)
         print_generated_code(Path(result.output_dir))
+        emit_event(
+            "code_build_finish",
+            mission_id,
+            "ok",
+            output_dir=result.output_dir,
+            files_generated=len(after),
+        )
         return 0
 
+    emit_event("code_build_finish", mission_id, "failed", reason=result.message)
     print(f"❌ Falha: {result.message}")
     return 2
 

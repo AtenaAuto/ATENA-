@@ -24,6 +24,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from modules.atena_browser_agent import AtenaBrowserAgent
+from core.atena_telemetry import emit_event
 
 
 def analyze_text(text: str) -> dict:
@@ -157,16 +158,26 @@ def collect_multi_source_text(
     success_sources = 0
     failed_sources = 0
 
+    source_quality: list[dict] = []
     for src in sources:
         ok_src, text_src = fetch_text_via_http(src)
         if ok_src and text_src:
             ok_any = True
             success_sources += 1
             chunks.append(text_src[:max_chars_per_source])
+            source_quality.append(
+                {
+                    "source": src,
+                    "chars": len(text_src),
+                    "words": len(text_src.split()),
+                    "quality_score": round(min(1.0, len(text_src.split()) / 1200), 3),
+                }
+            )
             if sum(len(c) for c in chunks) >= max_total_chars:
                 break
         else:
             failed_sources += 1
+            source_quality.append({"source": src, "chars": 0, "words": 0, "quality_score": 0.0})
 
     merged = "\n".join(chunks)[:max_total_chars]
     stats = {
@@ -174,11 +185,14 @@ def collect_multi_source_text(
         "successful_sources": success_sources,
         "failed_sources": failed_sources,
         "collected_chars": len(merged),
+        "source_quality": source_quality,
     }
     return ok_any, merged, stats
 
 
 async def run_pipeline(objective: str, base_query: str) -> dict:
+    mission_id = f"pipeline:{int(datetime.utcnow().timestamp())}"
+    emit_event("pipeline_start", mission_id, "started", objective=objective, base_query=base_query)
     agent = AtenaBrowserAgent()
     query = agent.next_objective_query(objective, base_query)
     target_url = "https://github.com/AtenaAuto/ATENA-"
@@ -233,6 +247,14 @@ async def run_pipeline(objective: str, base_query: str) -> dict:
         "analysis": analysis,
         "screenshot": screenshot_name,
     }
+    emit_event(
+        "pipeline_finish",
+        mission_id,
+        "ok" if ok else "degraded",
+        mode=mode,
+        words=analysis["words"],
+        successful_sources=collection_stats.get("successful_sources", 0),
+    )
     return report
 
 

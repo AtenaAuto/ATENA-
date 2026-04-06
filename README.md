@@ -22,7 +22,7 @@ cd ..
 ### Instalação 📱 Android
 ```bash
 # pkg update && pkg upgrade -y && pkg install git python clang make -y && git clone [https://github.com/AtenaAuto/ATENA-.git](https://github.com/AtenaAuto/ATENA-.git) && cd ATENA- && cd setup && pip install -r requirements.txt && cd ..
-
+```
 
 ### Execução 
 ```bash

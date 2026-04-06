@@ -24,6 +24,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from modules.atena_browser_agent import AtenaBrowserAgent
+from core.atena_mission_runner import run_async_mission
+from core.atena_runtime_contracts import MissionOutcome
 from core.atena_telemetry import emit_event
 
 
@@ -193,69 +195,81 @@ def collect_multi_source_text(
 async def run_pipeline(objective: str, base_query: str) -> dict:
     mission_id = f"pipeline:{int(datetime.utcnow().timestamp())}"
     emit_event("pipeline_start", mission_id, "started", objective=objective, base_query=base_query)
-    agent = AtenaBrowserAgent()
-    query = agent.next_objective_query(objective, base_query)
-    target_url = "https://github.com/AtenaAuto/ATENA-"
-    screenshot_name: str | None = "atena_pipeline_screenshot.png"
-    mode = "browser_agent"
-    sources: list[str] = [target_url]
-    collection_stats = {
-        "requested_sources": 1,
-        "successful_sources": 0,
-        "failed_sources": 0,
-        "collected_chars": 0,
-    }
+    report_holder: dict[str, dict] = {}
 
-    try:
-        await agent.launch(headless=True)
-        ok = await agent.navigate(target_url, allow_repeat=True)
-        text = await agent.get_text_content() if ok else ""
-        await agent.take_screenshot(screenshot_name)
-        await agent.close()
-    except ModuleNotFoundError:
-        mode = "http_fallback"
-        screenshot_name = None
-        links = fetch_search_links(query, max_links=8, per_domain_limit=2)
-        if links:
-            sources = links
-        elif target_url not in sources:
-            sources.append(target_url)
-        ok, text, collection_stats = collect_multi_source_text(sources)
-    except Exception:
-        mode = "http_fallback"
-        screenshot_name = None
-        links = fetch_search_links(query, max_links=8, per_domain_limit=2)
-        if links:
-            sources = links
-        elif target_url not in sources:
-            sources.append(target_url)
-        ok, text, collection_stats = collect_multi_source_text(sources)
+    async def _execute_pipeline() -> MissionOutcome:
+        agent = AtenaBrowserAgent()
+        query = agent.next_objective_query(objective, base_query)
+        target_url = "https://github.com/AtenaAuto/ATENA-"
+        screenshot_name: str | None = "atena_pipeline_screenshot.png"
+        mode = "browser_agent"
+        sources: list[str] = [target_url]
+        collection_stats = {
+            "requested_sources": 1,
+            "successful_sources": 0,
+            "failed_sources": 0,
+            "collected_chars": 0,
+        }
 
-    analysis = analyze_text(text[:12000]) if text else {"chars": 0, "words": 0, "top_terms": []}
-    score = 0.85 if ok and analysis["words"] > 20 else 0.35
-    agent.record_search_outcome(objective, query, target_url, score, "pipeline_auto_run")
+        try:
+            await agent.launch(headless=True)
+            ok = await agent.navigate(target_url, allow_repeat=True)
+            text = await agent.get_text_content() if ok else ""
+            await agent.take_screenshot(screenshot_name)
+            await agent.close()
+        except ModuleNotFoundError:
+            mode = "http_fallback"
+            screenshot_name = None
+            links = fetch_search_links(query, max_links=8, per_domain_limit=2)
+            if links:
+                sources = links
+            elif target_url not in sources:
+                sources.append(target_url)
+            ok, text, collection_stats = collect_multi_source_text(sources)
+        except Exception:
+            mode = "http_fallback"
+            screenshot_name = None
+            links = fetch_search_links(query, max_links=8, per_domain_limit=2)
+            if links:
+                sources = links
+            elif target_url not in sources:
+                sources.append(target_url)
+            ok, text, collection_stats = collect_multi_source_text(sources)
 
-    report = {
-        "timestamp": datetime.utcnow().isoformat() + "Z",
-        "objective": objective,
-        "query_used": query,
-        "target_url": target_url,
-        "sources": sources,
-        "mode": mode,
-        "navigation_ok": ok,
-        "collection": collection_stats,
-        "analysis": analysis,
-        "screenshot": screenshot_name,
-    }
-    emit_event(
-        "pipeline_finish",
-        mission_id,
-        "ok" if ok else "degraded",
-        mode=mode,
-        words=analysis["words"],
-        successful_sources=collection_stats.get("successful_sources", 0),
-    )
-    return report
+        analysis = analyze_text(text[:12000]) if text else {"chars": 0, "words": 0, "top_terms": []}
+        score = 0.85 if ok and analysis["words"] > 20 else 0.35
+        agent.record_search_outcome(objective, query, target_url, score, "pipeline_auto_run")
+
+        report = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "objective": objective,
+            "query_used": query,
+            "target_url": target_url,
+            "sources": sources,
+            "mode": mode,
+            "navigation_ok": ok,
+            "collection": collection_stats,
+            "analysis": analysis,
+            "screenshot": screenshot_name,
+        }
+        report_holder["report"] = report
+        emit_event(
+            "pipeline_finish",
+            mission_id,
+            "ok" if ok else "degraded",
+            mode=mode,
+            words=analysis["words"],
+            successful_sources=collection_stats.get("successful_sources", 0),
+        )
+        return MissionOutcome(
+            mission_id=mission_id,
+            status="ok" if ok else "degraded",
+            score=score,
+            details=f"mode={mode}",
+        )
+
+    await run_async_mission(mission_id, _execute_pipeline)
+    return report_holder["report"]
 
 
 def save_reports(report: dict):

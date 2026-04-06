@@ -20,6 +20,9 @@ cd ATENA-
 cd setup
 pip install -r requirements.txt
 cd ..
+apt update
+apt install build-essential python3-dev clang libfreetype6-dev libpng-dev
+
 ```
 
 ### Execução

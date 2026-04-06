@@ -12,6 +12,7 @@
 
 import os
 import sys
+import importlib.util
 import re
 import ast
 import json
@@ -193,12 +194,44 @@ class AtenaUltraBrain:
         self.cfg.enable_transformers = True
         self._init_model()
 
+        if not self.has_transformers and os.environ.get("ATENA_AUTO_INSTALL_LLM_DEPS", "1") == "1":
+            ok_install, _ = self._install_transformers_stack()
+            if ok_install:
+                self._init_model()
+
         if self.has_transformers:
             return True, f"Modelo local carregado (download/caching automático): {preferred_model}"
         return False, (
             "Não foi possível inicializar transformers para baixar/rodar o modelo Qwen local. "
             "ATENA seguirá em modo SimBrain."
         )
+
+    def _install_transformers_stack(self) -> Tuple[bool, str]:
+        """
+        Tenta instalar dependências mínimas de LLM local automaticamente.
+        Evita reinstalar se `transformers` já existir.
+        """
+        if importlib.util.find_spec("transformers") is not None:
+            return True, "transformers já disponível"
+        try:
+            cmd = [
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "-q",
+                "transformers>=4.41.0",
+                "accelerate>=0.30.0",
+                "safetensors>=0.4.0",
+                "sentencepiece>=0.2.0",
+                "huggingface_hub>=0.23.0",
+            ]
+            proc = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=600)
+            if proc.returncode == 0:
+                return True, "dependências de LLM local instaladas"
+            return False, (proc.stderr or proc.stdout or "falha ao instalar dependências").strip()[:500]
+        except Exception as exc:  # noqa: BLE001
+            return False, str(exc)
 
     def think(self, prompt: str, context: str = "") -> str:
         """Processa um pensamento e gera uma resposta/código."""

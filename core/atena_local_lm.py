@@ -670,7 +670,16 @@ if __name__ == "__main__":
 '''
         if "sort" in prompt_l:
             return "def quicksort(arr):\n    if len(arr) <= 1: return arr\n    pivot = arr[len(arr)//2]\n    left = [x for x in arr if x < pivot]\n    middle = [x for x in arr if x == pivot]\n    right = [x for x in arr if x > pivot]\n    return quicksort(left) + middle + quicksort(right)"
-        return f"# [Atena SimBrain] Processando tarefa: {prompt}\n# Resultado gerado via heurística cognitiva."
+        if any(k in prompt_l for k in ["oi", "olá", "ola", "e aí", "bom dia", "boa tarde", "boa noite"]):
+            return (
+                "Oi! Estou operando em modo local SimBrain e pronta para ajudar com tarefas técnicas. "
+                "Se quiser, me passe um objetivo e eu monto um plano executável."
+            )
+        return (
+            "Estou em modo local SimBrain (heurístico). "
+            f"Entendi sua solicitação: {prompt}\n"
+            "Posso responder com plano técnico, checklist de validação e próximos comandos."
+        )
 
     def learn_from_feedback(self, prompt: str, response: str, success: bool, score: float):
         """Ajusta a memória com base no sucesso ou falha da tarefa."""

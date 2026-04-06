@@ -222,11 +222,11 @@ def prompt_label(model: str) -> str:
 class AtenaSpinner:
     """Spinner simples para indicar processamento da ATENA no terminal."""
 
-    def __init__(self, message: str = "ATENA processando"):
+    def __init__(self, message: str = "ATENA processando", frames: Optional[list[str]] = None):
         self.message = message
         self._running = False
         self._thread: Optional[threading.Thread] = None
-        self._frames = ["◐", "◓", "◑", "◒"]
+        self._frames = frames or ["◐", "◓", "◑", "◒"]
 
     def start(self):
         if self._running:
@@ -248,6 +248,35 @@ class AtenaSpinner:
         if self._thread:
             self._thread.join(timeout=1)
         print(f"\r✅ {self.message}: {done_message}." + " " * 20)
+
+
+SPINNER_PRESETS = {
+    "warmup": {
+        "message": "Aquecendo núcleo local",
+        "frames": ["◜", "◠", "◝", "◞", "◡", "◟"],
+    },
+    "task": {
+        "message": "Executando tarefa",
+        "frames": ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
+    },
+    "plan": {
+        "message": "Montando plano",
+        "frames": ["◴", "◷", "◶", "◵"],
+    },
+    "brief": {
+        "message": "Criando brief",
+        "frames": ["▖", "▘", "▝", "▗"],
+    },
+    "chat": {
+        "message": "Pensando resposta",
+        "frames": ["◐", "◓", "◑", "◒"],
+    },
+}
+
+
+def build_spinner(kind: str) -> AtenaSpinner:
+    preset = SPINNER_PRESETS.get(kind, SPINNER_PRESETS["chat"])
+    return AtenaSpinner(message=preset["message"], frames=preset["frames"])
 
 
 @contextmanager
@@ -358,7 +387,7 @@ def main() -> int:
         if local_ready:
             return
         if router.cfg.provider == "local":
-            spinner = AtenaSpinner("Inicializando cérebro local da ATENA-Like") if show_spinner else None
+            spinner = build_spinner("warmup") if show_spinner else None
             if spinner:
                 spinner.start()
             try:
@@ -592,7 +621,7 @@ def main() -> int:
                 if not task:
                     print("Informe uma instrução após /task.")
                     continue
-                spinner = AtenaSpinner("ATENA-Like pensando na tarefa")
+                spinner = build_spinner("task")
                 spinner.start()
                 try:
                     effective_task = build_claude_mode_prompt(task) if claude_mode else task
@@ -636,7 +665,7 @@ def main() -> int:
                     planner_prompt = build_claude_mode_prompt(
                         f"Criar plano de execução para: {goal}"
                     )
-                spinner = AtenaSpinner("ATENA-Like criando plano")
+                spinner = build_spinner("plan")
                 spinner.start()
                 try:
                     if router.cfg.provider == "local":
@@ -667,7 +696,7 @@ def main() -> int:
                     "Comandos imediatos para execução no terminal."
                     f"\nObjetivo: {goal}"
                 )
-                spinner = AtenaSpinner("ATENA-Like criando brief técnico")
+                spinner = build_spinner("brief")
                 spinner.start()
                 try:
                     if router.cfg.provider == "local":
@@ -730,7 +759,7 @@ def main() -> int:
                     print(f"Falha ao executar comando: {exc}")
                 continue
 
-            spinner = AtenaSpinner("ATENA-Like elaborando resposta")
+            spinner = build_spinner("chat")
             spinner.start()
             try:
                 if router.cfg.provider == "local":

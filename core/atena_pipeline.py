@@ -39,6 +39,18 @@ ATENA_RELEVANCE_TERMS = {
     "github",
 }
 
+NOISE_TERMS = {
+    "your",
+    "view",
+    "search",
+    "reload",
+    "loading",
+    "navigation",
+    "support",
+    "community",
+    "actions",
+}
+
 
 def analyze_text(text: str) -> dict:
     tokens = [t.strip(".,:;!?()[]{}\"'").lower() for t in text.split()]
@@ -53,6 +65,10 @@ def analyze_text(text: str) -> dict:
 
 def is_valid_term(token: str) -> bool:
     if len(token) <= 3 or len(token) >= 40:
+        return False
+    if token in NOISE_TERMS:
+        return False
+    if token.startswith(("&lt", "&gt", "lt;", "gt;")):
         return False
     if token.startswith(("http://", "https://", "www.")):
         return False
@@ -180,46 +196,24 @@ def collect_multi_source_text(
     max_chars_per_source: int = 5000,
     max_total_chars: int = 20000,
 ) -> tuple[bool, str, dict]:
-    chunks: list[str] = []
-    ok_any = False
-    success_sources = 0
-    failed_sources = 0
-
     source_quality: list[dict] = []
+    fetched_candidates: list[dict] = []
     for src in sources:
         ok_src, text_src = fetch_text_via_http(src)
         if ok_src and text_src:
             relevance = score_source_relevance(src, text_src, objective)
-            if relevance < 0.30:
-                failed_sources += 1
-                source_quality.append(
-                    {
-                        "source": src,
-                        "chars": len(text_src),
-                        "words": len(text_src.split()),
-                        "quality_score": 0.0,
-                        "relevance_score": relevance,
-                        "selected": False,
-                    }
-                )
-                continue
-            ok_any = True
-            success_sources += 1
-            chunks.append(text_src[:max_chars_per_source])
-            source_quality.append(
+            quality = round(min(1.0, len(text_src.split()) / 1200), 3)
+            fetched_candidates.append(
                 {
                     "source": src,
+                    "text": text_src,
                     "chars": len(text_src),
                     "words": len(text_src.split()),
-                    "quality_score": round(min(1.0, len(text_src.split()) / 1200), 3),
+                    "quality_score": quality,
                     "relevance_score": relevance,
-                    "selected": True,
                 }
             )
-            if sum(len(c) for c in chunks) >= max_total_chars:
-                break
         else:
-            failed_sources += 1
             source_quality.append(
                 {
                     "source": src,
@@ -231,6 +225,38 @@ def collect_multi_source_text(
                 }
             )
 
+    selected = [c for c in fetched_candidates if c["relevance_score"] >= 0.30]
+    if not selected:
+        selected = [c for c in fetched_candidates if c["relevance_score"] >= 0.20]
+    if not selected and fetched_candidates:
+        selected = sorted(
+            fetched_candidates,
+            key=lambda c: (c["relevance_score"], c["quality_score"]),
+            reverse=True,
+        )[:1]
+
+    selected_sources = {c["source"] for c in selected}
+    for c in fetched_candidates:
+        source_quality.append(
+            {
+                "source": c["source"],
+                "chars": c["chars"],
+                "words": c["words"],
+                "quality_score": c["quality_score"] if c["source"] in selected_sources else 0.0,
+                "relevance_score": c["relevance_score"],
+                "selected": c["source"] in selected_sources,
+            }
+        )
+
+    chunks: list[str] = []
+    for c in selected:
+        chunks.append(c["text"][:max_chars_per_source])
+        if sum(len(x) for x in chunks) >= max_total_chars:
+            break
+
+    ok_any = len(selected) > 0
+    success_sources = len(selected)
+    failed_sources = max(0, len(sources) - success_sources)
     merged = "\n".join(chunks)[:max_total_chars]
     stats = {
         "requested_sources": len(sources),

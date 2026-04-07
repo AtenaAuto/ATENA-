@@ -286,8 +286,10 @@ def print_assistant_output(answer: str) -> None:
         console = Console()
         console.print()
         console.print(Panel(Markdown(payload), title="ATENA", border_style="green"))
+        sys.stdout.flush()
         return
     print("\n" + payload)
+    sys.stdout.flush()
 
 
 class AtenaSpinner:
@@ -310,7 +312,8 @@ class AtenaSpinner:
         idx = 0
         while self._running:
             frame = self._frames[idx % len(self._frames)]
-            print(f"\r{frame} {self.message}", end="", flush=True)
+            sys.stdout.write(f"\r{frame} {self.message}")
+            sys.stdout.flush()
             time.sleep(0.12)
             idx += 1
 
@@ -318,7 +321,9 @@ class AtenaSpinner:
         self._running = False
         if self._thread:
             self._thread.join(timeout=1)
-        print(f"\r✅ {self.message}: {done_message}." + " " * 20)
+        # Limpa a linha do spinner e imprime a mensagem de conclusão
+        sys.stdout.write(f"\r✅ {self.message}: {done_message}." + " " * 30 + "\n")
+        sys.stdout.flush()
 
 
 SPINNER_PRESETS = {
@@ -827,8 +832,11 @@ def main() -> int:
                     warmup_llm(show_spinner=False)
                 with suppress_noisy_runtime():
                     answer = router.generate(raw, context="Conversa livre no terminal")
+            except Exception as e:
+                answer = f"Erro interno na geração: {e}"
             finally:
                 spinner.stop("resposta gerada")
+                sys.stdout.flush()
             router.learn_from_feedback(
                 prompt=raw,
                 response=answer,

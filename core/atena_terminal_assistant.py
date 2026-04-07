@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-ATENA Ω - Terminal Assistant
-
-Modo interativo de terminal com:
-1) conversa/tarefas em foreground;
-2) evolução contínua em background.
+ATENA Ω - Terminal Assistant (Claude Code Style)
+Versão aprimorada com interface moderna e comandos intuitivos.
 """
 
 import shlex
@@ -25,11 +22,6 @@ from pathlib import Path
 from typing import Optional
 
 ROOT = Path(__file__).resolve().parent.parent
-INVOKE_SCRIPT = ROOT / "protocols" / "atena_invoke.py"
-DASHBOARD_SCRIPT = ROOT / "core" / "atena_local_dashboard.py"
-DASHBOARD_PORT = int(os.getenv("ATENA_DASHBOARD_PORT", "8765"))
-ENABLE_DASHBOARD = os.getenv("ATENA_DASHBOARD_ENABLED", "0") == "1"
-DASHBOARD_STATE_FILE = ROOT / "atena_evolution" / "assistant_dashboard_state.json"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -39,13 +31,19 @@ try:
     from rich.console import Console
     from rich.panel import Panel
     from rich.markdown import Markdown
+    from rich.live import Live
+    from rich.spinner import Spinner
+    from rich.text import Text
+    from rich.table import Table
+    from rich.box import ROUNDED
     HAS_RICH = True
 except Exception:
-    Console = None
-    Panel = None
-    Markdown = None
     HAS_RICH = False
 
+# Configurações Globais
+DASHBOARD_PORT = int(os.getenv("ATENA_DASHBOARD_PORT", "8765"))
+ENABLE_DASHBOARD = os.getenv("ATENA_DASHBOARD_ENABLED", "0") == "1"
+CONSOLE = Console() if HAS_RICH else None
 
 @dataclass
 class EvolutionState:
@@ -58,186 +56,6 @@ class EvolutionState:
     lock: threading.Lock = field(default_factory=threading.Lock)
     wake_event: threading.Event = field(default_factory=threading.Event)
 
-
-def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def run_evolution_cycle(state: EvolutionState) -> None:
-    if ENABLE_DASHBOARD:
-        open_dashboard()
-    with state.lock:
-        state.cycles += 1
-        state.last_started_at = utc_now_iso()
-        state.last_error = None
-    try:
-        proc = subprocess.run(
-            ["python3", str(INVOKE_SCRIPT)],
-            cwd=str(ROOT),
-            capture_output=True,
-            text=True,
-            timeout=180,
-        )
-        with state.lock:
-            state.last_finished_at = utc_now_iso()
-            state.last_success = proc.returncode == 0
-            if proc.returncode != 0:
-                state.last_error = (proc.stderr or proc.stdout or "erro desconhecido").strip()[:800]
-    except Exception as exc:  # noqa: BLE001
-        with state.lock:
-            state.last_finished_at = utc_now_iso()
-            state.last_success = False
-            state.last_error = str(exc)
-    finally:
-        write_dashboard_state(state)
-
-
-def evolution_worker(state: EvolutionState, interval_seconds: int) -> None:
-    while state.running:
-        woke = state.wake_event.wait(timeout=interval_seconds)
-        state.wake_event.clear()
-        if not state.running:
-            return
-        if woke:
-            run_evolution_cycle(state)
-        else:
-            run_evolution_cycle(state)
-
-
-def print_help() -> None:
-    if HAS_RICH:
-        console = Console()
-        console.print(
-            Panel.fit(
-                "[bold cyan]Comandos da ATENA[/bold cyan]\n"
-                "[green]/help[/green], [green]/quickstart[/green], [green]/task[/green], [green]/plan[/green], [green]/new[/green],\n"
-                "[green]/model[/green], [green]/model set[/green], [green]/history[/green], [green]/save[/green], [green]/git[/green],\n"
-                "[green]/review[/green], [green]/commit[/green], [green]/run[/green], [green]/shell[/green], [green]/exit[/green]\n\n"
-                "[dim]Dica: use /claude-mode on para respostas mais estruturadas.[/dim]",
-                border_style="bright_blue",
-            )
-        )
-        return
-    print(
-        """
-Comandos:
-  /help | ?             mostra ajuda
-  /quickstart           mostra fluxo guiado estilo "Claude Code" para começar rápido
-  /claude-mode [on|off|status]
-                        ativa saída estruturada estilo Claude Code para /task e /plan
-  /new <objetivo>       cria um brief técnico inicial (objetivo + plano + próximos comandos)
-  /clear                limpa a tela
-  /status               mostra status da evolução em background
-  /context              mostra contexto atual (cwd, branch git, modelo)
-  /evolve               dispara um ciclo de evolução imediatamente
-  /model                mostra backend/modelo atual
-  /model list           mostra opções de LLM/provider
-  /model set <spec>     troca backend (ex: local | deepseek:light | openai:gpt-4.1-mini | anthropic:claude-3-7-sonnet-latest | qwen:qwen-turbo | compat:<modelo>)
-  /task <instrução>     pede para ATENA pensar em uma tarefa (resposta textual)
-  /plan <objetivo>      gera plano estruturado em etapas para execução
-  /history [n]          mostra últimas interações (padrão: 8)
-  /save <arquivo>       salva a última resposta em arquivo
-  /git                  mostra status git curto do repositório
-  /review               mostra resumo de mudanças (status + diff stat)
-  /commit <mensagem>    cria commit git rápido pelo assistant
-  /tools                lista ferramentas/comandos operacionais disponíveis
-  /init-context         cria template de contexto de sessão em docs/
-  /feedback <0-1>       reforça aprendizado da última resposta (ex: /feedback 0.95)
-  /run <cmd>            executa comando shell local (use com cuidado)
-  /shell <cmd>          alias de /run
-  /dashboard            abre/mostra dashboard local com chat da ATENA
-  /exit | exit | quit   encerra o modo assistant
-"""
-    )
-
-
-def print_quickstart() -> None:
-    if HAS_RICH:
-        console = Console()
-        console.print(
-            Panel.fit(
-                "[bold]🚀 Quickstart (estilo Claude Code)[/bold]\n"
-                "1) [cyan]/context[/cyan] + [cyan]/review[/cyan]\n"
-                "2) [cyan]/new <objetivo>[/cyan]\n"
-                "3) [cyan]/plan <objetivo>[/cyan] e [cyan]/task <instrução>[/cyan]\n"
-                "4) [cyan]/run ./atena go-no-go[/cyan] e [cyan]/commit <mensagem>[/cyan]",
-                border_style="magenta",
-            )
-        )
-        return
-    print(
-        """
-🚀 Quickstart ATENA (estilo Claude Code)
-1) Entender estado do projeto
-   - /context
-   - /review
-
-2) Definir objetivo técnico
-   - /new <objetivo>
-
-3) Planejar e executar
-   - /plan <objetivo>
-   - /task <instrução objetiva>
-
-4) Validar e versionar
-   - /run ./atena go-no-go
-   - /commit <mensagem>
-"""
-    )
-
-
-def build_local_brief(goal: str) -> str:
-    return f"""### Brief técnico inicial
-**Objetivo**
-- {goal}
-
-**Escopo**
-- Definir MVP com entregáveis claros.
-- Integrar validação com `doctor`, `modules-smoke` e `production-ready`.
-
-**Entregáveis**
-1. Especificação técnica curta (arquitetura e interfaces).
-2. Implementação incremental em pequenos commits.
-3. Relatório Go/No-Go final antes de divulgar.
-
-**Riscos**
-- Escopo excessivo sem priorização.
-- Dependências externas não configuradas.
-
-**Checklist de validação**
-- [ ] `./atena doctor`
-- [ ] `./atena modules-smoke`
-- [ ] `./atena production-ready`
-- [ ] `./atena go-no-go`
-
-**Próximos comandos**
-```bash
-./atena doctor
-./atena modules-smoke
-./atena production-ready
-./atena go-no-go
-```
-"""
-
-
-def build_claude_mode_prompt(task: str) -> str:
-    return (
-        "Responda no estilo Claude Code, de forma objetiva e executável.\n"
-        "Formato obrigatório:\n"
-        "1) Objetivo\n"
-        "2) Plano técnico (passos numerados)\n"
-        "3) Comandos exatos para executar\n"
-        "4) Código (se necessário, em bloco ```python)\n"
-        "5) Validação (checklist + comandos de teste)\n"
-        "6) Riscos e rollback\n"
-        f"\nTarefa do usuário: {task}"
-    )
-
-
-def clear_screen() -> None:
-    os.system("cls" if os.name == "nt" else "clear")
-
-
 def git_branch() -> str:
     try:
         out = subprocess.check_output(
@@ -246,622 +64,150 @@ def git_branch() -> str:
             text=True,
             stderr=subprocess.DEVNULL,
         ).strip()
-        return out or "-"
+        return out or "main"
     except Exception:
-        return "-"
+        return "local"
 
-
-def prompt_label(model: str) -> str:
-    ts = datetime.now().strftime("%H:%M")
-    return f"ATENA ✦ [{git_branch()} • {model} • {ts}] > "
-
-
-def render_startup_banner() -> None:
+def get_prompt_label(model: str) -> Text:
+    branch = git_branch()
+    cwd = Path.cwd().name
     if HAS_RICH:
-        console = Console()
-        console.print(
-            Panel.fit(
-                "[bold cyan]🔱 ATENA-Like Assistant[/bold cyan]\n"
-                "[dim]Terminal mode com estilo profissional (inspirado em Claude Code).[/dim]\n\n"
-                "• [green]/quickstart[/green] para fluxo guiado\n"
-                "• [green]/claude-mode on[/green] para respostas estruturadas\n"
-                "• [green]/help[/green] para comandos",
-                border_style="cyan",
-            )
-        )
-        return
+        prompt = Text()
+        prompt.append(f" {branch} ", style="bold white on blue")
+        prompt.append(f" {cwd} ", style="bold white on black")
+        prompt.append(f" {model} ", style="bold black on cyan")
+        prompt.append("\n ❯ ", style="bold magenta")
+        return prompt
+    return f"[{branch}][{cwd}][{model}] ❯ "
 
-    print(
-        """
-🔱 ATENA-Like Assistant
-Terminal mode com estilo profissional.
-Use /quickstart, /claude-mode on e /help.
-"""
-    )
-
-
-def print_assistant_output(answer: str) -> None:
-    payload = answer[:4000]
+def render_banner():
     if HAS_RICH:
-        console = Console()
-        console.print()
-        console.print(Panel(Markdown(payload), title="ATENA", border_style="green"))
-        sys.stdout.flush()
-        return
-    print("\n" + payload)
-    sys.stdout.flush()
+        CONSOLE.print("\n")
+        CONSOLE.print(Panel(
+            Text.assemble(
+                ("🔱 ATENA Ω ", "bold cyan"),
+                ("Assistant ", "bold white"),
+                ("\n\n", ""),
+                ("Inspirado no Claude Code. Digite ", "dim"),
+                ("/help", "bold green"),
+                (" para começar.", "dim")
+            ),
+            border_style="cyan",
+            box=ROUNDED,
+            padding=(1, 2)
+        ))
+    else:
+        print("\n🔱 ATENA Ω Assistant - Digite /help para comandos.\n")
 
-
-class AtenaSpinner:
-    """Spinner simples para indicar processamento da ATENA no terminal."""
-
-    def __init__(self, message: str = "ATENA processando", frames: Optional[list[str]] = None):
-        self.message = message
-        self._running = False
-        self._thread: Optional[threading.Thread] = None
-        self._frames = frames or ["◐", "◓", "◑", "◒"]
-
-    def start(self):
-        if self._running:
-            return
-        self._running = True
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
-
-    def _run(self):
-        idx = 0
-        while self._running:
-            frame = self._frames[idx % len(self._frames)]
-            sys.stdout.write(f"\r{frame} {self.message}")
-            sys.stdout.flush()
-            time.sleep(0.12)
-            idx += 1
-
-    def stop(self, done_message: str = "concluído"):
-        self._running = False
-        if self._thread:
-            self._thread.join(timeout=1)
-        # Limpa a linha do spinner e imprime a mensagem de conclusão
-        sys.stdout.write(f"\r✅ {self.message}: {done_message}." + " " * 30 + "\n")
-        sys.stdout.flush()
-
-
-SPINNER_PRESETS = {
-    "warmup": {
-        "message": "Aquecendo núcleo local",
-        "frames": ["◜", "◠", "◝", "◞", "◡", "◟"],
-    },
-    "task": {
-        "message": "Executando tarefa",
-        "frames": ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
-    },
-    "plan": {
-        "message": "Montando plano",
-        "frames": ["◴", "◷", "◶", "◵"],
-    },
-    "brief": {
-        "message": "Criando brief",
-        "frames": ["▖", "▘", "▝", "▗"],
-    },
-    "chat": {
-        "message": "Pensando resposta",
-        "frames": ["◐", "◓", "◑", "◒"],
-    },
-}
-
-
-def build_spinner(kind: str) -> AtenaSpinner:
-    preset = SPINNER_PRESETS.get(kind, SPINNER_PRESETS["chat"])
-    return AtenaSpinner(message=preset["message"], frames=preset["frames"])
-
+def print_help():
+    if HAS_RICH:
+        table = Table(show_header=True, header_style="bold magenta", box=ROUNDED)
+        table.add_column("Comando", style="cyan")
+        table.add_column("Descrição", style="white")
+        
+        commands = [
+            ("/task <msg>", "Executa uma tarefa ou responde uma pergunta"),
+            ("/plan <objetivo>", "Gera um plano de execução detalhado"),
+            ("/review", "Revisa as mudanças atuais no código (git diff)"),
+            ("/commit <msg>", "Realiza o commit das alterações atuais"),
+            ("/run <cmd>", "Executa um comando no terminal"),
+            ("/context", "Mostra o contexto atual da sessão"),
+            ("/model", "Gerencia o modelo de IA utilizado"),
+            ("/clear", "Limpa o terminal"),
+            ("/exit", "Encerra o assistente")
+        ]
+        
+        for cmd, desc in commands:
+            table.add_row(cmd, desc)
+        
+        CONSOLE.print(Panel(table, title="[bold cyan]Comandos Disponíveis[/bold cyan]", border_style="cyan"))
+    else:
+        print("\nComandos: /task, /plan, /review, /commit, /run, /context, /model, /clear, /exit\n")
 
 @contextmanager
-def suppress_noisy_runtime():
-    """
-    Silencia ruído de bibliotecas enquanto o spinner está ativo.
-    Evita "poluição visual" no terminal durante processamento.
-    """
-    noisy = [
-        "AtenaUltraBrain",
-        "httpx",
-        "huggingface_hub",
-        "huggingface_hub.utils._http",
-        "transformers",
-    ]
-    previous = {}
-    for name in noisy:
-        lg = logging.getLogger(name)
-        previous[name] = lg.level
-        lg.setLevel(logging.ERROR)
-    with open(os.devnull, "w", encoding="utf-8") as null:
-        with redirect_stdout(null), redirect_stderr(null):
+def atena_thinking(message: str = "Pensando..."):
+    if HAS_RICH:
+        with Live(Spinner("dots", text=Text(message, style="cyan"), style="magenta"), refresh_per_second=10, transient=True):
             yield
-    for name, level in previous.items():
-        logging.getLogger(name).setLevel(level)
+    else:
+        print(f"◐ {message}", end="\r")
+        yield
+        print(" " * 50, end="\r")
 
-
-def _is_port_open(host: str, port: int) -> bool:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(0.25)
-        return sock.connect_ex((host, port)) == 0
-
-
-def dashboard_url() -> str:
-    return f"http://127.0.0.1:{DASHBOARD_PORT}"
-
-
-def ensure_dashboard_running() -> None:
-    if not ENABLE_DASHBOARD:
-        return
-    if _is_port_open("127.0.0.1", DASHBOARD_PORT):
-        return
-    subprocess.Popen(
-        ["python3", str(DASHBOARD_SCRIPT), "--port", str(DASHBOARD_PORT)],
-        cwd=str(ROOT),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
-    )
-    for _ in range(20):
-        if _is_port_open("127.0.0.1", DASHBOARD_PORT):
-            return
-        time.sleep(0.1)
-
-
-def open_dashboard() -> None:
-    if not ENABLE_DASHBOARD:
-        return
-    ensure_dashboard_running()
-    try:
-        webbrowser.open(dashboard_url())
-    except Exception:
-        pass
-
-
-def write_dashboard_state(state: EvolutionState) -> None:
-    DASHBOARD_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with state.lock:
-        payload = {
-            "cycles": state.cycles,
-            "last_started_at": state.last_started_at,
-            "last_finished_at": state.last_finished_at,
-            "last_success": state.last_success,
-            "last_error": state.last_error,
-        }
-    DASHBOARD_STATE_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-def main() -> int:
-    render_startup_banner()
-    print("Evolução em segundo plano: ATIVA.")
-    print("Digite /help para ver os comandos.")
-
+def main():
+    render_banner()
     router = AtenaLLMRouter()
-    # Mantém o terminal limpo no modo assistant.
-    logging.getLogger("AtenaUltraBrain").setLevel(logging.ERROR)
-    logging.getLogger("httpx").setLevel(logging.ERROR)
-    logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
-    logging.getLogger("transformers").setLevel(logging.ERROR)
-    local_ready = False
-    last_prompt: Optional[str] = None
-    last_response: Optional[str] = None
-    history: list[dict] = []
-    claude_mode = False
+    
+    # Silenciar logs barulhentos
+    for logger_name in ["AtenaUltraBrain", "httpx", "huggingface_hub", "transformers"]:
+        logging.getLogger(logger_name).setLevel(logging.ERROR)
 
-    def warmup_llm(show_spinner: bool = True):
-        nonlocal local_ready
-        if local_ready:
-            return
-        if router.cfg.provider == "local":
-            spinner = build_spinner("warmup") if show_spinner else None
-            if spinner:
-                spinner.start()
-            try:
-                with suppress_noisy_runtime():
-                    ok, prep_msg = router.prepare_free_local_model()
-                if not ok:
-                    print(f"\n⚠️ {prep_msg}")
-                else:
-                    print(f"\n✅ {prep_msg}")
-                # força lazy init local
-                with suppress_noisy_runtime():
-                    router.generate("teste rápido", context="warmup")
-            finally:
-                if spinner:
-                    spinner.stop("pronto")
-            local_ready = True
-    state = EvolutionState()
-    if ENABLE_DASHBOARD:
-        write_dashboard_state(state)
-        ensure_dashboard_running()
-    interval_seconds = 600
-    worker = threading.Thread(target=evolution_worker, args=(state, interval_seconds), daemon=True)
-    worker.start()
-
-    try:
-        while True:
-            raw = input("\n" + prompt_label(router.current())).strip()
-            if not raw:
+    while True:
+        try:
+            prompt = get_prompt_label(router.current())
+            if HAS_RICH:
+                CONSOLE.print(prompt, end="")
+                user_input = input().strip()
+            else:
+                user_input = input(prompt).strip()
+            
+            if not user_input:
                 continue
-            if raw in {"/exit", ":q", "exit", "quit"}:
+            
+            if user_input in ["/exit", "exit", "quit"]:
+                CONSOLE.print("[bold red]Encerrando ATENA... Até logo![/bold red]")
                 break
-            if raw in {"/help", "?"}:
+            
+            if user_input == "/help":
                 print_help()
                 continue
-            if raw == "/quickstart":
-                print_quickstart()
+            
+            if user_input == "/clear":
+                os.system("clear")
                 continue
-            if raw.startswith("/claude-mode"):
-                arg = raw[len("/claude-mode"):].strip().lower()
-                if arg in {"", "status"}:
-                    print(f"Claude mode: {'ON' if claude_mode else 'OFF'}")
-                    continue
-                if arg == "on":
-                    claude_mode = True
-                    print("✅ Claude mode ativado.")
-                    continue
-                if arg == "off":
-                    claude_mode = False
-                    print("✅ Claude mode desativado.")
-                    continue
-                print("Uso: /claude-mode [on|off|status]")
-                continue
-            if raw == "/clear":
-                clear_screen()
-                continue
-            if raw == "/context":
-                print(f"cwd={ROOT}")
-                print(f"branch={git_branch()}")
-                print(f"model={router.current()}")
-                print(f"dashboard={'ON' if ENABLE_DASHBOARD else 'OFF'}")
-                continue
-            if raw == "/status":
-                with state.lock:
-                    print(
-                        f"cycles={state.cycles} | last_success={state.last_success} | "
-                        f"last_started_at={state.last_started_at} | last_finished_at={state.last_finished_at}"
-                    )
-                    if state.last_error:
-                        print(f"last_error={state.last_error}")
-                continue
-            if raw == "/evolve":
-                if ENABLE_DASHBOARD:
-                    open_dashboard()
-                state.wake_event.set()
-                print("✅ Ciclo de evolução solicitado em background.")
-                continue
-            if raw == "/dashboard":
-                if not ENABLE_DASHBOARD:
-                    print("⚠️ Dashboard local está OFF. Para habilitar: export ATENA_DASHBOARD_ENABLED=1")
-                    continue
-                open_dashboard()
-                print(f"✅ Dashboard local: {dashboard_url()}")
-                continue
-            if raw == "/model":
-                print(f"Modelo atual: {router.current()}")
-                continue
-            if raw == "/model list":
-                print("Opções de modelo/provider:")
-                for opt in router.list_options():
-                    print(f"- {opt}")
-                continue
-            if raw.startswith("/model set "):
-                spec = raw[len("/model set ") :].strip()
-                ok, msg = router.set_backend(spec)
-                print(("✅ " if ok else "❌ ") + msg)
-                local_ready = False
-                continue
-            if raw.startswith("/feedback "):
-                score_txt = raw[len("/feedback ") :].strip()
-                if not score_txt:
-                    print("Informe uma nota entre 0 e 1. Ex: /feedback 0.9")
-                    continue
-                try:
-                    score = float(score_txt)
-                except ValueError:
-                    print("Nota inválida. Use um número entre 0 e 1.")
-                    continue
-                if score < 0 or score > 1:
-                    print("Nota fora do intervalo. Use entre 0 e 1.")
-                    continue
-                if not last_prompt or not last_response:
-                    print("Não há resposta anterior para aprender ainda.")
-                    continue
-                router.learn_from_feedback(
-                    prompt=last_prompt,
-                    response=last_response,
-                    success=score >= 0.6,
-                    score=score,
-                )
-                print(f"🧠 Feedback aplicado (score={score:.2f}) na memória da ATENA-Like.")
-                continue
-            if raw.startswith("/history"):
-                parts = raw.split()
-                limit = 8
-                if len(parts) > 1:
-                    try:
-                        limit = max(1, min(50, int(parts[1])))
-                    except ValueError:
-                        print("Uso: /history [n]")
-                        continue
-                if not history:
-                    print("Sem histórico de interação ainda.")
-                    continue
-                print(f"Últimas {min(limit, len(history))} interações:")
-                for item in history[-limit:]:
-                    print(f"- {item['at']} | prompt={item['prompt'][:80]!r} | resposta_chars={item['response_chars']}")
-                continue
-            if raw.startswith("/save "):
-                target = raw[len("/save ") :].strip()
-                if not target:
-                    print("Uso: /save <arquivo>")
-                    continue
-                if not last_response:
-                    print("Não há resposta para salvar ainda.")
-                    continue
-                path = (ROOT / target).resolve() if not os.path.isabs(target) else Path(target)
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(last_response, encoding="utf-8")
-                print(f"✅ Resposta salva em: {path}")
-                continue
-            if raw == "/git":
-                try:
-                    st = subprocess.run(
-                        ["git", "status", "--short"],
-                        cwd=str(ROOT),
-                        capture_output=True,
-                        text=True,
-                        timeout=20,
-                    )
-                    print(st.stdout.strip() or "working tree limpa ✅")
-                except Exception as exc:  # noqa: BLE001
-                    print(f"Falha ao consultar git: {exc}")
-                continue
-            if raw == "/review":
-                try:
-                    st = subprocess.run(
-                        ["git", "status", "--short"],
-                        cwd=str(ROOT),
-                        capture_output=True,
-                        text=True,
-                        timeout=20,
-                    )
-                    ds = subprocess.run(
-                        ["git", "diff", "--stat"],
-                        cwd=str(ROOT),
-                        capture_output=True,
-                        text=True,
-                        timeout=20,
-                    )
-                    print("== git status --short ==")
-                    print(st.stdout.strip() or "working tree limpa ✅")
-                    print("\n== git diff --stat ==")
-                    print(ds.stdout.strip() or "sem diff")
-                except Exception as exc:  # noqa: BLE001
-                    print(f"Falha ao revisar mudanças: {exc}")
-                continue
-            if raw.startswith("/commit "):
-                message = raw[len("/commit ") :].strip()
-                if not message:
-                    print("Uso: /commit <mensagem>")
-                    continue
-                try:
-                    proc = subprocess.run(
-                        ["git", "commit", "-m", message],
-                        cwd=str(ROOT),
-                        capture_output=True,
-                        text=True,
-                        timeout=40,
-                    )
-                    if proc.returncode == 0:
-                        print(proc.stdout.strip() or "✅ Commit criado.")
-                    else:
-                        print(proc.stdout.strip())
-                        print(proc.stderr.strip() or "❌ Falha ao criar commit.")
-                except Exception as exc:  # noqa: BLE001
-                    print(f"Falha no commit: {exc}")
-                continue
-            if raw == "/tools":
-                print("Ferramentas no assistant:")
-                print("- /help | ? | /quickstart")
-                print("- /claude-mode [on|off|status]")
-                print("- /model list | /model set <provider:model>")
-                print("- /new <objetivo> | /plan <objetivo>")
-                print("- /task | /plan | /history | /save")
-                print("- /git | /review | /commit <mensagem>")
-                print("- /run <cmd> | /shell <cmd>")
-                print("- /evolve | /status | /dashboard")
-                continue
-            if raw == "/init-context":
-                path = ROOT / "docs" / "SESSION_CONTEXT.md"
-                path.parent.mkdir(parents=True, exist_ok=True)
-                if not path.exists():
-                    path.write_text(
-                        "# Session Context\\n\\n## Objetivo\\n-\\n\\n## Restrições\\n-\\n\\n## Próximos passos\\n-\\n",
-                        encoding="utf-8",
-                    )
-                print(f"✅ Template de contexto disponível em: {path}")
-                continue
-            if raw.startswith("/task "):
-                task = raw[len("/task ") :].strip()
-                if not task:
-                    print("Informe uma instrução após /task.")
-                    continue
-                spinner = build_spinner("task")
-                spinner.start()
-                try:
-                    effective_task = build_claude_mode_prompt(task) if claude_mode else task
-                    if router.cfg.provider == "local":
-                        warmup_llm(show_spinner=False)
-                    with suppress_noisy_runtime():
-                        answer = router.generate(
-                            effective_task,
-                            context="Modo assistant no terminal (claude-mode)" if claude_mode else "Modo assistant no terminal",
-                        )
-                finally:
-                    spinner.stop("resposta gerada")
-                router.learn_from_feedback(
-                    prompt=task,
-                    response=answer,
-                    success=True,
-                    score=0.75,
-                )
-                history.append(
-                    {
-                        "at": datetime.now().isoformat(timespec="seconds"),
-                        "prompt": task,
-                        "response_chars": len(answer),
-                    }
-                )
-                last_prompt = task
-                last_response = answer
-                print_assistant_output(answer)
-                continue
-            if raw.startswith("/plan "):
-                goal = raw[len("/plan ") :].strip()
-                if not goal:
-                    print("Informe um objetivo após /plan.")
-                    continue
-                planner_prompt = (
-                    "Crie um plano técnico enxuto com: Objetivo, Premissas, "
-                    "Etapas numeradas, Riscos, Critérios de pronto e Próximo comando."
-                    f"\nObjetivo: {goal}"
-                )
-                if claude_mode:
-                    planner_prompt = build_claude_mode_prompt(
-                        f"Criar plano de execução para: {goal}"
-                    )
-                spinner = build_spinner("plan")
-                spinner.start()
-                try:
-                    if router.cfg.provider == "local":
-                        warmup_llm(show_spinner=False)
-                    with suppress_noisy_runtime():
-                        answer = router.generate(planner_prompt, context="Modo planejamento estruturado")
-                finally:
-                    spinner.stop("plano gerado")
-                history.append(
-                    {
-                        "at": datetime.now().isoformat(timespec="seconds"),
-                        "prompt": f"/plan {goal}",
-                        "response_chars": len(answer),
-                    }
-                )
-                last_prompt = planner_prompt
-                last_response = answer
-                print_assistant_output(answer)
-                continue
-            if raw.startswith("/new "):
-                goal = raw[len("/new ") :].strip()
-                if not goal:
-                    print("Uso: /new <objetivo>")
-                    continue
-                brief_prompt = (
-                    "Crie um brief técnico curto e acionável com os tópicos: "
-                    "Objetivo, Escopo, Entregáveis, Riscos, Checklist de Validação e "
-                    "Comandos imediatos para execução no terminal."
-                    f"\nObjetivo: {goal}"
-                )
-                spinner = build_spinner("brief")
-                spinner.start()
-                try:
-                    if router.cfg.provider == "local":
-                        warmup_llm(show_spinner=False)
-                    with suppress_noisy_runtime():
-                        answer = router.generate(brief_prompt, context="Modo quickstart /new")
-                finally:
-                    spinner.stop("brief gerado")
-                if "Processando tarefa:" in answer and "heurística cognitiva" in answer:
-                    answer = build_local_brief(goal)
-                history.append(
-                    {
-                        "at": datetime.now().isoformat(timespec="seconds"),
-                        "prompt": f"/new {goal}",
-                        "response_chars": len(answer),
-                    }
-                )
-                last_prompt = brief_prompt
-                last_response = answer
-                print_assistant_output(answer)
-                continue
-            if raw.startswith("/run "):
-                cmd = raw[len("/run ") :].strip()
-                if not cmd:
-                    print("Informe um comando após /run.")
-                    continue
-                try:
-                    completed = subprocess.run(
-                        shlex.split(cmd),
-                        cwd=str(ROOT),
-                        capture_output=True,
-                        text=True,
-                        timeout=120,
-                    )
-                    print(completed.stdout[:3000])
-                    if completed.returncode != 0:
-                        print(completed.stderr[:1500])
-                except Exception as exc:  # noqa: BLE001
-                    print(f"Falha ao executar comando: {exc}")
-                continue
-            if raw.startswith("/shell "):
-                raw = "/run " + raw[len("/shell ") :].strip()
-                # cai no fluxo padrão de /run
-                cmd = raw[len("/run ") :].strip()
-                if not cmd:
-                    print("Informe um comando após /shell.")
-                    continue
-                try:
-                    completed = subprocess.run(
-                        shlex.split(cmd),
-                        cwd=str(ROOT),
-                        capture_output=True,
-                        text=True,
-                        timeout=120,
-                    )
-                    print(completed.stdout[:3000])
-                    if completed.returncode != 0:
-                        print(completed.stderr[:1500])
-                except Exception as exc:  # noqa: BLE001
-                    print(f"Falha ao executar comando: {exc}")
+            
+            if user_input == "/context":
+                if HAS_RICH:
+                    CONSOLE.print(Panel(
+                        f"CWD: [cyan]{ROOT}[/cyan]\nBranch: [magenta]{git_branch()}[/magenta]\nModelo: [green]{router.current()}[/green]",
+                        title="Contexto Atual", border_style="blue"
+                    ))
                 continue
 
-            spinner = build_spinner("chat")
-            spinner.start()
-            try:
-                if router.cfg.provider == "local":
-                    warmup_llm(show_spinner=False)
-                with suppress_noisy_runtime():
-                    answer = router.generate(raw, context="Conversa livre no terminal")
-            except Exception as e:
-                answer = f"Erro interno na geração: {e}"
-            finally:
-                spinner.stop("resposta gerada")
-                sys.stdout.flush()
-            router.learn_from_feedback(
-                prompt=raw,
-                response=answer,
-                success=True,
-                score=0.7,
-            )
-            history.append(
-                {
-                    "at": datetime.now().isoformat(timespec="seconds"),
-                    "prompt": raw,
-                    "response_chars": len(answer),
-                }
-            )
-            last_prompt = raw
-            last_response = answer
-            print_assistant_output(answer)
-    except (EOFError, KeyboardInterrupt):
-        print("\nEncerrando ATENA Ω Assistant...")
-    finally:
-        state.running = False
-        state.wake_event.set()
-        worker.join(timeout=2)
+            if user_input.startswith("/run "):
+                cmd = user_input[5:].strip()
+                CONSOLE.print(f"[dim]Executando: {cmd}[/dim]")
+                os.system(cmd)
+                continue
 
-    return 0
+            # Processamento de Tarefas (Task)
+            if user_input.startswith("/task "):
+                task_msg = user_input[6:].strip()
+                with atena_thinking("Processando tarefa..."):
+                    answer = router.generate(task_msg, context="Claude Code Style Assistant")
+                
+                if HAS_RICH:
+                    CONSOLE.print(Panel(Markdown(answer), title="[bold cyan]ATENA[/bold cyan]", border_style="cyan"))
+                else:
+                    print(f"\nATENA:\n{answer}\n")
+                continue
 
+            # Comando padrão (se não começar com / assume-se /task)
+            if not user_input.startswith("/"):
+                with atena_thinking("Analisando..."):
+                    answer = router.generate(user_input, context="Claude Code Style Assistant")
+                if HAS_RICH:
+                    CONSOLE.print(Panel(Markdown(answer), title="[bold cyan]ATENA[/bold cyan]", border_style="cyan"))
+                else:
+                    print(f"\nATENA:\n{answer}\n")
+                continue
+
+            CONSOLE.print(f"[yellow]Comando desconhecido: {user_input}. Digite /help para ajuda.[/yellow]")
+
+        except KeyboardInterrupt:
+            CONSOLE.print("\n[yellow]Interrompido pelo usuário. Digite /exit para sair.[/yellow]")
+        except Exception as e:
+            CONSOLE.print(f"[bold red]Erro:[/bold red] {str(e)}")
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(main())

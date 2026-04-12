@@ -110,6 +110,7 @@ def print_help():
             ("/task <msg>", "Executa uma tarefa ou responde uma pergunta"),
             ("/task-exec <objetivo>", "Planeja e executa comandos seguros com relatório"),
             ("/self-test [quick]", "Executa validações automáticas da ATENA e gera relatório"),
+            ("/release-governor", "Executa gates security/release/perf e decide GO/NO-GO"),
             ("/saas-bootstrap <nome>", "Gera stack SaaS web/api/cli + artefatos"),
             ("/telemetry-insights", "Resumo de falhas/sucessos por missão"),
             ("/policy", "Mostra política de segurança para execução"),
@@ -128,7 +129,7 @@ def print_help():
         
         CONSOLE.print(Panel(table, title="[bold cyan]Comandos Disponíveis[/bold cyan]", border_style="cyan"))
     else:
-        print("\nComandos: /task, /task-exec, /self-test, /saas-bootstrap, /telemetry-insights, /policy, /plan, /review, /commit, /run, /context, /model, /clear, /exit\n")
+        print("\nComandos: /task, /task-exec, /self-test, /release-governor, /saas-bootstrap, /telemetry-insights, /policy, /plan, /review, /commit, /run, /context, /model, /clear, /exit\n")
 
 
 def run_self_test(mode: str = "full") -> tuple[str, str]:
@@ -193,6 +194,7 @@ def run_self_test(mode: str = "full") -> tuple[str, str]:
         "results": results,
     }
     report_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    append_learning_memory({"event": "self_test", "mode": mode, "status": status, "report_path": str(report_path)})
     return status, str(report_path)
 
 
@@ -226,8 +228,22 @@ DENY_PATTERNS = (
     r"git\s+push",
 )
 
+READ_ONLY_PREFIXES = ("ls", "cat", "echo", "pwd", "whoami", "date", "uname", "git status", "git diff")
+SLO_TARGETS = {
+    "max_fail_rate": 0.20,
+    "min_success_rate": 0.80,
+}
 
-def validate_command_policy(command: str) -> tuple[bool, str]:
+
+def append_learning_memory(entry: dict[str, object]) -> None:
+    memory_path = ROOT / "atena_evolution" / "assistant_learning_memory.jsonl"
+    memory_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"timestamp": datetime.now(timezone.utc).isoformat(), **entry}
+    with memory_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+
+def validate_command_policy(command: str, context: str = "interactive") -> tuple[bool, str]:
     cmd = command.strip()
     if not cmd:
         return False, "comando vazio"
@@ -236,11 +252,14 @@ def validate_command_policy(command: str) -> tuple[bool, str]:
             return False, f"bloqueado por política: {pattern}"
     if not cmd.startswith(ALLOWED_PREFIXES):
         return False, "comando fora da allowlist"
+    current_branch = git_branch()
+    if current_branch == "main" and context in {"run", "task-exec"} and not cmd.startswith(READ_ONLY_PREFIXES):
+        return False, "em branch main apenas comandos read-only são permitidos neste contexto"
     return True, "ok"
 
 
-def run_safe_command(command: str, timeout: int = 120) -> tuple[int, str, str]:
-    allowed, reason = validate_command_policy(command)
+def run_safe_command(command: str, timeout: int = 120, context: str = "interactive") -> tuple[int, str, str]:
+    allowed, reason = validate_command_policy(command, context=context)
     if not allowed:
         return 126, "", reason
     proc = subprocess.run(
@@ -267,6 +286,21 @@ def extract_commands_from_plan(plan_text: str) -> list[str]:
     return unique[:5]
 
 
+def rollback_from_command(command: str) -> str:
+    match = re.search(r"--name\s+([a-zA-Z0-9_-]+)", command)
+    if "code-build" in command and match:
+        target = ROOT / "atena_evolution" / "generated_apps" / match.group(1)
+        if target.exists():
+            for path in sorted(target.rglob("*"), reverse=True):
+                if path.is_file():
+                    path.unlink(missing_ok=True)
+                elif path.is_dir():
+                    path.rmdir()
+            target.rmdir()
+            return f"rollback aplicado: removido {target}"
+    return "rollback não necessário"
+
+
 def run_task_exec(router: AtenaLLMRouter, objective: str) -> tuple[str, str]:
     planner_prompt = (
         "Retorne no máximo 5 comandos shell seguros para executar o objetivo. "
@@ -277,8 +311,9 @@ def run_task_exec(router: AtenaLLMRouter, objective: str) -> tuple[str, str]:
     plan_text = router.generate(planner_prompt, context="Atena task executor")
     commands = extract_commands_from_plan(plan_text) or ["./atena doctor", "./atena modules-smoke"]
     results: list[dict[str, object]] = []
+    rollback_logs: list[str] = []
     for command in commands:
-        rc, out, err = run_safe_command(command, timeout=180)
+        rc, out, err = run_safe_command(command, timeout=180, context="task-exec")
         results.append(
             {
                 "command": command,
@@ -288,6 +323,9 @@ def run_task_exec(router: AtenaLLMRouter, objective: str) -> tuple[str, str]:
                 "stderr_tail": err[-1200:],
             }
         )
+        if rc != 0:
+            rollback_logs.append(rollback_from_command(command))
+            break
     status = "ok" if all(item["ok"] for item in results) else "failed"
     report_dir = ROOT / "atena_evolution" / "task_exec_reports"
     report_dir.mkdir(parents=True, exist_ok=True)
@@ -300,12 +338,22 @@ def run_task_exec(router: AtenaLLMRouter, objective: str) -> tuple[str, str]:
                 "plan_text": plan_text,
                 "commands": commands,
                 "results": results,
+                "rollback_logs": rollback_logs,
                 "generated_at": datetime.now(timezone.utc).isoformat(),
             },
             ensure_ascii=False,
             indent=2,
         ),
         encoding="utf-8",
+    )
+    append_learning_memory(
+        {
+            "event": "task_exec",
+            "status": status,
+            "objective": objective,
+            "commands": commands,
+            "report_path": str(report_path),
+        }
     )
     return status, str(report_path)
 
@@ -319,7 +367,7 @@ def run_saas_bootstrap(project_name: str) -> tuple[str, str]:
     ]
     results = []
     for command in commands:
-        rc, out, err = run_safe_command(command, timeout=240)
+        rc, out, err = run_safe_command(command, timeout=240, context="saas-bootstrap")
         results.append({"command": command, "returncode": rc, "ok": rc == 0, "stdout_tail": out[-1800:], "stderr_tail": err[-800:]})
 
     bundle_dir = ROOT / "atena_evolution" / "generated_apps" / f"{safe_name}_bundle"
@@ -332,9 +380,22 @@ def run_saas_bootstrap(project_name: str) -> tuple[str, str]:
         "name: atena-saas-ci\non: [push]\njobs:\n  smoke:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: ./atena doctor\n      - run: ./atena modules-smoke\n",
         encoding="utf-8",
     )
+    (bundle_dir / ".env.example").write_text(
+        "APP_ENV=production\nJWT_SECRET=change_me\nDATABASE_URL=postgresql://user:pass@localhost:5432/app\n",
+        encoding="utf-8",
+    )
+    (bundle_dir / "migration.sql").write_text(
+        "CREATE TABLE IF NOT EXISTS users (\n  id SERIAL PRIMARY KEY,\n  email TEXT UNIQUE NOT NULL,\n  password_hash TEXT NOT NULL,\n  created_at TIMESTAMP DEFAULT NOW()\n);\n",
+        encoding="utf-8",
+    )
+    (bundle_dir / "smoke_test.py").write_text(
+        "def test_smoke():\n    assert True\n",
+        encoding="utf-8",
+    )
     status = "ok" if all(item["ok"] for item in results) else "failed"
     report_path = bundle_dir / "bootstrap_report.json"
     report_path.write_text(json.dumps({"status": status, "project": safe_name, "results": results}, ensure_ascii=False, indent=2), encoding="utf-8")
+    append_learning_memory({"event": "saas_bootstrap", "status": status, "project": safe_name, "report_path": str(report_path)})
     return status, str(report_path)
 
 
@@ -363,9 +424,38 @@ def telemetry_insights() -> str:
             missions[mission]["fail"] += 1
             fail += 1
     top = sorted(missions.items(), key=lambda x: x[1]["fail"], reverse=True)[:3]
-    lines = [f"Eventos totais: {total}", f"Falhas totais: {fail}", "Top missões por falha:"]
+    fail_rate = (fail / total) if total else 0.0
+    success_rate = 1.0 - fail_rate
+    slo_ok = fail_rate <= SLO_TARGETS["max_fail_rate"] and success_rate >= SLO_TARGETS["min_success_rate"]
+    lines = [
+        f"Eventos totais: {total}",
+        f"Falhas totais: {fail}",
+        f"Fail rate: {fail_rate:.2%}",
+        f"Success rate: {success_rate:.2%}",
+        f"SLO status: {'OK' if slo_ok else 'ALERTA'}",
+        "Top missões por falha:",
+    ]
     lines.extend([f"- {name}: fail={stats['fail']} ok={stats['ok']}" for name, stats in top])
+    append_learning_memory({"event": "telemetry_insights", "status": "ok" if slo_ok else "alert", "fail_rate": fail_rate, "success_rate": success_rate})
     return "\n".join(lines)
+
+
+def run_release_governor() -> tuple[str, str]:
+    sequence = ["security", "release", "perf"]
+    details = []
+    for mode in sequence:
+        status, report_path = run_self_test(mode=mode)
+        details.append({"mode": mode, "status": status, "report_path": report_path})
+    final_status = "go" if all(item["status"] == "ok" for item in details) else "no-go"
+    governor_dir = ROOT / "atena_evolution" / "release_governor"
+    governor_dir.mkdir(parents=True, exist_ok=True)
+    out_path = governor_dir / f"release_governor_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
+    out_path.write_text(
+        json.dumps({"status": final_status, "checks": details, "generated_at": datetime.now(timezone.utc).isoformat()}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    append_learning_memory({"event": "release_governor", "status": final_status, "report_path": str(out_path)})
+    return final_status, str(out_path)
 
 @contextmanager
 def atena_thinking(message: str = "Pensando..."):
@@ -427,6 +517,14 @@ def main():
                 CONSOLE.print(f"[dim]Relatório: {report_path}[/dim]")
                 continue
 
+            if user_input == "/release-governor":
+                with atena_thinking("Executando Release Governor..."):
+                    status, report_path = run_release_governor()
+                color = "green" if status == "go" else "red"
+                CONSOLE.print(f"[bold {color}]Release Governor: {status.upper()}[/bold {color}]")
+                CONSOLE.print(f"[dim]Relatório: {report_path}[/dim]")
+                continue
+
             if user_input == "/policy":
                 CONSOLE.print("[bold cyan]Policy Engine[/bold cyan]")
                 CONSOLE.print(f"Allowlist: {', '.join(ALLOWED_PREFIXES)}")
@@ -436,7 +534,7 @@ def main():
             if user_input.startswith("/run "):
                 cmd = user_input[5:].strip()
                 CONSOLE.print(f"[dim]Executando: {cmd}[/dim]")
-                rc, out, err = run_safe_command(cmd)
+                rc, out, err = run_safe_command(cmd, context="run")
                 if out:
                     CONSOLE.print(out.rstrip())
                 if err:

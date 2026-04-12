@@ -116,6 +116,7 @@ def print_help():
             ("/orchestrate <objetivo>", "Executa orquestração multiagente por papéis"),
             ("/memory-suggest <objetivo>", "Sugere ação com base em memória histórica"),
             ("/benchmark", "Roda benchmark contínuo e atualiza leaderboard"),
+            ("/device-control <pedido> [--confirm]", "Controla dispositivo local com permissões seguras"),
             ("/policy", "Mostra política de segurança para execução"),
             ("/plan <objetivo>", "Gera um plano de execução detalhado"),
             ("/review", "Revisa as mudanças atuais no código (git diff)"),
@@ -132,7 +133,7 @@ def print_help():
         
         CONSOLE.print(Panel(table, title="[bold cyan]Comandos Disponíveis[/bold cyan]", border_style="cyan"))
     else:
-        print("\nComandos: /task, /task-exec, /self-test, /release-governor, /saas-bootstrap, /telemetry-insights, /orchestrate, /memory-suggest, /benchmark, /policy, /plan, /review, /commit, /run, /context, /model, /clear, /exit\n")
+        print("\nComandos: /task, /task-exec, /self-test, /release-governor, /saas-bootstrap, /telemetry-insights, /orchestrate, /memory-suggest, /benchmark, /device-control, /policy, /plan, /review, /commit, /run, /context, /model, /clear, /exit\n")
 
 
 def run_self_test(mode: str = "full") -> tuple[str, str]:
@@ -572,6 +573,53 @@ def run_benchmark_suite() -> tuple[str, str]:
     append_learning_memory({"event": "benchmark", "status": "ok", "score": total, "report_path": str(out_path)})
     return ("ok" if total >= 80 else "alert"), str(out_path)
 
+
+def run_device_control(request: str, confirmed: bool) -> tuple[str, str]:
+    report_dir = ROOT / "atena_evolution" / "device_control"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_path = report_dir / f"device_control_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_%f')}.json"
+
+    if not confirmed:
+        payload = {
+            "status": "blocked",
+            "reason": "confirmation_required",
+            "request": request,
+            "allowed_actions": [
+                "abrir URL (http/https)",
+                "diagnóstico rápido do sistema",
+                "status básico do sistema",
+            ],
+        }
+        report_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        return "blocked", str(report_path)
+
+    req = request.strip().lower()
+    action = "unknown"
+    result: dict[str, object] = {"request": request}
+
+    url_match = re.search(r"(https?://[^\s]+)", request, flags=re.IGNORECASE)
+    if ("abrir" in req or "open" in req) and url_match:
+        action = "open_url"
+        url = url_match.group(1)
+        ok = webbrowser.open(url)
+        result.update({"action": action, "url": url, "ok": bool(ok)})
+    elif "diagnost" in req or "teste" in req:
+        action = "self_test_quick"
+        status, path = run_self_test(mode="quick")
+        result.update({"action": action, "status": status, "report": path})
+    elif "status" in req or "sistema" in req:
+        action = "system_status"
+        rc, out, err = run_safe_command("uname -a", context="device-control", tier="tier0")
+        result.update({"action": action, "returncode": rc, "stdout": out[-800:], "stderr": err[-400:]})
+    else:
+        result.update({"action": action, "status": "unsupported_request"})
+
+    final_status = "ok" if result.get("action") != "unknown" and result.get("status") != "unsupported_request" else "failed"
+    payload = {"status": final_status, **result}
+    report_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    append_learning_memory({"event": "device_control", "status": final_status, "action": action, "report_path": str(report_path)})
+    return final_status, str(report_path)
+
 @contextmanager
 def atena_thinking(message: str = "Pensando..."):
     if HAS_RICH:
@@ -667,6 +715,19 @@ def main():
                 color = "green" if status == "ok" else "yellow"
                 CONSOLE.print(f"[bold {color}]Benchmark: {status.upper()}[/bold {color}]")
                 CONSOLE.print(f"[dim]Leaderboard: {report_path}[/dim]")
+                continue
+
+            if user_input.startswith("/device-control "):
+                raw = user_input[len("/device-control "):].strip()
+                confirmed = raw.endswith("--confirm")
+                request = raw[:-9].strip() if confirmed else raw
+                with atena_thinking("Executando device control..."):
+                    status, report_path = run_device_control(request=request, confirmed=confirmed)
+                color = "green" if status == "ok" else ("yellow" if status == "blocked" else "red")
+                CONSOLE.print(f"[bold {color}]Device control: {status.upper()}[/bold {color}]")
+                CONSOLE.print(f"[dim]Relatório: {report_path}[/dim]")
+                if status == "blocked":
+                    CONSOLE.print("[yellow]Use --confirm para executar ações de controle de dispositivo.[/yellow]")
                 continue
 
             if user_input.startswith("/run "):

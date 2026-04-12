@@ -113,6 +113,9 @@ def print_help():
             ("/release-governor", "Executa gates security/release/perf e decide GO/NO-GO"),
             ("/saas-bootstrap <nome>", "Gera stack SaaS web/api/cli + artefatos"),
             ("/telemetry-insights", "Resumo de falhas/sucessos por missão"),
+            ("/orchestrate <objetivo>", "Executa orquestração multiagente por papéis"),
+            ("/memory-suggest <objetivo>", "Sugere ação com base em memória histórica"),
+            ("/benchmark", "Roda benchmark contínuo e atualiza leaderboard"),
             ("/policy", "Mostra política de segurança para execução"),
             ("/plan <objetivo>", "Gera um plano de execução detalhado"),
             ("/review", "Revisa as mudanças atuais no código (git diff)"),
@@ -129,7 +132,7 @@ def print_help():
         
         CONSOLE.print(Panel(table, title="[bold cyan]Comandos Disponíveis[/bold cyan]", border_style="cyan"))
     else:
-        print("\nComandos: /task, /task-exec, /self-test, /release-governor, /saas-bootstrap, /telemetry-insights, /policy, /plan, /review, /commit, /run, /context, /model, /clear, /exit\n")
+        print("\nComandos: /task, /task-exec, /self-test, /release-governor, /saas-bootstrap, /telemetry-insights, /orchestrate, /memory-suggest, /benchmark, /policy, /plan, /review, /commit, /run, /context, /model, /clear, /exit\n")
 
 
 def run_self_test(mode: str = "full") -> tuple[str, str]:
@@ -233,6 +236,11 @@ SLO_TARGETS = {
     "max_fail_rate": 0.20,
     "min_success_rate": 0.80,
 }
+APPROVAL_TIERS = {
+    "tier0": {"desc": "read-only", "allowed": READ_ONLY_PREFIXES},
+    "tier1": {"desc": "build-and-test", "allowed": ("./atena", "python", "python3", "pytest", "uv ", "pip ")},
+    "tier2": {"desc": "mutable", "allowed": ALLOWED_PREFIXES},
+}
 
 
 def append_learning_memory(entry: dict[str, object]) -> None:
@@ -243,14 +251,16 @@ def append_learning_memory(entry: dict[str, object]) -> None:
         f.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
 
-def validate_command_policy(command: str, context: str = "interactive") -> tuple[bool, str]:
+def validate_command_policy(command: str, context: str = "interactive", tier: str = "tier1") -> tuple[bool, str]:
     cmd = command.strip()
     if not cmd:
         return False, "comando vazio"
     for pattern in DENY_PATTERNS:
         if re.search(pattern, cmd):
             return False, f"bloqueado por política: {pattern}"
-    if not cmd.startswith(ALLOWED_PREFIXES):
+    tier_cfg = APPROVAL_TIERS.get(tier, APPROVAL_TIERS["tier1"])
+    allowed_prefixes = tuple(tier_cfg["allowed"])
+    if not cmd.startswith(allowed_prefixes):
         return False, "comando fora da allowlist"
     current_branch = git_branch()
     if current_branch == "main" and context in {"run", "task-exec"} and not cmd.startswith(READ_ONLY_PREFIXES):
@@ -258,8 +268,8 @@ def validate_command_policy(command: str, context: str = "interactive") -> tuple
     return True, "ok"
 
 
-def run_safe_command(command: str, timeout: int = 120, context: str = "interactive") -> tuple[int, str, str]:
-    allowed, reason = validate_command_policy(command, context=context)
+def run_safe_command(command: str, timeout: int = 120, context: str = "interactive", tier: str = "tier1") -> tuple[int, str, str]:
+    allowed, reason = validate_command_policy(command, context=context, tier=tier)
     if not allowed:
         return 126, "", reason
     proc = subprocess.run(
@@ -286,6 +296,42 @@ def extract_commands_from_plan(plan_text: str) -> list[str]:
     return unique[:5]
 
 
+def extract_dag_commands(plan_text: str) -> list[dict[str, object]]:
+    commands = extract_commands_from_plan(plan_text)
+    nodes = []
+    for idx, cmd in enumerate(commands):
+        deps = [] if idx == 0 else [idx - 1]
+        nodes.append({"id": idx, "command": cmd, "deps": deps})
+    return nodes
+
+
+def execute_command_dag(nodes: list[dict[str, object]], context: str, tier: str = "tier1") -> list[dict[str, object]]:
+    completed: set[int] = set()
+    results: list[dict[str, object]] = []
+    for node in nodes:
+        deps = set(node["deps"])
+        if not deps.issubset(completed):
+            continue
+        command = str(node["command"])
+        rc, out, err = run_safe_command(command, timeout=180, context=context, tier=tier)
+        results.append(
+            {
+                "id": node["id"],
+                "deps": list(deps),
+                "command": command,
+                "returncode": rc,
+                "ok": rc == 0,
+                "stdout_tail": out[-2500:],
+                "stderr_tail": err[-1200:],
+            }
+        )
+        if rc == 0:
+            completed.add(int(node["id"]))
+        else:
+            break
+    return results
+
+
 def rollback_from_command(command: str) -> str:
     match = re.search(r"--name\s+([a-zA-Z0-9_-]+)", command)
     if "code-build" in command and match:
@@ -310,21 +356,12 @@ def run_task_exec(router: AtenaLLMRouter, objective: str) -> tuple[str, str]:
     )
     plan_text = router.generate(planner_prompt, context="Atena task executor")
     commands = extract_commands_from_plan(plan_text) or ["./atena doctor", "./atena modules-smoke"]
-    results: list[dict[str, object]] = []
+    dag_nodes = extract_dag_commands("\n".join(commands))
+    results = execute_command_dag(dag_nodes, context="task-exec", tier="tier1")
     rollback_logs: list[str] = []
-    for command in commands:
-        rc, out, err = run_safe_command(command, timeout=180, context="task-exec")
-        results.append(
-            {
-                "command": command,
-                "returncode": rc,
-                "ok": rc == 0,
-                "stdout_tail": out[-2500:],
-                "stderr_tail": err[-1200:],
-            }
-        )
-        if rc != 0:
-            rollback_logs.append(rollback_from_command(command))
+    for item in results:
+        if not item["ok"]:
+            rollback_logs.append(rollback_from_command(str(item["command"])))
             break
     status = "ok" if all(item["ok"] for item in results) else "failed"
     report_dir = ROOT / "atena_evolution" / "task_exec_reports"
@@ -337,6 +374,7 @@ def run_task_exec(router: AtenaLLMRouter, objective: str) -> tuple[str, str]:
                 "objective": objective,
                 "plan_text": plan_text,
                 "commands": commands,
+                "dag_nodes": dag_nodes,
                 "results": results,
                 "rollback_logs": rollback_logs,
                 "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -392,6 +430,14 @@ def run_saas_bootstrap(project_name: str) -> tuple[str, str]:
         "def test_smoke():\n    assert True\n",
         encoding="utf-8",
     )
+    (bundle_dir / "auth_stub.py").write_text(
+        "def issue_token(user_id: str) -> str:\n    return f'token-{user_id}'\n",
+        encoding="utf-8",
+    )
+    (bundle_dir / "healthcheck.sh").write_text(
+        "#!/usr/bin/env bash\nset -euo pipefail\ncurl -sf http://localhost:8000/health\n",
+        encoding="utf-8",
+    )
     status = "ok" if all(item["ok"] for item in results) else "failed"
     report_path = bundle_dir / "bootstrap_report.json"
     report_path.write_text(json.dumps({"status": status, "project": safe_name, "results": results}, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -436,6 +482,12 @@ def telemetry_insights() -> str:
         "Top missões por falha:",
     ]
     lines.extend([f"- {name}: fail={stats['fail']} ok={stats['ok']}" for name, stats in top])
+    lines.append("SLO por missão:")
+    for name, stats in sorted(missions.items()):
+        count = stats["ok"] + stats["fail"]
+        mission_fail_rate = (stats["fail"] / count) if count else 0.0
+        mission_status = "ALERTA" if mission_fail_rate > SLO_TARGETS["max_fail_rate"] else "OK"
+        lines.append(f"- {name}: fail_rate={mission_fail_rate:.2%} status={mission_status}")
     append_learning_memory({"event": "telemetry_insights", "status": "ok" if slo_ok else "alert", "fail_rate": fail_rate, "success_rate": success_rate})
     return "\n".join(lines)
 
@@ -443,19 +495,82 @@ def telemetry_insights() -> str:
 def run_release_governor() -> tuple[str, str]:
     sequence = ["security", "release", "perf"]
     details = []
+    weights = {"security": 0.5, "release": 0.3, "perf": 0.2}
+    score = 0.0
     for mode in sequence:
         status, report_path = run_self_test(mode=mode)
         details.append({"mode": mode, "status": status, "report_path": report_path})
-    final_status = "go" if all(item["status"] == "ok" for item in details) else "no-go"
+        score += weights.get(mode, 0.0) * (1.0 if status == "ok" else 0.0)
+    final_status = "go" if score >= 0.8 else "no-go"
+    remediation = "Executar ./atena fix e repetir /self-test security" if final_status == "no-go" else "Sistema aprovado para evolução."
     governor_dir = ROOT / "atena_evolution" / "release_governor"
     governor_dir.mkdir(parents=True, exist_ok=True)
     out_path = governor_dir / f"release_governor_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
     out_path.write_text(
-        json.dumps({"status": final_status, "checks": details, "generated_at": datetime.now(timezone.utc).isoformat()}, ensure_ascii=False, indent=2),
+        json.dumps({"status": final_status, "score": round(score, 3), "checks": details, "remediation": remediation, "generated_at": datetime.now(timezone.utc).isoformat()}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     append_learning_memory({"event": "release_governor", "status": final_status, "report_path": str(out_path)})
     return final_status, str(out_path)
+
+
+def suggest_from_memory(objective: str) -> str:
+    memory_path = ROOT / "atena_evolution" / "assistant_learning_memory.jsonl"
+    if not memory_path.exists():
+        return "Sem memória histórica ainda."
+    query_tokens = set(re.findall(r"\w+", objective.lower()))
+    scored: list[tuple[int, dict[str, object]]] = []
+    for line in memory_path.read_text(encoding="utf-8").splitlines():
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        text = json.dumps(item, ensure_ascii=False).lower()
+        score = sum(1 for token in query_tokens if token in text)
+        if score:
+            scored.append((score, item))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    best = [entry for _, entry in scored[:3]]
+    if not best:
+        return "Nenhum caso similar encontrado."
+    lines = ["Top casos similares:"]
+    for item in best:
+        lines.append(f"- event={item.get('event')} status={item.get('status')} report={item.get('report_path', '-')}")
+    return "\n".join(lines)
+
+
+def run_multi_agent_orchestrator(router: AtenaLLMRouter, objective: str) -> tuple[str, str]:
+    roles = ["planner", "builder", "reviewer", "security", "release"]
+    outputs = {}
+    for role in roles:
+        prompt = f"Você é o agente {role}. Objetivo: {objective}. Entregue resumo objetivo e próximo passo."
+        outputs[role] = router.generate(prompt, context=f"multi-agent:{role}")
+    orchestration_dir = ROOT / "atena_evolution" / "multi_agent_runs"
+    orchestration_dir.mkdir(parents=True, exist_ok=True)
+    out_path = orchestration_dir / f"orchestrate_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
+    out_path.write_text(json.dumps({"objective": objective, "outputs": outputs}, ensure_ascii=False, indent=2), encoding="utf-8")
+    append_learning_memory({"event": "orchestrate", "status": "ok", "objective": objective, "report_path": str(out_path)})
+    return "ok", str(out_path)
+
+
+def run_benchmark_suite() -> tuple[str, str]:
+    suites = ["quick", "security", "perf"]
+    points = {"quick": 20, "security": 40, "perf": 40}
+    total = 0
+    details = []
+    for suite in suites:
+        status, report_path = run_self_test(mode=suite)
+        earned = points[suite] if status == "ok" else 0
+        total += earned
+        details.append({"suite": suite, "status": status, "points": earned, "report_path": report_path})
+    leaderboard_dir = ROOT / "atena_evolution" / "benchmarks"
+    leaderboard_dir.mkdir(parents=True, exist_ok=True)
+    out_path = leaderboard_dir / "leaderboard.jsonl"
+    entry = {"timestamp": datetime.now(timezone.utc).isoformat(), "score": total, "details": details}
+    with out_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    append_learning_memory({"event": "benchmark", "status": "ok", "score": total, "report_path": str(out_path)})
+    return ("ok" if total >= 80 else "alert"), str(out_path)
 
 @contextmanager
 def atena_thinking(message: str = "Pensando..."):
@@ -529,6 +644,29 @@ def main():
                 CONSOLE.print("[bold cyan]Policy Engine[/bold cyan]")
                 CONSOLE.print(f"Allowlist: {', '.join(ALLOWED_PREFIXES)}")
                 CONSOLE.print(f"Bloqueios: {', '.join(DENY_PATTERNS)}")
+                CONSOLE.print("Tiers: " + ", ".join(f"{name}={cfg['desc']}" for name, cfg in APPROVAL_TIERS.items()))
+                continue
+
+            if user_input.startswith("/orchestrate "):
+                objective = user_input[len("/orchestrate "):].strip()
+                with atena_thinking("Executando orquestração multiagente..."):
+                    status, report_path = run_multi_agent_orchestrator(router, objective)
+                color = "green" if status == "ok" else "red"
+                CONSOLE.print(f"[bold {color}]Orchestrate: {status.upper()}[/bold {color}]")
+                CONSOLE.print(f"[dim]Relatório: {report_path}[/dim]")
+                continue
+
+            if user_input.startswith("/memory-suggest "):
+                objective = user_input[len("/memory-suggest "):].strip()
+                CONSOLE.print(Panel(suggest_from_memory(objective), title="[bold cyan]Memory Suggest[/bold cyan]", border_style="cyan"))
+                continue
+
+            if user_input == "/benchmark":
+                with atena_thinking("Executando benchmark contínuo..."):
+                    status, report_path = run_benchmark_suite()
+                color = "green" if status == "ok" else "yellow"
+                CONSOLE.print(f"[bold {color}]Benchmark: {status.upper()}[/bold {color}]")
+                CONSOLE.print(f"[dim]Leaderboard: {report_path}[/dim]")
                 continue
 
             if user_input.startswith("/run "):

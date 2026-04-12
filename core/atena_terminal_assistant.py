@@ -154,7 +154,7 @@ def main():
             if not user_input:
                 continue
             
-            if user_input in ["/exit", "exit", "quit"]:
+            if user_input in ["/exit", "exit", "quit", "/quit", "/q", ":q", "/sair", "sair"]:
                 CONSOLE.print("[bold red]Encerrando ATENA... Até logo![/bold red]")
                 break
             
@@ -204,6 +204,12 @@ def main():
 
             CONSOLE.print(f"[yellow]Comando desconhecido: {user_input}. Digite /help para ajuda.[/yellow]")
 
+        except EOFError:
+            if HAS_RICH:
+                CONSOLE.print("\n[yellow]Entrada finalizada (EOF). Encerrando assistente.[/yellow]")
+            else:
+                print("\nEntrada finalizada (EOF). Encerrando assistente.")
+            break
         except KeyboardInterrupt:
             CONSOLE.print("\n[yellow]Interrompido pelo usuário. Digite /exit para sair.[/yellow]")
         except Exception as e:

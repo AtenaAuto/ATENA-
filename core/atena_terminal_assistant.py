@@ -107,6 +107,7 @@ def print_help():
         
         commands = [
             ("/task <msg>", "Executa uma tarefa ou responde uma pergunta"),
+            ("/self-test [quick]", "Executa validações automáticas da ATENA e gera relatório"),
             ("/plan <objetivo>", "Gera um plano de execução detalhado"),
             ("/review", "Revisa as mudanças atuais no código (git diff)"),
             ("/commit <msg>", "Realiza o commit das alterações atuais"),
@@ -122,7 +123,61 @@ def print_help():
         
         CONSOLE.print(Panel(table, title="[bold cyan]Comandos Disponíveis[/bold cyan]", border_style="cyan"))
     else:
-        print("\nComandos: /task, /plan, /review, /commit, /run, /context, /model, /clear, /exit\n")
+        print("\nComandos: /task, /self-test, /plan, /review, /commit, /run, /context, /model, /clear, /exit\n")
+
+
+def run_self_test(mode: str = "full") -> tuple[str, str]:
+    checks = [
+        ("doctor", ["./atena", "doctor"]),
+        ("modules-smoke", ["./atena", "modules-smoke"]),
+        ("go-no-go", ["./atena", "go-no-go"]),
+    ]
+    if mode == "quick":
+        checks = checks[:2]
+
+    report_dir = ROOT / "atena_evolution" / "assistant_self_tests"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_path = report_dir / f"assistant_self_test_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
+
+    results: list[dict[str, object]] = []
+    for name, cmd in checks:
+        started = datetime.now(timezone.utc).isoformat()
+        try:
+            proc = subprocess.run(
+                cmd,
+                cwd=str(ROOT),
+                capture_output=True,
+                text=True,
+                timeout=180 if name == "go-no-go" else 120,
+            )
+            rc = proc.returncode
+            stdout = (proc.stdout or "")[-4000:]
+            stderr = (proc.stderr or "")[-2000:]
+        except subprocess.TimeoutExpired as exc:
+            rc = 124
+            stdout = (exc.stdout or "")[-4000:] if exc.stdout else ""
+            stderr = f"timeout: {exc}"
+        results.append(
+            {
+                "name": name,
+                "command": " ".join(cmd),
+                "started_at": started,
+                "returncode": rc,
+                "ok": rc == 0,
+                "stdout_tail": stdout,
+                "stderr_tail": stderr,
+            }
+        )
+
+    status = "ok" if all(item["ok"] for item in results) else "failed"
+    payload = {
+        "status": status,
+        "mode": mode,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "results": results,
+    }
+    report_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return status, str(report_path)
 
 @contextmanager
 def atena_thinking(message: str = "Pensando..."):
@@ -172,6 +227,15 @@ def main():
                         f"CWD: [cyan]{ROOT}[/cyan]\nBranch: [magenta]{git_branch()}[/magenta]\nModelo: [green]{router.current()}[/green]",
                         title="Contexto Atual", border_style="blue"
                     ))
+                continue
+
+            if user_input.startswith("/self-test"):
+                mode = "quick" if "quick" in user_input.lower() else "full"
+                with atena_thinking("Executando auto-validação da ATENA..."):
+                    status, report_path = run_self_test(mode=mode)
+                color = "green" if status == "ok" else "red"
+                CONSOLE.print(f"[bold {color}]Self-test: {status.upper()}[/bold {color}]")
+                CONSOLE.print(f"[dim]Relatório: {report_path}[/dim]")
                 continue
 
             if user_input.startswith("/run "):

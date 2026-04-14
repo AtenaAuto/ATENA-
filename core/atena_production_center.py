@@ -75,6 +75,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_alert.add_argument("--max-avg-latency-ms", type=int, default=500)
     p_alert.add_argument("--max-cost-units", type=float, default=100.0)
     p_alert.add_argument("--webhook-url")
+    p_alert.add_argument("--retries", type=int, default=2)
+    p_alert.add_argument("--backoff-sec", type=float, default=1.0)
+    p_alert.add_argument("--dedupe-window-sec", type=int, default=300)
 
     p_quality = sub.add_parser("quality-score", help="Scoring por perfis")
     p_quality.add_argument("--profiles", default="support,dev,ops,security")
@@ -183,7 +186,14 @@ def main() -> int:
         )
         delivery = {"sent": False, "reason": "webhook not provided"}
         if args.webhook_url:
-            delivery = dispatch_alert(args.webhook_url, payload)
+            delivery = dispatch_alert(
+                args.webhook_url,
+                payload,
+                retries=args.retries,
+                backoff_sec=args.backoff_sec,
+                dedupe_window_sec=args.dedupe_window_sec,
+                state_path=EVOLUTION / "alerts_dedupe.json",
+            )
         alert_payload = {
             "status": payload["status"],
             "alert": payload["alert"],

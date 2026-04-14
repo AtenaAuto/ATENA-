@@ -4,8 +4,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import urllib.request
+import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -135,17 +137,57 @@ class TelemetryStore:
         }
 
 
-def dispatch_alert(webhook_url: str, payload: dict[str, object], timeout: int = 10) -> dict[str, object]:
+def dispatch_alert(
+    webhook_url: str,
+    payload: dict[str, object],
+    timeout: int = 10,
+    retries: int = 2,
+    backoff_sec: float = 1.0,
+    dedupe_window_sec: int = 300,
+    state_path: str | Path | None = None,
+) -> dict[str, object]:
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    dedupe_key = hashlib.sha256(body).hexdigest()
+
+    if state_path is not None:
+        state_file = Path(state_path)
+        state_file.parent.mkdir(parents=True, exist_ok=True)
+        state: dict[str, float] = {}
+        if state_file.exists():
+            try:
+                state = json.loads(state_file.read_text(encoding="utf-8"))
+            except Exception:  # noqa: BLE001
+                state = {}
+        now = time.time()
+        previous = float(state.get(dedupe_key, 0.0))
+        if previous and now - previous < dedupe_window_sec:
+            return {"sent": False, "deduped": True, "dedupe_key": dedupe_key}
+
     request = urllib.request.Request(
         webhook_url,
         data=body,
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec - user-controlled endpoint
-            code = getattr(response, "status", 200)
-        return {"sent": True, "http_status": int(code)}
-    except Exception as exc:  # noqa: BLE001
-        return {"sent": False, "error": str(exc)}
+    attempts = max(1, retries + 1)
+    for attempt in range(1, attempts + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec - user-controlled endpoint
+                code = getattr(response, "status", 200)
+            if state_path is not None:
+                state = {}
+                state_file = Path(state_path)
+                if state_file.exists():
+                    try:
+                        state = json.loads(state_file.read_text(encoding="utf-8"))
+                    except Exception:  # noqa: BLE001
+                        state = {}
+                state[dedupe_key] = time.time()
+                state_file.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+            return {"sent": True, "http_status": int(code), "attempt": attempt, "dedupe_key": dedupe_key}
+        except Exception as exc:  # noqa: BLE001
+            if attempt == attempts:
+                return {"sent": False, "error": str(exc), "attempt": attempt, "dedupe_key": dedupe_key}
+            time.sleep(max(0.0, backoff_sec) * attempt)
+
+    return {"sent": False, "error": "unknown", "dedupe_key": dedupe_key}

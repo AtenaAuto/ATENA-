@@ -41,3 +41,8 @@ def test_validate_contract_internet_challenge():
 def test_validate_contract_slo_alert():
     payload = {"status": "ok", "alert": {}, "sent": False, "delivery": {}}
     assert validate_contract("slo-alert", payload) == []
+
+
+def test_validate_contract_go_live_gate():
+    payload = {"decision": "GO", "blockers": [], "readiness_status": "pass", "slo_status": "ok", "pending_actions": 1}
+    assert validate_contract("go-live-gate", payload) == []

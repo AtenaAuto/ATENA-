@@ -137,3 +137,11 @@ def test_slo_alert_command():
     payload = json.loads(proc.stdout)
     assert payload["contract_valid"] is True
     assert "delivery" in payload
+
+
+def test_go_live_gate_command():
+    proc = run_cli("go-live-gate", "--window-days", "30", "--min-success-rate", "0.1", "--max-avg-latency-ms", "99999", "--max-cost-units", "9999")
+    assert proc.returncode in {0, 2}
+    payload = json.loads(proc.stdout)
+    assert payload["contract_valid"] is True
+    assert payload["decision"] in {"GO", "NO_GO"}

@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
 from core.heavy_mode_selector import choose_mode
 from core.internet_challenge import run_internet_challenge
 from core.production_access import QuotaManager, TenantQuota
+from core.production_gate import evaluate_go_live
 from core.production_contracts import validate_contract
 from core.production_guardrails import Action, AuditLogger, PolicyEngine, Role
 from core.production_observability import TelemetryStore, dispatch_alert
@@ -121,6 +122,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("production-ready", help="Executa checklist de prontidão para produção")
     sub.add_parser("remediation-plan", help="Gera plano de ação a partir da prontidão")
     sub.add_parser("perfection-plan", help="Mostra trilha para nível enterprise")
+    p_gate = sub.add_parser("go-live-gate", help="Decisão formal GO/NO_GO para produção")
+    p_gate.add_argument("--window-days", type=int, default=30)
+    p_gate.add_argument("--min-success-rate", type=float, default=0.95)
+    p_gate.add_argument("--max-avg-latency-ms", type=int, default=500)
+    p_gate.add_argument("--max-cost-units", type=float, default=100.0)
 
     p_quota = sub.add_parser("quota-check", help="Valida uso atual contra quota")
     p_quota.add_argument("--rpm", type=int, required=True)
@@ -299,6 +305,23 @@ def main() -> int:
         payload = build_perfection_plan()
         _emit("perfection-plan", payload)
         return 0
+
+    if args.cmd == "go-live-gate":
+        readiness = run_readiness(
+            telemetry=telemetry,
+            market=market,
+            evolution_dir=EVOLUTION,
+        )
+        remediation = build_remediation_plan(readiness)
+        slo_payload = telemetry.slo_check(
+            min_success_rate=args.min_success_rate,
+            max_avg_latency_ms=args.max_avg_latency_ms,
+            max_cost_units=args.max_cost_units,
+            window_days=args.window_days,
+        )
+        decision = evaluate_go_live(readiness=readiness, remediation=remediation, slo_alert=slo_payload)
+        _emit("go-live-gate", decision)
+        return 0 if decision["decision"] == "GO" else 2
 
     return 2
 

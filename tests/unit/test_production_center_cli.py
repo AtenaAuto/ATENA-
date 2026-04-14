@@ -96,3 +96,12 @@ def test_quota_check_command():
     payload = json.loads(quota.stdout)
     assert payload["status"] == "ok"
     assert payload["contract_valid"] is True
+
+
+def test_production_ready_command():
+    proc = run_cli("production-ready")
+    assert proc.returncode in {0, 2}
+    payload = json.loads(proc.stdout)
+    assert payload["status"] in {"pass", "warn", "fail"}
+    assert payload["contract_valid"] is True
+    assert "checks" in payload

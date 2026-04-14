@@ -16,3 +16,8 @@ def test_validate_contract_missing_fields():
     errors = validate_contract("tenant-report", {"tenant_id": "t1"})
     assert errors
     assert any("missing field" in e for e in errors)
+
+
+def test_validate_contract_production_ready():
+    payload = {"status": "warn", "checks": [], "summary": {}}
+    assert validate_contract("production-ready", payload) == []

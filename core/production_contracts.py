@@ -16,6 +16,7 @@ REQUIRED_FIELDS: dict[str, set[str]] = {
     "skill-list": set(),
     "incident-drill": {"scenario", "primary_provider", "fallback_provider", "recovered", "timestamp"},
     "quota-check": {"quota", "usage", "checks", "status"},
+    "production-ready": {"status", "checks", "summary"},
 }
 
 

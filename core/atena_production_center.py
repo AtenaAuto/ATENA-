@@ -20,6 +20,7 @@ from core.production_guardrails import Action, AuditLogger, PolicyEngine, Role
 from core.production_observability import TelemetryStore
 from core.production_onboarding import run_onboarding
 from core.production_quality_harness import score_profiles_with_baseline
+from core.production_readiness import run_readiness
 from core.production_resilience import run_incident_drill
 from core.skill_marketplace import SkillMarketplace, SkillRecord
 
@@ -101,6 +102,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_drill.add_argument("--scenario", default="provider-outage")
     p_drill.add_argument("--primary", default="provider-a")
     p_drill.add_argument("--fallback", default="provider-b")
+
+
+    sub.add_parser("production-ready", help="Executa checklist de prontidão para produção")
 
     p_quota = sub.add_parser("quota-check", help="Valida uso atual contra quota")
     p_quota.add_argument("--rpm", type=int, required=True)
@@ -224,6 +228,15 @@ def main() -> int:
         )
         _emit("quota-check", payload)
         return 0 if payload["status"] == "ok" else 2
+
+    if args.cmd == "production-ready":
+        payload = run_readiness(
+            telemetry=telemetry,
+            market=market,
+            evolution_dir=EVOLUTION,
+        )
+        _emit("production-ready", payload)
+        return 0 if payload["status"] in {"pass", "warn"} else 2
 
     return 2
 

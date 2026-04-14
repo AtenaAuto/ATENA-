@@ -18,7 +18,7 @@ from core.internet_challenge import run_internet_challenge
 from core.production_access import QuotaManager, TenantQuota
 from core.production_contracts import validate_contract
 from core.production_guardrails import Action, AuditLogger, PolicyEngine, Role
-from core.production_observability import TelemetryStore
+from core.production_observability import TelemetryStore, dispatch_alert
 from core.production_onboarding import run_onboarding
 from core.production_quality_harness import score_profiles_with_baseline
 from core.production_perfection import build_perfection_plan
@@ -68,6 +68,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_slo.add_argument("--min-success-rate", type=float, default=0.95)
     p_slo.add_argument("--max-avg-latency-ms", type=int, default=500)
     p_slo.add_argument("--max-cost-units", type=float, default=100.0)
+
+    p_alert = sub.add_parser("slo-alert", help="Valida SLO e opcionalmente dispara webhook")
+    p_alert.add_argument("--window-days", type=int, default=7)
+    p_alert.add_argument("--min-success-rate", type=float, default=0.95)
+    p_alert.add_argument("--max-avg-latency-ms", type=int, default=500)
+    p_alert.add_argument("--max-cost-units", type=float, default=100.0)
+    p_alert.add_argument("--webhook-url")
 
     p_quality = sub.add_parser("quality-score", help="Scoring por perfis")
     p_quality.add_argument("--profiles", default="support,dev,ops,security")
@@ -165,6 +172,25 @@ def main() -> int:
             window_days=args.window_days,
         )
         _emit("slo-check", payload)
+        return 0 if payload["status"] == "ok" else 2
+
+    if args.cmd == "slo-alert":
+        payload = telemetry.slo_check(
+            min_success_rate=args.min_success_rate,
+            max_avg_latency_ms=args.max_avg_latency_ms,
+            max_cost_units=args.max_cost_units,
+            window_days=args.window_days,
+        )
+        delivery = {"sent": False, "reason": "webhook not provided"}
+        if args.webhook_url:
+            delivery = dispatch_alert(args.webhook_url, payload)
+        alert_payload = {
+            "status": payload["status"],
+            "alert": payload["alert"],
+            "sent": bool(delivery.get("sent", False)),
+            "delivery": delivery,
+        }
+        _emit("slo-alert", alert_payload)
         return 0 if payload["status"] == "ok" else 2
 
     if args.cmd == "quality-score":

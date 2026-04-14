@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import urllib.request
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -132,3 +133,19 @@ class TelemetryStore:
             "alert": alert,
             "status": "ok" if all(checks.values()) else "violated",
         }
+
+
+def dispatch_alert(webhook_url: str, payload: dict[str, object], timeout: int = 10) -> dict[str, object]:
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    request = urllib.request.Request(
+        webhook_url,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec - user-controlled endpoint
+            code = getattr(response, "status", 200)
+        return {"sent": True, "http_status": int(code)}
+    except Exception as exc:  # noqa: BLE001
+        return {"sent": False, "error": str(exc)}

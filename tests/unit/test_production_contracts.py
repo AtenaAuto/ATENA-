@@ -36,3 +36,8 @@ def test_validate_contract_perfection_plan():
 def test_validate_contract_internet_challenge():
     payload = {"topic": "ai", "status": "ok", "confidence": 1.0, "sources": [], "recommendation": "x"}
     assert validate_contract("internet-challenge", payload) == []
+
+
+def test_validate_contract_slo_alert():
+    payload = {"status": "ok", "alert": {}, "sent": False, "delivery": {}}
+    assert validate_contract("slo-alert", payload) == []

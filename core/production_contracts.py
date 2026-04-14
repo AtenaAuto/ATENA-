@@ -12,6 +12,7 @@ REQUIRED_FIELDS: dict[str, set[str]] = {
     "telemetry-summary": {"total", "success_rate", "avg_latency_ms", "cost_units"},
     "tenant-report": {"tenant_id", "total", "success_rate", "avg_latency_ms", "cost_units", "month"},
     "slo-check": {"window_days", "thresholds", "summary", "checks", "status"},
+    "slo-alert": {"status", "alert", "sent", "delivery"},
     "quality-score": {"total", "passed", "score", "results", "baseline"},
     "skill-list": set(),
     "incident-drill": {"scenario", "primary_provider", "fallback_provider", "recovered", "timestamp"},

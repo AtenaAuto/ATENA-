@@ -2,36 +2,21 @@ name: 🧬 ATENA Ω - Evolução Divina v4.2 (DeepSeek-R1 Edition)
 
 on:
   schedule:
-    - cron: '*/30 * * * *' 
+    - cron: '*/30 * * * *'
   workflow_dispatch:
     inputs:
       model_size:
-        description: 'Tamanho do modelo DeepSeek-R1'
+        description: 'Tamanho do modelo'
         required: true
         default: '1.5B'
         type: choice
-        options:
-          - '1.5B'
-          - '7B'
+        options: ['1.5B', '7B']
       generations:
-        description: 'Número de gerações por ciclo'
+        description: 'Gerações'
         required: true
         default: '30'
         type: choice
-        options:
-          - '2500'
-          - '600'
-          - '700'
-          - '800'
-      mode:
-        description: 'Modo de evolução'
-        required: true
-        default: 'auto'
-        type: choice
-        options:
-          - 'auto'
-          - 'recon'
-          - 'nocode'
+        options: ['30', '600', '2500']
 
 permissions:
   contents: write
@@ -44,10 +29,8 @@ jobs:
     timeout-minutes: 25
     
     env:
-      PYTHON_VERSION: '3.11'
       MODEL_SIZE: ${{ github.event.inputs.model_size || '1.5B' }}
       GENERATIONS: ${{ github.event.inputs.generations || '30' }}
-      MODE: ${{ github.event.inputs.mode || 'auto' }}
 
     steps:
     - name: 📥 Checkout
@@ -56,28 +39,23 @@ jobs:
     - name: 🐍 Setup Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ env.PYTHON_VERSION }}
+        python-version: '3.11'
 
     - name: 🔧 Instalar dependências
       run: |
-        sudo apt-get update -qq
-        sudo apt-get install -y sqlite3
         python -m pip install --upgrade pip
         python -m pip install requests torch transformers accelerate faiss-cpu astor sentence-transformers aiosqlite aiohttp
 
     - name: 📂 Preparar Estrutura
       run: |
         mkdir -p atena_evolution/code atena_evolution/knowledge atena_evolution/logs
-        if [ -d modules ]; then
-          cp -r modules core/ || true
-        fi
+        if [ -d modules ]; then cp -r modules core/ || true; fi
 
     - name: 🧠 Baixar Evolução Anterior
       uses: dawidd6/action-download-artifact@v3
       continue-on-error: true
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        # Removido workflow: main.yml para evitar erro de referência
         name: atena-brain-${{ env.MODEL_SIZE }}
         path: atena_evolution/
         if_no_artifact_found: warn
@@ -85,10 +63,9 @@ jobs:
     - name: 🔮 Executar ATENA Core
       run: |
         export PYTHONPATH=$PYTHONPATH:$(pwd):$(pwd)/core
-        # Garantir que o diretório de evolução existe para o script não falhar ao abrir arquivos
         python core/main.py --auto --cycles ${{ env.GENERATIONS }}
 
-    - name: ⬆️ Salvar Evolução Atualizada
+    - name: ⬆️ Salvar Evolução
       if: always()
       uses: actions/upload-artifact@v4
       with:

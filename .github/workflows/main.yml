@@ -1,59 +1,42 @@
-name: ATENA-Evolucao-Divina
+name: ATENA-EVO
 
 on:
-  schedule:
-    - cron: '*/30 * * * *'
   workflow_dispatch:
     inputs:
       generations:
-        description: 'Geracoes'
-        required: true
         default: '30'
+  schedule:
+    - cron: '0 * * * *'
 
 permissions:
   contents: write
   actions: write
 
 jobs:
-  evoluir:
+  run-evolution:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Setup
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install Deps
+      - name: Deps
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install requests torch transformers accelerate faiss-cpu astor sentence-transformers aiosqlite aiohttp
+          pip install requests torch transformers accelerate faiss-cpu astor sentence-transformers aiosqlite aiohttp
 
-      - name: Prepare
-        run: |
-          mkdir -p atena_evolution/knowledge atena_evolution/logs
-          if [ -d modules ]; then cp -r modules core/ || true; fi
-
-      - name: Download Artifact
-        uses: dawidd6/action-download-artifact@v3
-        continue-on-error: true
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          name: atena-brain
-          path: atena_evolution/
-
-      - name: Run Core
+      - name: Run
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd):$(pwd)/core
           python core/main.py --auto --cycles ${{ github.event.inputs.generations || '30' }}
 
-      - name: Upload Artifact
+      - name: Save
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: atena-brain
           path: atena_evolution/
-          retention-days: 3
           

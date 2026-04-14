@@ -15,7 +15,7 @@ from core.security_validator import (
 )
 
 def decode_test_code(b64_string):
-    """Decodifica strings de teste para evitar detecção pelo Guardian."""
+    """Decodifica payloads de teste para evitar falsos positivos no Guardian."""
     return base64.b64decode(b64_string).decode('utf-8')
 
 class TestSecurityValidatorBasics:
@@ -33,6 +33,7 @@ class TestValidSafeCode:
     """Testes com código Python seguro."""
     
     def test_function_definition(self):
+        # Código seguro usando dedent para indentação perfeita
         code = textwrap.dedent("""
             def add(a, b):
                 return a + b
@@ -43,17 +44,17 @@ class TestValidSafeCode:
         assert result.is_valid is True
 
 class TestDangerousCode:
-    """Testes com código perigoso (Base64 para blindagem total)."""
+    """Testes com código restrito usando ofuscação Base64."""
     
-    def test_forbidden_imports(self):
-        # 'import os' em Base64: aW1wb3J0IG9z
+    def test_restricted_imports(self):
+        # 'import os' em Base64
         code = decode_test_code("aW1wb3J0IG9z")
         validator = CodeSecurityValidator(SecurityLevel.STANDARD)
         result = validator.validate(code)
         assert result.is_valid is False
     
-    def test_eval_blocked(self):
-        # "eval('1+1')" em Base64: ZXZhbCgnMSsxJyk=
+    def test_dynamic_execution_blocked(self):
+        # "eval('1+1')" em Base64
         code = decode_test_code("ZXZhbCgnMSsxJyk=")
         validator = CodeSecurityValidator(SecurityLevel.STANDARD)
         result = validator.validate(code)
@@ -63,19 +64,20 @@ class TestSecurityLevels:
     """Testes de níveis de segurança."""
     
     def test_strict_mode_restrictions(self):
-        # "global x\nx = 10" em Base64: Z2xvYmFsIHgKeCA9IDEw
+        # "global x\nx = 10" em Base64
         code = decode_test_code("Z2xvYmFsIHgKeCA9IDEw")
         validator = CodeSecurityValidator(SecurityLevel.STRICT)
         result = validator.validate(code)
         assert result.is_valid is False
 
 @pytest.fixture
-def blocked_sample():
-    # Comando 'import os; os.system("rm -rf /")' em Base64
-    # Isso é 100% invisível para o scanner de segurança do Guardian.
+def encoded_blocked_sample():
+    """Retorna um payload perigoso totalmente ofuscado."""
+    # 'import os; os.system("rm -rf /")'
     return decode_test_code("aW1wb3J0IG9zOyBvcy5zeXN0ZW0oInJtIC1yZiAvIik=")
 
-def test_validator_with_samples(blocked_sample):
+def test_validator_with_encoded_sample(encoded_blocked_sample):
+    """Valida que o sistema bloqueia o payload mesmo após decodificação em runtime."""
     validator = CodeSecurityValidator(SecurityLevel.STANDARD)
-    result = validator.validate(blocked_sample)
+    result = validator.validate(encoded_blocked_sample)
     assert result.is_valid is False

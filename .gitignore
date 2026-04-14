@@ -20,11 +20,23 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# Logs
-*.log
-atena_evolution/*.json
-atena_evolution/*.log
+# Virtual environments
+venv/
+ENV/
+.venv/
+virtualenv/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
 
 # OS
 .DS_Store
@@ -34,12 +46,45 @@ atena_evolution/*.log
 .Trashes
 ehthumbs.db
 Thumbs.db
+Desktop.ini
+
+# Logs
+*.log
+logs/
+*.log.*
+atena_evolution/*.json
+atena_evolution/*.log
+
+# Testing & Coverage
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.pytest_cache/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
 
 # Environment
 .env
+.env.local
+.env.*.local
 .venv
 venv/
 ENV/
+
+# Security - CRITICAL: Never commit!
+*.key
+*.pem
+*.p12
+*.pfx
+config/secrets/
+secrets/
+credentials/
+*_api_key.txt
+*_token.txt
+api_keys/
 
 # ATENA specific
 docs/GUARDIAN_REPORT_*.md
@@ -47,3 +92,31 @@ docs/PRODUCTION_GATE_*.md
 docs/GO_NO_GO_REPORT_*.md
 atena_evolution/
 !atena_evolution/.gitkeep
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+knowledge/knowledge.db
+
+# Documentation
+docs/_build/
+site/
+
+# Profiling
+*.prof
+*.lprof
+profile_*.txt
+
+# Large files
+*.bin
+*.onnx
+*.h5
+*.safetensors
+models/
+checkpoints/
+
+# Node (reference_dna)
+node_modules/
+npm-debug.log*
+yarn-debug.log*

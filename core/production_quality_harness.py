@@ -4,8 +4,10 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -45,3 +47,36 @@ def score_profiles(profiles: list[str]) -> dict[str, object]:
         "score": round((passed / total) if total else 0.0, 4),
         "results": [r.__dict__ for r in results],
     }
+
+
+def score_profiles_with_baseline(profiles: list[str], baseline_path: str | Path) -> dict[str, object]:
+    payload = score_profiles(profiles)
+    baseline_file = Path(baseline_path)
+    baseline_file.parent.mkdir(parents=True, exist_ok=True)
+    history: list[dict[str, object]] = []
+    if baseline_file.exists():
+        history = json.loads(baseline_file.read_text(encoding="utf-8"))
+
+    entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "score": payload["score"],
+        "profiles": profiles,
+    }
+    history.append(entry)
+    baseline_file.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    previous_score = float(history[-2]["score"]) if len(history) > 1 else None
+    trend = "stable"
+    if previous_score is not None:
+        if float(payload["score"]) > previous_score:
+            trend = "up"
+        elif float(payload["score"]) < previous_score:
+            trend = "down"
+
+    payload["baseline"] = {
+        "history_points": len(history),
+        "previous_score": previous_score,
+        "trend": trend,
+    }
+    payload["history_entry"] = entry
+    return payload

@@ -17,6 +17,7 @@ class SkillRecord:
     cost_class: str
     compatible_with: str
     approved: bool = False
+    active: bool = False
 
 
 class SkillMarketplace:
@@ -34,20 +35,56 @@ class SkillMarketplace:
 
     def register(self, record: SkillRecord) -> None:
         records = self._load()
-        records = [r for r in records if r.get("skill_id") != record.skill_id]
-        records.append(asdict(record))
+        exists = any(r.get("skill_id") == record.skill_id and r.get("version") == record.version for r in records)
+        if exists:
+            return
+        same_skill = [r for r in records if r.get("skill_id") == record.skill_id]
+        payload = asdict(record)
+        if not same_skill:
+            payload["active"] = True
+        records.append(payload)
         self._save(records)
 
-    def approve(self, skill_id: str) -> bool:
+    def approve(self, skill_id: str, version: str | None = None) -> bool:
         records = self._load()
         updated = False
         for r in records:
-            if r.get("skill_id") == skill_id:
-                r["approved"] = True
-                updated = True
+            if r.get("skill_id") != skill_id:
+                continue
+            if version and r.get("version") != version:
+                continue
+            r["approved"] = True
+            updated = True
         if updated:
             self._save(records)
         return updated
 
+    def promote(self, skill_id: str, version: str) -> bool:
+        records = self._load()
+        found = False
+        approved = False
+        for r in records:
+            if r.get("skill_id") != skill_id:
+                continue
+            if r.get("version") == version:
+                found = True
+                approved = bool(r.get("approved", False))
+        if not found or not approved:
+            return False
+        for r in records:
+            if r.get("skill_id") == skill_id:
+                r["active"] = r.get("version") == version
+        self._save(records)
+        return True
+
+    def rollback(self, skill_id: str, to_version: str) -> bool:
+        return self.promote(skill_id, to_version)
+
     def list_records(self) -> list[dict]:
         return self._load()
+
+    def active_version(self, skill_id: str) -> str | None:
+        for record in self._load():
+            if record.get("skill_id") == skill_id and record.get("active") is True:
+                return str(record.get("version"))
+        return None

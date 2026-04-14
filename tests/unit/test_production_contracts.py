@@ -31,3 +31,8 @@ def test_validate_contract_remediation_plan():
 def test_validate_contract_perfection_plan():
     payload = {"generated_at": "2026-04-14T00:00:00+00:00", "status": "in-progress", "tracks": [], "success_criteria": {}}
     assert validate_contract("perfection-plan", payload) == []
+
+
+def test_validate_contract_internet_challenge():
+    payload = {"topic": "ai", "status": "ok", "confidence": 1.0, "sources": [], "recommendation": "x"}
+    assert validate_contract("internet-challenge", payload) == []

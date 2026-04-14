@@ -19,6 +19,7 @@ REQUIRED_FIELDS: dict[str, set[str]] = {
     "production-ready": {"status", "checks", "summary"},
     "remediation-plan": {"status", "actions", "total_actions"},
     "perfection-plan": {"generated_at", "status", "tracks", "success_criteria"},
+    "internet-challenge": {"topic", "status", "confidence", "sources", "recommendation"},
 }
 
 

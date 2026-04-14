@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from core.heavy_mode_selector import choose_mode
+from core.internet_challenge import run_internet_challenge
 from core.production_access import QuotaManager, TenantQuota
 from core.production_contracts import validate_contract
 from core.production_guardrails import Action, AuditLogger, PolicyEngine, Role
@@ -104,6 +105,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_drill.add_argument("--primary", default="provider-a")
     p_drill.add_argument("--fallback", default="provider-b")
 
+    p_net = sub.add_parser("internet-challenge", help="Executa desafio de pesquisa complexa multi-fonte")
+    p_net.add_argument("--topic", required=True)
 
     sub.add_parser("production-ready", help="Executa checklist de prontidão para produção")
     sub.add_parser("remediation-plan", help="Gera plano de ação a partir da prontidão")
@@ -216,6 +219,11 @@ def main() -> int:
         result = run_incident_drill(args.scenario, primary_provider=args.primary, fallback_provider=args.fallback)
         _emit("incident-drill", result.__dict__)
         return 0 if result.recovered else 2
+
+    if args.cmd == "internet-challenge":
+        payload = run_internet_challenge(args.topic)
+        _emit("internet-challenge", payload)
+        return 0 if payload["status"] in {"ok", "partial"} else 2
 
     if args.cmd == "quota-check":
         quota = TenantQuota(

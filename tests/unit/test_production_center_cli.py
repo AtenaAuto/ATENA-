@@ -121,3 +121,11 @@ def test_perfection_plan_command():
     payload = json.loads(proc.stdout)
     assert payload["contract_valid"] is True
     assert payload["status"] == "in-progress"
+
+
+def test_internet_challenge_command():
+    proc = run_cli("internet-challenge", "--topic", "artificial intelligence")
+    assert proc.returncode in {0, 2}
+    payload = json.loads(proc.stdout)
+    assert payload["contract_valid"] is True
+    assert "sources" in payload

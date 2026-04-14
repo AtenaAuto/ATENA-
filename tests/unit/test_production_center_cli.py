@@ -105,3 +105,11 @@ def test_production_ready_command():
     assert payload["status"] in {"pass", "warn", "fail"}
     assert payload["contract_valid"] is True
     assert "checks" in payload
+
+
+def test_remediation_plan_command():
+    proc = run_cli("remediation-plan")
+    assert proc.returncode == 0
+    payload = json.loads(proc.stdout)
+    assert payload["contract_valid"] is True
+    assert "actions" in payload

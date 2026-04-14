@@ -91,3 +91,31 @@ def run_readiness(
             "total_checks": len(checks),
         },
     }
+
+
+def build_remediation_plan(readiness_payload: dict[str, object]) -> dict[str, object]:
+    checks = readiness_payload.get("checks", [])
+    actions: list[dict[str, str]] = []
+    for check in checks:
+        if check.get("ok"):
+            continue
+        name = str(check.get("name"))
+        if name == "telemetry_events_present":
+            actions.append({"priority": "p1", "action": "Registrar telemetria mínima com telemetry-log antes do go-live."})
+        elif name == "slo_baseline":
+            actions.append({"priority": "p0", "action": "Corrigir SLO: reduzir falhas/latência/custo e rerodar slo-check."})
+        elif name == "approved_active_skill":
+            actions.append({"priority": "p0", "action": "Aprovar e promover ao menos uma skill ativa (skill-approve + skill-promote)."})
+        elif name == "policy_audit_enabled":
+            actions.append({"priority": "p2", "action": "Executar policy-check para inicializar trilha de auditoria."})
+        else:
+            actions.append({"priority": "p2", "action": f"Revisar check {name} e aplicar mitigação."})
+
+    if not actions:
+        actions.append({"priority": "p3", "action": "Sem ações pendentes. Pronto para operar."})
+
+    return {
+        "status": readiness_payload.get("status", "unknown"),
+        "actions": actions,
+        "total_actions": len(actions),
+    }

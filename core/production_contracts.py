@@ -17,6 +17,7 @@ REQUIRED_FIELDS: dict[str, set[str]] = {
     "incident-drill": {"scenario", "primary_provider", "fallback_provider", "recovered", "timestamp"},
     "quota-check": {"quota", "usage", "checks", "status"},
     "production-ready": {"status", "checks", "summary"},
+    "remediation-plan": {"status", "actions", "total_actions"},
 }
 
 

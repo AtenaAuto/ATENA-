@@ -21,3 +21,8 @@ def test_validate_contract_missing_fields():
 def test_validate_contract_production_ready():
     payload = {"status": "warn", "checks": [], "summary": {}}
     assert validate_contract("production-ready", payload) == []
+
+
+def test_validate_contract_remediation_plan():
+    payload = {"status": "warn", "actions": [], "total_actions": 0}
+    assert validate_contract("remediation-plan", payload) == []

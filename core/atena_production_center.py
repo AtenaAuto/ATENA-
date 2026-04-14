@@ -20,7 +20,7 @@ from core.production_guardrails import Action, AuditLogger, PolicyEngine, Role
 from core.production_observability import TelemetryStore
 from core.production_onboarding import run_onboarding
 from core.production_quality_harness import score_profiles_with_baseline
-from core.production_readiness import run_readiness
+from core.production_readiness import build_remediation_plan, run_readiness
 from core.production_resilience import run_incident_drill
 from core.skill_marketplace import SkillMarketplace, SkillRecord
 
@@ -105,6 +105,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
     sub.add_parser("production-ready", help="Executa checklist de prontidão para produção")
+    sub.add_parser("remediation-plan", help="Gera plano de ação a partir da prontidão")
 
     p_quota = sub.add_parser("quota-check", help="Valida uso atual contra quota")
     p_quota.add_argument("--rpm", type=int, required=True)
@@ -237,6 +238,16 @@ def main() -> int:
         )
         _emit("production-ready", payload)
         return 0 if payload["status"] in {"pass", "warn"} else 2
+
+    if args.cmd == "remediation-plan":
+        readiness = run_readiness(
+            telemetry=telemetry,
+            market=market,
+            evolution_dir=EVOLUTION,
+        )
+        payload = build_remediation_plan(readiness)
+        _emit("remediation-plan", payload)
+        return 0
 
     return 2
 

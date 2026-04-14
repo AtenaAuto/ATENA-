@@ -18,6 +18,7 @@ REQUIRED_FIELDS: dict[str, set[str]] = {
     "quota-check": {"quota", "usage", "checks", "status"},
     "production-ready": {"status", "checks", "summary"},
     "remediation-plan": {"status", "actions", "total_actions"},
+    "perfection-plan": {"generated_at", "status", "tracks", "success_criteria"},
 }
 
 

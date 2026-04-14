@@ -26,3 +26,8 @@ def test_validate_contract_production_ready():
 def test_validate_contract_remediation_plan():
     payload = {"status": "warn", "actions": [], "total_actions": 0}
     assert validate_contract("remediation-plan", payload) == []
+
+
+def test_validate_contract_perfection_plan():
+    payload = {"generated_at": "2026-04-14T00:00:00+00:00", "status": "in-progress", "tracks": [], "success_criteria": {}}
+    assert validate_contract("perfection-plan", payload) == []

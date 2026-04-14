@@ -113,3 +113,11 @@ def test_remediation_plan_command():
     payload = json.loads(proc.stdout)
     assert payload["contract_valid"] is True
     assert "actions" in payload
+
+
+def test_perfection_plan_command():
+    proc = run_cli("perfection-plan")
+    assert proc.returncode == 0
+    payload = json.loads(proc.stdout)
+    assert payload["contract_valid"] is True
+    assert payload["status"] == "in-progress"

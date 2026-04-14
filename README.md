@@ -1,78 +1,466 @@
-# 🔱 ATENA Ω (Atena-code)
+# 🔱 ATENA Ω (Atena-code) v3.2.0
 
-ATENA Ω é uma IA,para execução de assistentes de terminal, missões autônomas e gates de qualidade e evolução segura de sistemas. uma arquitetura de agentes modernos, a Atena combina execução local com capacidades avançadas de orquestração.
+[![CI/CD Pipeline](https://github.com/AtenaAuto/ATENA-/actions/workflows/ci.yml/badge.svg)](https://github.com/AtenaAuto/ATENA-/actions)
+[![Code Coverage](https://codecov.io/gh/AtenaAuto/ATENA-/branch/main/graph/badge.svg)](https://codecov.io/gh/AtenaAuto/ATENA-)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
+**ATENA Ω** é um sistema de IA autônomo avançado para execução de assistentes de terminal, missões autônomas e gates de qualidade com evolução segura de sistemas. Combinando arquitetura moderna de agentes, a ATENA integra execução local com capacidades avançadas de orquestração multi-LLM.
+
+---
+
+## ✨ Características Principais
+
+- 🤖 **Assistente de Terminal Interativo** - Interface conversacional inteligente
+- 🚀 **Sistema de Missões Autônomas** - Execução assíncrona de tarefas complexas
+- 🛡️ **Gates de Segurança e Qualidade** - Validação automática robusta
+- 🧬 **Motor de Auto-Evolução** - Aprendizado contínuo e otimização
+- 🔄 **Orquestração Multi-LLM** - Suporte a OpenAI, Anthropic, modelos locais
+- 🔐 **Validação de Código Segura** - Proteção contra execução maliciosa
+- 📊 **Dashboard em Tempo Real** - Monitoramento e visualizações
+- 🧪 **Sistema de Testes Robusto** - Cobertura completa com pytest
 
 ---
 
 ## 🚀 Início Rápido
 
 ### Requisitos
-- Python 3.10+
-- Acesso à internet para modelos remotos (opcional)
 
-### Instalação. 💻 Windows
+- **Python 3.10+** (Python 3.11 recomendado)
+- **Git** para clonar o repositório
+- **Pip** para gerenciamento de pacotes
+- **(Opcional)** Chaves de API para OpenAI, Anthropic, etc.
+
+### Instalação em Windows 💻
+
 ```bash
-# git clone [https://github.com/AtenaAuto/ATENA-.git](https://github.com/AtenaAuto/ATENA-.git)
+# Clonar repositório
+git clone https://github.com/AtenaAuto/ATENA-.git
+cd ATENA-
+
+# Criar ambiente virtual (recomendado)
+python -m venv venv
+venv\Scripts\activate
+
+# Instalar dependências
+cd setup
+pip install -r requirements-pinned.txt
+pip install -r requirements-dev.txt  # Para desenvolvimento
+cd ..
+
+# Configurar variáveis de ambiente
+copy .env.example .env
+# Edite .env com suas credenciais
+```
+
+### Instalação em Linux/macOS 🐧🍎
+
+```bash
+# Clonar repositório
+git clone https://github.com/AtenaAuto/ATENA-.git
+cd ATENA-
+
+# Criar ambiente virtual
+python3 -m venv venv
+source venv/bin/activate
+
+# Instalar dependências
+cd setup
+pip install -r requirements-pinned.txt
+pip install -r requirements-dev.txt  # Para desenvolvimento
+cd ..
+
+# Configurar variáveis de ambiente
+cp .env.example .env
+# Edite .env com suas credenciais
+```
+
+### Instalação em Android (Termux) 📱
+
+```bash
+# Atualizar pacotes
+pkg update && pkg upgrade -y
+
+# Instalar dependências
+pkg install git python clang make -y
+
+# Clonar e instalar
+git clone https://github.com/AtenaAuto/ATENA-.git
 cd ATENA-
 cd setup
 pip install -r requirements.txt
 cd ..
-
-```
-### Instalação 📱 Android
-```bash
-# pkg update && pkg upgrade -y && pkg install git python clang make -y && git clone [https://github.com/AtenaAuto/ATENA-.git](https://github.com/AtenaAuto/ATENA-.git) && cd ATENA- && cd setup && pip install -r requirements.txt && cd ..
 ```
 
-### Execução 
+### Verificação de Instalação
+
 ```bash
-# Verifique se o ambiente está pronto
+# Verificar se ambiente está pronto
 ./atena doctor
 
-# Inicie o assistente interativo
-./atena assistant
+# Deve mostrar status de todos os componentes
 ```
 
 ---
 
-## 🛠️ Comandos Principais
+## 🎮 Uso
 
-| Comando | Descrição |
-| :--- | :--- |
-| `./atena assistant` | Assistente de terminal interativo com evolução em background |
-| `./atena doctor` | Diagnóstico rápido de ambiente e dependências |
-| `./atena guardian` | Gate essencial de segurança (autopilot + smoke tests) |
-| `./atena production-ready` | Validação final para release (`doctor` + `guardian`) |
-| `./atena code-build` | Gerador automático de projetos (Site, API, CLI) |
-| `./atena research-lab` | Gera propostas estratégicas de evolução do sistema |
-| `./atena go-no-go` | Checklist de 5 testes para validação pré-divulgação |
+### Comandos Principais
+
+| Comando | Descrição | Exemplo |
+|---------|-----------|---------|
+| `./atena assistant` | Inicia assistente interativo | `./atena assistant` |
+| `./atena doctor` | Diagnóstico de ambiente | `./atena doctor` |
+| `./atena guardian` | Gate de segurança essencial | `./atena guardian` |
+| `./atena production-ready` | Validação completa para release | `./atena production-ready` |
+| `./atena code-build` | Gerador automático de projetos | `./atena code-build --type api` |
+| `./atena research-lab` | Propostas de evolução | `./atena research-lab` |
+| `./atena go-no-go` | Checklist pré-divulgação | `./atena go-no-go` |
+
+### Exemplos de Uso
+
+#### 1. Assistente Interativo
+
+```bash
+./atena assistant
+
+# Interface conversacional
+> Olá ATENA!
+ATENA: Olá! Como posso ajudar hoje?
+
+> Crie uma API REST em FastAPI
+ATENA: Gerando projeto FastAPI...
+✅ Projeto criado em ./output/api_project/
+```
+
+#### 2. Executar Missão Específica
+
+```python
+# Em Python
+from protocols.atena_invoke import run_mission
+
+result = await run_mission(
+    mission_type="code_build",
+    params={
+        "project_type": "api",
+        "framework": "fastapi"
+    }
+)
+```
+
+#### 3. Validação de Código
+
+```python
+from core.security_validator import validate_code_safe, SecurityLevel
+
+code = """
+def hello():
+    return "Hello, World!"
+"""
+
+is_valid, violations = validate_code_safe(code, SecurityLevel.STANDARD)
+if is_valid:
+    print("✅ Código seguro!")
+else:
+    print(f"❌ Violações: {violations}")
+```
 
 ---
 
 ## 📂 Estrutura do Projeto
 
-- **`core/`**: Núcleo do sistema, incluindo launcher, assistant e runtime principal.
-- **`modules/`**: Módulos funcionais (Browser Agent, Codex, Telemetry, etc.).
-- **`protocols/`**: Entrypoints para missões autônomas e tarefas específicas.
-- **`setup/`**: Scripts de instalação e arquivos de requisitos.
-- **`docs/`**: Documentação técnica, relatórios e roadmaps.
-- **`atena_evolution/`**: Artefatos de execução, logs e memória persistente.
+```
+ATENA-/
+├── 📁 core/                    # Núcleo executivo
+│   ├── main.py                # Motor principal
+│   ├── atena_pipeline.py      # Pipeline de processamento
+│   ├── atena_launcher.py      # Ponto de entrada
+│   ├── security_validator.py  # ✨ Validação de segurança
+│   └── [30+ módulos]
+│
+├── 📁 modules/                 # Módulos funcionais
+│   ├── atena_engine.py        # Motor auxiliar
+│   ├── atena_codex.py         # Gerador de código
+│   ├── atena_browser_agent.py # Automação web
+│   ├── atena_tasks.py         # Executor de tarefas
+│   └── [50+ módulos]
+│
+├── 📁 protocols/               # Missões e protocolos
+│   ├── atena_invoke.py        # Orquestrador
+│   └── [20+ missões]
+│
+├── 📁 tests/                   # ✨ Testes completos
+│   ├── unit/                  # Testes unitários
+│   ├── integration/           # Testes de integração
+│   ├── e2e/                   # Testes end-to-end
+│   └── conftest.py            # Fixtures compartilhadas
+│
+├── 📁 setup/                   # Instalação
+│   ├── requirements.txt       # Dependências originais
+│   ├── requirements-pinned.txt # ✨ Versões pinadas
+│   └── requirements-dev.txt   # ✨ Ferramentas de dev
+│
+├── 📁 docs/                    # Documentação
+├── 📁 atena_evolution/         # Estado e evolução
+├── 📁 reference_dna/           # Interface React/TS
+│
+├── .env.example               # ✨ Template de configuração
+├── .gitignore                 # ✨ Atualizado com segurança
+├── .pre-commit-config.yaml    # ✨ Hooks de qualidade
+├── pyproject.toml             # ✨ Configuração do projeto
+├── README.md                  # ✨ Este arquivo
+└── LICENSE                    # Licença MIT
+```
+
+---
+
+## 🔧 Desenvolvimento
+
+### Configurando Ambiente de Desenvolvimento
+
+```bash
+# Instalar ferramentas de desenvolvimento
+pip install -r setup/requirements-dev.txt
+
+# Configurar pre-commit hooks
+pre-commit install
+
+# Executar formatação
+black core/ modules/ protocols/
+isort core/ modules/ protocols/
+
+# Executar linting
+pylint core/ modules/ --fail-under=7.0
+flake8 core/ modules/ protocols/
+
+# Executar type checking
+mypy core/ modules/ --ignore-missing-imports
+```
+
+### Executando Testes
+
+```bash
+# Todos os testes
+pytest
+
+# Apenas testes unitários
+pytest tests/unit/ -v
+
+# Com cobertura
+pytest --cov=core --cov=modules --cov-report=html
+
+# Testes específicos
+pytest tests/unit/test_atena_engine.py -v
+
+# Testes lentos (marcados com @pytest.mark.slow)
+pytest -m "not slow"  # Pula testes lentos
+pytest -m slow        # Apenas testes lentos
+```
+
+### Verificação de Qualidade
+
+```bash
+# Executar todas as verificações
+./scripts/run_quality_checks.sh
+
+# Ou manualmente:
+black --check core/ modules/
+pylint core/ modules/
+mypy core/ modules/
+bandit -r core/ modules/
+pytest --cov=core --cov=modules
+```
 
 ---
 
 ## 🛡️ Fluxo de Qualidade (CI/CD)
 
-Para garantir a estabilidade, utilize o fluxo recomendado antes de qualquer alteração importante:
+Para garantir estabilidade, use o fluxo recomendado antes de qualquer alteração importante:
 
-1. `./atena doctor` (Verifica ambiente)
-2. `./atena guardian` (Verifica integridade e riscos)
-3. `./atena production-ready` (Validação final)
+```bash
+# 1. Verificar ambiente
+./atena doctor
+
+# 2. Executar testes
+pytest
+
+# 3. Verificar segurança
+./atena guardian
+
+# 4. Validação final
+./atena production-ready
+```
+
+### Pipeline CI/CD
+
+O projeto inclui pipeline completo de CI/CD com GitHub Actions:
+
+- ✅ **Linting** - Black, isort, flake8, pylint
+- ✅ **Type Checking** - mypy
+- ✅ **Security Scan** - Bandit, Safety
+- ✅ **Unit Tests** - pytest com cobertura
+- ✅ **Integration Tests** - Testes de integração
+- ✅ **Build Check** - Verificação de build
 
 ---
 
-## 📝 Licença
+## 🔐 Segurança
 
-Este projeto está sob a licença definida no arquivo `LICENSE`.
+### Validação de Código
+
+ATENA inclui validação robusta de código para prevenir execução maliciosa:
+
+```python
+from core.security_validator import CodeSecurityValidator, SecurityLevel
+
+validator = CodeSecurityValidator(SecurityLevel.STRICT)
+result = validator.validate(user_code)
+
+if not result.is_valid:
+    print(f"❌ Código rejeitado:")
+    for violation in result.violations:
+        print(f"  - {violation}")
+```
+
+### Níveis de Segurança
+
+- **STRICT** - Máxima segurança, funcionalidade mínima
+- **STANDARD** - Balanceado (padrão)
+- **PERMISSIVE** - Menos restrições (use com cuidado)
+
+### Proteções Implementadas
+
+- ✅ Bloqueio de imports perigosos (os, sys, subprocess, etc.)
+- ✅ Bloqueio de funções builtin perigosas (exec, eval, __import__)
+- ✅ Validação de AST antes de execução
+- ✅ Sandbox isolado para execução
+- ✅ Timeout configurável
+- ✅ Limite de recursos (memória, CPU)
 
 ---
-*Desenvolvido por Danilo AtenaAuto Team*
+
+## 📊 Monitoramento e Telemetria
+
+### Dashboard Local
+
+```bash
+# Iniciar dashboard Streamlit
+streamlit run atena_live_dashboard.py
+
+# Acessar em http://localhost:8501
+```
+
+### Métricas Disponíveis
+
+- Taxa de sucesso de missões
+- Tempo médio de execução
+- Gerações de evolução
+- Score de qualidade
+- Uso de recursos
+
+---
+
+## 🤝 Contribuindo
+
+Contribuições são bem-vindas! Por favor:
+
+1. Fork o projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
+3. Execute os testes (`pytest`)
+4. Execute verificações de qualidade (`black`, `pylint`, `mypy`)
+5. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
+6. Push para a branch (`git push origin feature/AmazingFeature`)
+7. Abra um Pull Request
+
+### Checklist para PRs
+
+- [ ] Testes passando (`pytest`)
+- [ ] Cobertura >60% para código novo
+- [ ] Linting sem erros (`black`, `pylint`)
+- [ ] Type hints adicionados
+- [ ] Documentação atualizada
+- [ ] Changelog atualizado
+
+---
+
+## 📝 Changelog
+
+### v3.2.0 (2026-04-14) - Melhorias de Qualidade ✨
+
+**Adicionado:**
+- ✨ Sistema completo de testes (pytest)
+- ✨ Validação de código com AST
+- ✨ CI/CD pipeline com GitHub Actions
+- ✨ Pre-commit hooks para qualidade
+- ✨ Dependências pinadas para estabilidade
+- ✨ Configuração .env para segurança
+- ✨ Type hints e documentação melhorada
+
+**Melhorado:**
+- 🔧 .gitignore com proteções de segurança
+- 🔧 Estrutura de diretórios organizada
+- 🔧 README expandido e atualizado
+- 🔧 Configuração pyproject.toml
+
+**Segurança:**
+- 🔐 Proteção contra código malicioso
+- 🔐 Validação de imports
+- 🔐 Sandbox melhorado
+
+### v3.1.0 - Versão Original
+
+- Implementação inicial do motor de evolução
+- Assistente de terminal
+- Sistema de missões
+
+---
+
+## 📚 Documentação
+
+Para documentação detalhada, consulte:
+
+- [Análise Completa](analysis_reports/ATENA_Analise_Completa.md)
+- [Guia de Implementação](analysis_reports/ATENA_Guia_Implementacao.md)
+- [Roadmap Executivo](analysis_reports/ATENA_Roadmap_Executivo.md)
+- [Modo Manual Internet](analysis_reports/ATENA_Modo_Manual_Internet.md)
+
+---
+
+## 📜 Licença
+
+Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.
+
+---
+
+## 👥 Equipe
+
+**Desenvolvido por:** Danilo AtenaAuto Team
+
+---
+
+## 🙏 Agradecimentos
+
+- Comunidade Python
+- Criadores do FastAPI, Streamlit, PyTorch
+- Todos os contribuidores open-source
+
+---
+
+## 📞 Suporte
+
+Para questões e suporte:
+
+- 📧 Issues: [GitHub Issues](https://github.com/AtenaAuto/ATENA-/issues)
+- 📖 Documentação: [Wiki](https://github.com/AtenaAuto/ATENA-/wiki)
+- 💬 Discussões: [GitHub Discussions](https://github.com/AtenaAuto/ATENA-/discussions)
+
+---
+
+<div align="center">
+
+**⚡ Feito com 💙 e Python**
+
+[⬆ Voltar ao topo](#-atena-ω-atena-code-v320)
+
+</div>

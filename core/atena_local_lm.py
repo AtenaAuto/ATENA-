@@ -276,6 +276,41 @@ class AtenaUltraBrain:
         """Fallback quando o modelo pesado não está disponível."""
         # Simulação de lógica para manter o workflow rodando em ambientes limitados
         prompt_l = prompt.lower()
+        if any(
+            k in prompt_l
+            for k in [
+                "p=np",
+                "p = np",
+                "prove p=np",
+                "provar p=np",
+                "prova formal de p=np",
+                "nenhuma ia conseguiu",
+            ]
+        ):
+            return """### Entrega da ATENA (modo local) para desafio de fronteira
+Você pediu uma prova formal de **P=NP**. Hoje (2026), esse problema continua em aberto na literatura.
+Não posso alegar uma prova inédita sem validação matemática pública e revisão por pares.
+
+#### O que eu consigo entregar agora
+1. **Diagnóstico objetivo**
+   - Status: problema aberto (Clay Millennium Prize).
+   - Resultado honesto: não existe, neste contexto local, uma prova verificável para afirmar P=NP.
+
+2. **Plano técnico real de tentativa (entregável)**
+   - Modelar tentativas em assistentes formais (Lean/Coq/Isabelle).
+   - Estruturar hipóteses por classes: circuit lower bounds, proof complexity, algebrization barriers.
+   - Automatizar verificações de consistência e contraexemplos por SAT/SMT.
+   - Gerar trilha auditável (commits + logs + artefatos formais).
+
+3. **Próximo passo executável**
+   - Posso criar agora um esqueleto de projeto com:
+     - `docs/strategy.md` (hipóteses e barreiras),
+     - `proofs/` (stubs Lean/Coq),
+     - `scripts/verify.sh` (checagem local),
+     - `reports/progress.md` (registro experimental).
+
+Se você confirmar, eu entrego esse scaffold completo no próximo comando.
+"""
         if "responda no estilo claude code" in prompt_l and "formato obrigatório" in prompt_l:
             return """## 1) Objetivo
 Implementar uma solução técnica complexa, com saída operacional e executável em ambiente real.

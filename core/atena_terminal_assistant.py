@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -44,7 +44,24 @@ except Exception:
 # Configurações Globais
 DASHBOARD_PORT = int(os.getenv("ATENA_DASHBOARD_PORT", "8765"))
 ENABLE_DASHBOARD = os.getenv("ATENA_DASHBOARD_ENABLED", "0") == "1"
-CONSOLE = Console() if HAS_RICH else None
+class PlainConsole:
+    """Fallback simples para ambientes sem rich."""
+
+    @staticmethod
+    def print(*args, end: str = "\n", **kwargs) -> None:  # noqa: ANN003
+        # ignora kwargs de estilo do rich
+        text = " ".join(str(a) for a in args)
+        print(text, end=end)
+
+
+CONSOLE = Console() if HAS_RICH else PlainConsole()
+
+
+def console_print(message: str) -> None:
+    if HAS_RICH:
+        CONSOLE.print(message)
+    else:
+        print(message)
 
 @dataclass
 class EvolutionState:
@@ -69,7 +86,7 @@ def git_branch() -> str:
     except Exception:
         return "local"
 
-def get_prompt_label(model: str) -> Text:
+def get_prompt_label(model: str) -> Any:
     branch = git_branch()
     cwd = Path.cwd().name
     if HAS_RICH:
@@ -651,7 +668,7 @@ def main():
                 continue
             
             if user_input in ["/exit", "exit", "quit", "/quit", "/q", ":q", "/sair", "sair"]:
-                CONSOLE.print("[bold red]Encerrando ATENA... Até logo![/bold red]")
+                console_print("[bold red]Encerrando ATENA... Até logo![/bold red]" if HAS_RICH else "Encerrando ATENA... Até logo!")
                 break
             
             if user_input == "/help":
@@ -785,7 +802,11 @@ def main():
                     print(f"\nATENA:\n{answer}\n")
                 continue
 
-            CONSOLE.print(f"[yellow]Comando desconhecido: {user_input}. Digite /help para ajuda.[/yellow]")
+            console_print(
+                f"[yellow]Comando desconhecido: {user_input}. Digite /help para ajuda.[/yellow]"
+                if HAS_RICH
+                else f"Comando desconhecido: {user_input}. Digite /help para ajuda."
+            )
 
         except EOFError:
             if HAS_RICH:
@@ -794,9 +815,13 @@ def main():
                 print("\nEntrada finalizada (EOF). Encerrando assistente.")
             break
         except KeyboardInterrupt:
-            CONSOLE.print("\n[yellow]Interrompido pelo usuário. Digite /exit para sair.[/yellow]")
+            console_print(
+                "\n[yellow]Interrompido pelo usuário. Digite /exit para sair.[/yellow]"
+                if HAS_RICH
+                else "\nInterrompido pelo usuário. Digite /exit para sair."
+            )
         except Exception as e:
-            CONSOLE.print(f"[bold red]Erro:[/bold red] {str(e)}")
+            console_print(f"[bold red]Erro:[/bold red] {str(e)}" if HAS_RICH else f"Erro: {str(e)}")
 
 if __name__ == "__main__":
     sys.exit(main())

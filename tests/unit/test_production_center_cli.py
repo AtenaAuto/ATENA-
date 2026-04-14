@@ -23,6 +23,7 @@ def test_policy_check_and_mode_select():
     payload = json.loads(p.stdout)
     assert payload["allowed"] is True
     assert payload["requires_approval"] is True
+    assert payload["contract_valid"] is True
 
     m = run_cli("mode-select", "--complexity", "9", "--budget", "5")
     assert m.returncode == 0
@@ -81,8 +82,17 @@ def test_skill_catalog_telemetry_and_resilience_flow():
     assert slo.returncode == 0
     slo_payload = json.loads(slo.stdout)
     assert slo_payload["status"] == "ok"
+    assert "alert" in slo_payload
 
     drill = run_cli("incident-drill", "--scenario", "provider-outage")
     assert drill.returncode == 0
     drill_payload = json.loads(drill.stdout)
     assert drill_payload["recovered"] is True
+
+
+def test_quota_check_command():
+    quota = run_cli("quota-check", "--rpm", "80", "--parallel-jobs", "2", "--storage-mb", "300")
+    assert quota.returncode == 0
+    payload = json.loads(quota.stdout)
+    assert payload["status"] == "ok"
+    assert payload["contract_valid"] is True

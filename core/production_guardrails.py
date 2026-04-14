@@ -71,10 +71,21 @@ class PolicyEngine:
     }
 
     def decide(self, role: Role, action: Action) -> PolicyDecision:
+        return self.decide_with_context(role=role, action=action, risk_level="medium", hour_utc=12)
+
+    def decide_with_context(self, *, role: Role, action: Action, risk_level: str, hour_utc: int) -> PolicyDecision:
         allowed = action in self._ALLOWLIST.get(role, set())
         if not allowed:
             return PolicyDecision(False, False, f"role={role.value} não pode executar {action.value}")
-        requires_approval = action in self._APPROVAL_REQUIRED
+
+        normalized_risk = risk_level.strip().lower()
+        if role == Role.OPERATOR and normalized_risk == "high":
+            return PolicyDecision(False, True, "operator não pode executar ação de risco high")
+
+        if action in {Action.RUN_MUTABLE_COMMAND, Action.KILL_PROCESS} and not (6 <= hour_utc <= 22):
+            return PolicyDecision(False, True, "ação destrutiva fora da janela operacional UTC (06-22)")
+
+        requires_approval = action in self._APPROVAL_REQUIRED or normalized_risk in {"high", "critical"}
         if requires_approval:
             return PolicyDecision(True, True, f"{action.value} requer aprovação explícita")
         return PolicyDecision(True, False, "permitido pela política")

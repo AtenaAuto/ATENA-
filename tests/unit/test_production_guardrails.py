@@ -21,6 +21,12 @@ def test_operator_open_url_requires_approval():
     assert decision.requires_approval is True
 
 
+def test_operator_high_risk_denied():
+    engine = PolicyEngine()
+    decision = engine.decide_with_context(role=Role.OPERATOR, action=Action.OPEN_URL, risk_level="high", hour_utc=14)
+    assert decision.allowed is False
+
+
 def test_audit_logger_writes_jsonl(tmp_path: Path):
     engine = PolicyEngine()
     logger = AuditLogger(tmp_path / "audit.jsonl")

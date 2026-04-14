@@ -89,6 +89,24 @@ class TelemetryStore:
                 lines.append(item)
         return self._summarize_events(lines)
 
+
+    @staticmethod
+    def alert_state(summary: dict[str, float], *, min_success_rate: float, max_avg_latency_ms: int, max_cost_units: float) -> dict[str, object]:
+        violations = []
+        if summary["success_rate"] < min_success_rate:
+            violations.append("success_rate")
+        if summary["avg_latency_ms"] > max_avg_latency_ms:
+            violations.append("avg_latency_ms")
+        if summary["cost_units"] > max_cost_units:
+            violations.append("cost_units")
+        if not violations:
+            severity = "none"
+        elif len(violations) == 1:
+            severity = "warning"
+        else:
+            severity = "critical"
+        return {"severity": severity, "violations": violations}
+
     def slo_check(self, *, min_success_rate: float, max_avg_latency_ms: int, max_cost_units: float, window_days: int) -> dict[str, object]:
         summary = self.summarize_since_days(window_days)
         checks = {
@@ -96,6 +114,12 @@ class TelemetryStore:
             "avg_latency_ms": summary["avg_latency_ms"] <= max_avg_latency_ms,
             "cost_units": summary["cost_units"] <= max_cost_units,
         }
+        alert = self.alert_state(
+            summary,
+            min_success_rate=min_success_rate,
+            max_avg_latency_ms=max_avg_latency_ms,
+            max_cost_units=max_cost_units,
+        )
         return {
             "window_days": window_days,
             "thresholds": {
@@ -105,5 +129,6 @@ class TelemetryStore:
             },
             "summary": summary,
             "checks": checks,
+            "alert": alert,
             "status": "ok" if all(checks.values()) else "violated",
         }

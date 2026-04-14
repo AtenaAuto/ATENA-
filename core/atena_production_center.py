@@ -14,7 +14,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from core.heavy_mode_selector import choose_mode
-from core.production_guardrails import Action, PolicyEngine, Role
+from core.production_access import QuotaManager, TenantQuota
+from core.production_contracts import validate_contract
+from core.production_guardrails import Action, AuditLogger, PolicyEngine, Role
 from core.production_observability import TelemetryStore
 from core.production_onboarding import run_onboarding
 from core.production_quality_harness import score_profiles_with_baseline
@@ -25,6 +27,15 @@ EVOLUTION = ROOT / "atena_evolution" / "production_center"
 EVOLUTION.mkdir(parents=True, exist_ok=True)
 
 
+def _emit(command: str, payload: dict | list) -> None:
+    errors = validate_contract(command, payload)
+    if isinstance(payload, dict):
+        payload["contract_valid"] = len(errors) == 0
+        if errors:
+            payload["contract_errors"] = errors
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="ATENA Production Center")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -32,6 +43,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_policy = sub.add_parser("policy-check", help="Valida role/action")
     p_policy.add_argument("--role", required=True, choices=[r.value for r in Role])
     p_policy.add_argument("--action", required=True, choices=[a.value for a in Action])
+    p_policy.add_argument("--risk", default="medium")
+    p_policy.add_argument("--hour-utc", type=int, default=12)
+    p_policy.add_argument("--actor", default="cli-user")
 
     p_tlog = sub.add_parser("telemetry-log", help="Registra evento de telemetria")
     p_tlog.add_argument("--mission", required=True)
@@ -88,6 +102,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_drill.add_argument("--primary", default="provider-a")
     p_drill.add_argument("--fallback", default="provider-b")
 
+    p_quota = sub.add_parser("quota-check", help="Valida uso atual contra quota")
+    p_quota.add_argument("--rpm", type=int, required=True)
+    p_quota.add_argument("--parallel-jobs", type=int, required=True)
+    p_quota.add_argument("--storage-mb", type=int, required=True)
+    p_quota.add_argument("--limit-rpm", type=int, default=120)
+    p_quota.add_argument("--limit-jobs", type=int, default=4)
+    p_quota.add_argument("--limit-storage-mb", type=int, default=500)
+
     return parser
 
 
@@ -96,25 +118,33 @@ def main() -> int:
     telemetry = TelemetryStore(EVOLUTION / "telemetry.jsonl")
     market = SkillMarketplace(EVOLUTION / "skills_catalog.json")
     policy = PolicyEngine()
+    audit = AuditLogger(EVOLUTION / "policy_audit.jsonl")
 
     if args.cmd == "policy-check":
-        decision = policy.decide(Role(args.role), Action(args.action))
-        print(json.dumps(decision.__dict__, ensure_ascii=False, indent=2))
+        decision = policy.decide_with_context(role=Role(args.role), action=Action(args.action), risk_level=args.risk, hour_utc=args.hour_utc)
+        audit.append(
+            actor=args.actor,
+            role=Role(args.role),
+            action=Action(args.action),
+            decision=decision,
+            metadata={"risk": args.risk, "hour_utc": str(args.hour_utc)},
+        )
+        _emit("policy-check", decision.__dict__)
         return 0 if decision.allowed else 2
 
     if args.cmd == "telemetry-log":
         event = telemetry.append(args.mission, args.status, args.latency_ms, args.cost, tenant_id=args.tenant)
-        print(json.dumps(event.__dict__, ensure_ascii=False, indent=2))
+        _emit("telemetry-log", event.__dict__)
         return 0
 
     if args.cmd == "telemetry-summary":
-        print(json.dumps(telemetry.summarize(), ensure_ascii=False, indent=2))
+        _emit("telemetry-summary", telemetry.summarize())
         return 0
 
     if args.cmd == "tenant-report":
         report = telemetry.summarize_by_tenant(args.tenant)
         report["month"] = args.month
-        print(json.dumps(report, ensure_ascii=False, indent=2))
+        _emit("tenant-report", report)
         return 0
 
     if args.cmd == "slo-check":
@@ -124,18 +154,18 @@ def main() -> int:
             max_cost_units=args.max_cost_units,
             window_days=args.window_days,
         )
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        _emit("slo-check", payload)
         return 0 if payload["status"] == "ok" else 2
 
     if args.cmd == "quality-score":
         profiles = [p.strip() for p in args.profiles.split(",") if p.strip()]
         payload = score_profiles_with_baseline(profiles, EVOLUTION / "quality_baseline.json")
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        _emit("quality-score", payload)
         return 0 if float(payload.get("score", 0.0)) >= 0.5 else 2
 
     if args.cmd == "onboarding-run":
         payload = run_onboarding()
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        _emit("onboarding-run", payload)
         return 0 if payload["status"] == "ok" else 2
 
     if args.cmd == "skill-register":
@@ -148,37 +178,52 @@ def main() -> int:
                 compatible_with=args.compat,
             )
         )
-        print(json.dumps({"status": "registered", "id": args.id, "version": args.version}, ensure_ascii=False, indent=2))
+        _emit("skill-register", {"status": "registered", "id": args.id, "version": args.version})
         return 0
 
     if args.cmd == "skill-approve":
         ok = market.approve(args.id, version=args.version)
-        print(json.dumps({"status": "approved" if ok else "not-found", "id": args.id, "version": args.version}, ensure_ascii=False, indent=2))
+        _emit("skill-approve", {"status": "approved" if ok else "not-found", "id": args.id, "version": args.version})
         return 0 if ok else 2
 
     if args.cmd == "skill-promote":
         ok = market.promote(args.id, args.version)
-        print(json.dumps({"status": "promoted" if ok else "not-eligible", "id": args.id, "version": args.version}, ensure_ascii=False, indent=2))
+        _emit("skill-promote", {"status": "promoted" if ok else "not-eligible", "id": args.id, "version": args.version})
         return 0 if ok else 2
 
     if args.cmd == "skill-rollback":
         ok = market.rollback(args.id, args.to_version)
-        print(json.dumps({"status": "rolled-back" if ok else "not-eligible", "id": args.id, "to_version": args.to_version}, ensure_ascii=False, indent=2))
+        _emit("skill-rollback", {"status": "rolled-back" if ok else "not-eligible", "id": args.id, "to_version": args.to_version})
         return 0 if ok else 2
 
     if args.cmd == "skill-list":
-        print(json.dumps(market.list_records(), ensure_ascii=False, indent=2))
+        _emit("skill-list", market.list_records())
         return 0
 
     if args.cmd == "mode-select":
         decision = choose_mode(args.complexity, args.budget, args.latency_sensitive)
-        print(json.dumps(decision.__dict__, ensure_ascii=False, indent=2))
+        _emit("mode-select", decision.__dict__)
         return 0
 
     if args.cmd == "incident-drill":
         result = run_incident_drill(args.scenario, primary_provider=args.primary, fallback_provider=args.fallback)
-        print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
+        _emit("incident-drill", result.__dict__)
         return 0 if result.recovered else 2
+
+    if args.cmd == "quota-check":
+        quota = TenantQuota(
+            requests_per_minute=args.limit_rpm,
+            max_parallel_jobs=args.limit_jobs,
+            max_storage_mb=args.limit_storage_mb,
+        )
+        payload = QuotaManager.evaluate_usage(
+            quota,
+            requests_per_minute=args.rpm,
+            parallel_jobs=args.parallel_jobs,
+            storage_mb=args.storage_mb,
+        )
+        _emit("quota-check", payload)
+        return 0 if payload["status"] == "ok" else 2
 
     return 2
 

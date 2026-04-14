@@ -615,7 +615,7 @@ def run_device_control(request: str, confirmed: bool) -> tuple[str, str]:
     result: dict[str, object] = {"request": request}
 
     url_match = re.search(r"(https?://[^\s]+)", request, flags=re.IGNORECASE)
-    if ("abrir" in req or "open" in req) and url_match:
+    if any(token in req for token in ("abrir", "abra", "open")) and url_match:
         action = "open_url"
         url = url_match.group(1)
         ok = webbrowser.open(url)

@@ -50,13 +50,36 @@ class AtenaMissionOrchestrator:
             json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
         )
 
-    def run(self, initial_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        run_id = self._new_run_id()
+    def _read_checkpoint(self, run_id: str) -> Dict[str, Any]:
+        path = self._checkpoint_path(run_id)
+        if not path.exists():
+            raise FileNotFoundError(f"Checkpoint não encontrado para run_id={run_id}")
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def run(
+        self,
+        initial_context: Optional[Dict[str, Any]] = None,
+        run_id: Optional[str] = None,
+        resume_from_checkpoint: bool = False,
+    ) -> Dict[str, Any]:
+        run_id = run_id or self._new_run_id()
         context: Dict[str, Any] = dict(initial_context or {})
         steps: List[Dict[str, Any]] = []
+        start_index = 0
+
+        if resume_from_checkpoint:
+            checkpoint = self._read_checkpoint(run_id)
+            context = dict(checkpoint.get("context", {}))
+            steps = list(checkpoint.get("steps", []))
+            start_index = len(steps)
+            for i, step in enumerate(steps):
+                if step.get("status") == "failed":
+                    start_index = i
+                    steps = steps[:i]
+                    break
 
         status = "ok"
-        for idx, task in enumerate(self.tasks, start=1):
+        for idx, task in enumerate(self.tasks[start_index:], start=start_index + 1):
             started = time.perf_counter()
             task_result: Dict[str, Any] = {
                 "index": idx,
@@ -125,9 +148,15 @@ class AtenaMissionOrchestrator:
             "status": status,
             "total_tasks": len(self.tasks),
             "completed_steps": len(steps),
+            "remaining_steps": max(0, len(self.tasks) - len(steps)),
             "context": context,
             "steps": steps,
+            "resumed": resume_from_checkpoint,
             "checkpoint_path": str(self._checkpoint_path(run_id)),
         }
         self._write_checkpoint(run_id, final)
         return final
+
+    def resume(self, run_id: str) -> Dict[str, Any]:
+        """Retoma uma execução a partir do checkpoint existente."""
+        return self.run(run_id=run_id, resume_from_checkpoint=True)

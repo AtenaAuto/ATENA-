@@ -34,6 +34,7 @@ COMMANDS = {
     "go-no-go": ROOT / "protocols" / "atena_go_no_go_mission.py",
     "kyros": ROOT / "core" / "atena_kyros_mode.py",
     "production-center": ROOT / "core" / "atena_production_center.py",
+    "orchestrator-mission": ROOT / "protocols" / "atena_orchestrator_mission.py",
 }
 
 ALIASES = {
@@ -86,6 +87,7 @@ def render_help() -> None:
         table.add_row("./atena go-no-go", "Executa checklist com 5 testes de prontidão para divulgação")
         table.add_row("./atena kyros", "Modo Kyros: prontidão operacional + execução guiada")
         table.add_row("./atena production-center", "CLI de integração dos módulos de produção (RBAC/telemetria/quality)")
+        table.add_row("./atena orchestrator-mission", "Missão avançada com orquestrador (checkpoint+retry+fallback)")
         table.add_row("./atena atena-like", "Alias do modo assistant")
         table.add_row("./atena help", "Exibe esta ajuda")
         console.print(table)
@@ -119,6 +121,7 @@ def render_help() -> None:
         print("  ./atena go-no-go         # checklist com 5 testes de prontidão")
         print("  ./atena kyros            # modo Kyros (prontidão + execução guiada)")
         print("  ./atena production-center # CLI de integração dos módulos de produção")
+        print("  ./atena orchestrator-mission # missão avançada com orquestrador")
         print("  ./atena atena-like      # alias do assistant")
         print("  ./atena help            # ajuda")
 

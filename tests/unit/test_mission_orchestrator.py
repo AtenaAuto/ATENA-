@@ -72,3 +72,30 @@ def test_orchestrator_stops_on_failure_without_continue(tmp_path) -> None:
     assert result["completed_steps"] == 2
     assert result["steps"][1]["status"] == "failed"
     assert result["steps"][1]["error"] == "hard-fail"
+
+
+def test_orchestrator_resume_from_checkpoint(tmp_path) -> None:
+    orchestrator = AtenaMissionOrchestrator(root_path=tmp_path)
+    calls = {"count": 0}
+
+    def first_step(_ctx):
+        calls["count"] += 1
+        return {"first": calls["count"]}
+
+    def second_step(_ctx):
+        raise RuntimeError("fails-on-purpose")
+
+    orchestrator.add_task(TaskNode(name="first", handler=first_step))
+    orchestrator.add_task(TaskNode(name="second", handler=second_step))
+    result_1 = orchestrator.run()
+
+    assert result_1["status"] == "partial"
+    run_id = result_1["run_id"]
+
+    # Substitui a segunda task por versão saudável e retoma.
+    orchestrator.tasks[1] = TaskNode(name="second", handler=lambda ctx: {"second": "ok"})
+    result_2 = orchestrator.resume(run_id)
+
+    assert result_2["status"] == "ok"
+    assert result_2["resumed"] is True
+    assert result_2["context"]["second"] == "ok"

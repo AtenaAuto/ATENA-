@@ -502,6 +502,28 @@ def run_task_exec(router: AtenaLLMRouter, objective: str) -> tuple[str, str]:
     return status, str(report_path)
 
 
+def summarize_task_exec_report(report_path: str) -> str:
+    """Resumo curto e humano do resultado do /task-exec."""
+    try:
+        payload = json.loads(Path(report_path).read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return ""
+    commands = payload.get("commands") or []
+    results = payload.get("results") or []
+    lines: list[str] = []
+    if commands:
+        lines.append(f"Comandos executados: {len(commands)}")
+    for item in results[:2]:
+        cmd = str(item.get("command", "")).strip()
+        stdout_tail = str(item.get("stdout_tail", "")).strip()
+        if cmd:
+            lines.append(f"- {cmd}")
+        if stdout_tail:
+            snippet = " ".join(stdout_tail.splitlines())[:240]
+            lines.append(f"  saída: {snippet}")
+    return "\n".join(lines)
+
+
 def run_saas_bootstrap(project_name: str) -> tuple[str, str]:
     safe_name = "".join(ch for ch in project_name if ch.isalnum() or ch in ("-", "_")).strip("-_") or "atena_saas"
     commands = [
@@ -854,6 +876,9 @@ def main():
                 color = "green" if status == "ok" else "red"
                 CONSOLE.print(f"[bold {color}]Task exec: {status.upper()}[/bold {color}]")
                 CONSOLE.print(f"[dim]Relatório: {report_path}[/dim]")
+                summary = summarize_task_exec_report(report_path)
+                if summary:
+                    CONSOLE.print(summary)
                 continue
 
             if user_input.startswith("/saas-bootstrap "):

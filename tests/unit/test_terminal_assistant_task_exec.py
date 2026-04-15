@@ -85,3 +85,21 @@ def test_run_task_exec_uses_objective_fallback_when_plan_has_no_commands(monkeyp
 
     assert status == "ok"
     assert report["commands"][0].startswith("python3 -c ")
+
+
+def test_summarize_task_exec_report_returns_human_summary(tmp_path) -> None:
+    report_path = tmp_path / "task_exec_report.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "commands": ["python3 -c \"print('ok')\""],
+                "results": [
+                    {"command": "python3 -c \"print('ok')\"", "stdout_tail": "ok\n", "stderr_tail": "", "ok": True}
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    summary = assistant.summarize_task_exec_report(str(report_path))
+    assert "Comandos executados: 1" in summary
+    assert "saída: ok" in summary

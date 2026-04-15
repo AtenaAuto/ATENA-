@@ -5178,6 +5178,19 @@ class LanguageTrainer:
 
 class VocabularyHarvester(threading.Thread):
     """Coleta termos de fontes externas periodicamente."""
+    STOPWORDS = {
+        "with", "from", "that", "this", "there", "their", "have", "what", "when", "where", "which",
+        "about", "would", "could", "should", "into", "your", "while", "using", "used", "more", "less",
+        "para", "como", "mais", "menos", "sobre", "entre", "depois", "antes", "tambem", "ainda",
+        "resultado", "util", "main", "class", "work", "through", "either", "reading",
+    }
+    ADVANCED_SIGNAL_TERMS = {
+        "transformer", "transformers", "attention", "tokenizer", "embedding", "vector", "retrieval",
+        "rag", "agentic", "orchestrator", "kubernetes", "k8s", "terraform", "observability", "otel",
+        "telemetry", "distributed", "sharding", "consensus", "eventdriven", "streaming", "asyncio",
+        "profiling", "memoization", "autotuning", "rlhf", "inference", "quantization", "distillation",
+        "federated", "multimodal", "timeseries", "featurestore", "grpc", "protobuf", "websocket",
+    }
 
     def __init__(self, kb: KnowledgeBase):
         super().__init__(daemon=True)
@@ -5206,11 +5219,12 @@ class VocabularyHarvester(threading.Thread):
                 terms.update(self._expand_with_wordnet(terms))
             except Exception as e:
                 logger.debug(f"Erro no WordNet: {e}")
+        terms = {term for term in terms if self._is_high_signal_term(term)}
         if terms:
             now = datetime.now().isoformat()
             with self.kb._lock:
                 for word in terms:
-                    if len(word) > 3 and word.isidentifier():
+                    if word.isidentifier():
                         self.kb.conn.execute("""
                             INSERT INTO lang_vocabulary (word, frequency, last_seen)
                             VALUES (?, 1, ?)
@@ -5220,6 +5234,22 @@ class VocabularyHarvester(threading.Thread):
                         """, (word, now))
                 self.kb.conn.commit()
             logger.info(f"[] {len(terms)} termos inseridos/atualizados.")
+        else:
+            logger.info("[] Nenhum termo avançado de alta confiança coletado nesta rodada.")
+
+    def _is_high_signal_term(self, word: str) -> bool:
+        word = (word or "").strip().lower()
+        if len(word) < 4 or not word.isidentifier():
+            return False
+        if word in self.STOPWORDS:
+            return False
+        if word in self.ADVANCED_SIGNAL_TERMS:
+            return True
+        advanced_fragments = (
+            "cloud", "vector", "graph", "quant", "model", "agent", "async", "cache", "cluster",
+            "metric", "telemet", "kubern", "token", "embed", "optimizer", "federat", "distill",
+        )
+        return any(fragment in word for fragment in advanced_fragments)
 
     def _fetch_stackoverflow_terms(self, pages: int = 2) -> Set[str]:
         terms = set()

@@ -6222,37 +6222,47 @@ class AtenaCore:
         best_candidate = None
         best_candidate_score = -1.0
 
+        def _blend_score(
+            code: str,
+            desc: str,
+            mtype: str,
+            metrics: Dict,
+            *,
+            apply_rlhf: bool = True,
+            log_world_model_failures: bool = True,
+        ) -> float:
+            """Calcula score operacional em escala comparável para seleção."""
+            if self.problem:
+                return float(metrics["score"])
+
+            evolvable_score = self.v3.evolvable_scorer.compute(metrics)
+            blended = metrics["score"] * 0.7 + evolvable_score * 0.3
+
+            if HAS_COUNCIL:
+                council_vote = council.consensus_score(code, metrics)
+                blended = blended * 0.8 + council_vote * 20.0
+
+            if HAS_WORLD_MODEL:
+                success, predicted_score, logs = world_model.simulate_mutation(code)
+                if not success:
+                    if log_world_model_failures:
+                        logger.warning(f"⚠️ WorldModel previu falha crítica para mutação: {desc[:30]}")
+                    blended *= 0.1
+                else:
+                    logger.info(f"✅ WorldModel validou mutação: {desc[:30]} (Score previsto: {predicted_score:.2f})")
+                    blended *= 1.1
+
+            if apply_rlhf and HAS_RLHF:
+                reward_mult = rlhf.get_reward_multiplier(mtype)
+                blended *= reward_mult
+                logger.info(f"🧠 RLHF: Multiplicador de recompensa para '{mtype}': {reward_mult:.2f}")
+
+            return float(blended)
+
         def _eval_candidate(candidate):
             code, desc, mtype = candidate
             metrics = self.evaluator.evaluate(code, original_code=self.original_code)
-            # v3: usa EvolvableScorer para scoring (se no houver problema)
-            if self.problem:
-                # O score j vem do problema
-                blended = metrics["score"]
-            else:
-                evolvable_score = self.v3.evolvable_scorer.compute(metrics)
-                blended = metrics["score"] * 0.7 + evolvable_score * 0.3
-                
-                # The Council: Orquestração Multi-Agente
-                if HAS_COUNCIL:
-                    council_vote = council.consensus_score(code, metrics)
-                    blended = blended * 0.8 + council_vote * 20.0 # Peso do conselho (escala 0-100)
-                
-                # World Model: Simulação de Ambiente
-                if HAS_WORLD_MODEL:
-                    success, predicted_score, logs = world_model.simulate_mutation(code)
-                    if not success:
-                        logger.warning(f"⚠️ WorldModel previu falha crítica para mutação: {desc[:30]}")
-                        blended *= 0.1 # Penalidade severa por falha na simulação
-                    else:
-                        logger.info(f"✅ WorldModel validou mutação: {desc[:30]} (Score previsto: {predicted_score:.2f})")
-                        blended *= 1.1 # Bônus por validação em ambiente isolado
-                
-                # RLHF Interno: Modelo de Recompensa Local
-                if HAS_RLHF:
-                    reward_mult = rlhf.get_reward_multiplier(mtype)
-                    blended *= reward_mult
-                    logger.info(f"🧠 RLHF: Multiplicador de recompensa para '{mtype}': {reward_mult:.2f}")
+            blended = _blend_score(code, desc, mtype, metrics, apply_rlhf=True, log_world_model_failures=True)
             return code, desc, mtype, metrics, blended
 
         with concurrent.futures.ThreadPoolExecutor(
@@ -6269,10 +6279,30 @@ class AtenaCore:
                 except Exception as e:
                     logger.debug(f"   Avaliao falhou: {e}")
 
+        # Baseline operacional do código atual para evitar mismatch de escala
+        current_metrics = self.evaluator.evaluate(self.current_code, original_code=self.original_code)
+        current_operational_score = _blend_score(
+            self.current_code,
+            "baseline_current",
+            "baseline_current",
+            current_metrics,
+            apply_rlhf=False,
+            log_world_model_failures=False,
+        )
+
         replaced = False
         stagnation_factor = min(self.stagnation_cycles, 10)
         adaptive_delta = max(0.001, Config.MIN_IMPROVEMENT_DELTA * (1.0 - 0.08 * stagnation_factor))
-        improvement_threshold = old_best_score + adaptive_delta
+        score_scale_ratio = old_best_score / max(current_operational_score, 1e-6)
+        if score_scale_ratio > 2.0 or score_scale_ratio < 0.5:
+            comparison_baseline = current_operational_score
+            logger.info(
+                f"   [Recalibração] Baseline de seleção ajustada para escala operacional ({comparison_baseline:.2f}); "
+                f"histórico={old_best_score:.2f}"
+            )
+        else:
+            comparison_baseline = old_best_score
+        improvement_threshold = comparison_baseline + adaptive_delta
 
         if best_candidate and best_candidate_score >= improvement_threshold:
             code, desc, mtype, metrics = best_candidate
@@ -6282,7 +6312,7 @@ class AtenaCore:
             self.current_code = code
             self.best_score = best_candidate_score
             self.best_code = code
-            self.last_cycle_delta = self.best_score - old_best_score
+            self.last_cycle_delta = self.best_score - comparison_baseline
             self.stagnation_cycles = 0
             replaced = True
             if HAS_CURIOSITY:
@@ -6313,7 +6343,7 @@ class AtenaCore:
                 apply_workflow_mutation()
                 self.kb.update_objective("otimizar_workflow", 1.0)
         else:
-            self.last_cycle_delta = max(0.0, best_candidate_score - old_best_score) if best_candidate else 0.0
+            self.last_cycle_delta = max(0.0, best_candidate_score - comparison_baseline) if best_candidate else 0.0
             self.stagnation_cycles += 1
             if best_candidate:
                 _, desc, mtype, metrics = best_candidate

@@ -31,18 +31,43 @@ class CuriosityEngine:
     def _init_db(self):
         """Garante que as tabelas de curiosidade existam."""
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-        conn = sqlite3.connect(self.db_path)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS curiosity_topics (
-                topic TEXT PRIMARY KEY,
-                interest_score REAL DEFAULT 1.0,
-                last_explored DATETIME,
-                discovery_count INTEGER DEFAULT 0,
-                reward_sum REAL DEFAULT 0.0
-            )
-        """)
-        conn.commit()
-        conn.close()
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS curiosity_topics (
+                    topic TEXT PRIMARY KEY,
+                    interest_score REAL DEFAULT 1.0,
+                    last_explored DATETIME,
+                    discovery_count INTEGER DEFAULT 0,
+                    reward_sum REAL DEFAULT 0.0
+                )
+            """)
+            conn.commit()
+            conn.close()
+        except sqlite3.DatabaseError:
+            # Recuperação automática quando o arquivo de estado estiver corrompido.
+            try:
+                if os.path.exists(self.db_path):
+                    backup = f"{self.db_path}.corrupted"
+                    if os.path.exists(backup):
+                        os.remove(backup)
+                    os.replace(self.db_path, backup)
+                    logger.warning("[Curiosity] Banco corrompido detectado; backup salvo em %s", backup)
+            except Exception as exc:
+                logger.warning("[Curiosity] Falha ao fazer backup do banco corrompido: %s", exc)
+
+            conn = sqlite3.connect(self.db_path)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS curiosity_topics (
+                    topic TEXT PRIMARY KEY,
+                    interest_score REAL DEFAULT 1.0,
+                    last_explored DATETIME,
+                    discovery_count INTEGER DEFAULT 0,
+                    reward_sum REAL DEFAULT 0.0
+                )
+            """)
+            conn.commit()
+            conn.close()
 
     def get_next_topic(self, context_terms: Optional[List[str]] = None) -> str:
         """Decide o próximo tópico para exploração usando estratégia Epsilon-Greedy."""

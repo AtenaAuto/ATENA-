@@ -6163,7 +6163,7 @@ class AtenaCore:
         # Hacker Recon 2.0: Curiosidade Intrínseca
         recon_topic = "advanced python optimization"
         if HAS_CURIOSITY:
-            recon_topic = curiosity.get_next_topic()
+            recon_topic = curiosity.get_next_topic(context_terms=self._get_context_terms_for_curiosity())
             logger.info(f"🔍 Próximo tópico de curiosidade: {recon_topic}")
 
         # Protocolo Hydra: Auto-Hospedagem e Redundância
@@ -6407,7 +6407,7 @@ class AtenaCore:
             from modules.hyper_evolution import HyperEvolutionEngine
             hyper = HyperEvolutionEngine()
             if HAS_CURIOSITY:
-                topic = curiosity.get_next_topic()
+                topic = curiosity.get_next_topic(context_terms=self._get_context_terms_for_curiosity())
                 if random.random() < 0.3: # 30% de chance de gerar novo mdulo
                     proposal = hyper.propose_new_module(topic)
                     if hyper.run_adversarial_test(proposal["code"]):
@@ -6508,6 +6508,17 @@ class AtenaCore:
         self.kb.update_objective("aprender_algoritmos",       metrics.get("num_functions", 0) // 2)
         total = max(1, metrics.get("tests_total", 1))
         self.kb.update_objective("aumentar_cobertura_testes", metrics.get("tests_passed", 0) / total)
+
+    def _get_context_terms_for_curiosity(self, limit: int = 12) -> List[str]:
+        """Extrai termos recentes aprendidos para guiar a geração de tópicos de pesquisa."""
+        try:
+            rows = self.kb.conn.execute(
+                "SELECT word FROM lang_vocabulary ORDER BY frequency DESC, last_seen DESC LIMIT ?",
+                (max(1, limit),),
+            ).fetchall()
+            return [str(r[0]) for r in rows if r and r[0]]
+        except Exception:
+            return []
 
 
 # =============================================================================

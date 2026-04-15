@@ -18,6 +18,15 @@ class CuriosityEngine:
         self.db_path = db_path
         self._init_db()
         self.exploration_history = []
+        self.base_topics = [
+            "advanced python optimization",
+            "neural architecture search",
+            "autonomous agents",
+            "self-modifying code",
+            "distributed systems",
+            "retrieval augmented generation",
+            "ai observability",
+        ]
         
     def _init_db(self):
         """Garante que as tabelas de curiosidade existam."""
@@ -35,26 +44,50 @@ class CuriosityEngine:
         conn.commit()
         conn.close()
 
-    def get_next_topic(self) -> str:
+    def get_next_topic(self, context_terms: Optional[List[str]] = None) -> str:
         """Decide o próximo tópico para exploração usando estratégia Epsilon-Greedy."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
+        contextual_topics = self._generate_contextual_topics(context_terms or [])
+        candidate_topics = list(dict.fromkeys(self.base_topics + contextual_topics))
         
         # 20% exploração aleatória, 80% exploração baseada em interesse
         if random.random() < 0.2:
-            topics = ["advanced python optimization", "neural architecture search", 
-                      "autonomous agents", "self-modifying code", "distributed systems"]
-            topic = random.choice(topics)
+            topic = random.choice(candidate_topics)
         else:
             cursor.execute("SELECT topic FROM curiosity_topics ORDER BY interest_score DESC LIMIT 5")
             results = cursor.fetchall()
             if not results:
                 topic = "artificial general intelligence"
             else:
-                topic = random.choice([r[0] for r in results])
+                learned = [r[0] for r in results]
+                topic_pool = list(dict.fromkeys(learned + candidate_topics))
+                topic = random.choice(topic_pool)
         
         conn.close()
         return topic
+
+    def _generate_contextual_topics(self, context_terms: List[str]) -> List[str]:
+        """Gera tópicos novos a partir de termos aprendidos para guiar pesquisa incremental."""
+        cleaned = []
+        for term in context_terms:
+            token = (term or "").strip().lower().replace("_", " ")
+            if len(token) < 4:
+                continue
+            if any(ch.isdigit() for ch in token):
+                continue
+            cleaned.append(token)
+        cleaned = list(dict.fromkeys(cleaned))[:6]
+        topics: List[str] = []
+        for token in cleaned:
+            topics.extend(
+                [
+                    f"{token} optimization",
+                    f"{token} for autonomous agents",
+                    f"{token} in distributed systems",
+                ]
+            )
+        return list(dict.fromkeys(topics))[:12]
 
     def update_reward(self, topic: str, reward: float):
         """Atualiza o interesse no tópico baseado na recompensa recebida (ex: novas funções úteis)."""

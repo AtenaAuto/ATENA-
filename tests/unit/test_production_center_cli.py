@@ -145,3 +145,11 @@ def test_go_live_gate_command():
     payload = json.loads(proc.stdout)
     assert payload["contract_valid"] is True
     assert payload["decision"] in {"GO", "NO_GO"}
+
+
+def test_self_audit_command():
+    proc = run_cli("self-audit")
+    assert proc.returncode in {0, 2}
+    payload = json.loads(proc.stdout)
+    assert payload["contract_valid"] is True
+    assert "recommendations" in payload

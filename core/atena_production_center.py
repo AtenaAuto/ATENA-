@@ -25,6 +25,7 @@ from core.production_quality_harness import score_profiles_with_baseline
 from core.production_perfection import build_perfection_plan
 from core.production_readiness import build_remediation_plan, run_readiness
 from core.production_resilience import run_incident_drill
+from core.production_self_audit import run_self_audit
 from core.skill_marketplace import SkillMarketplace, SkillRecord
 
 EVOLUTION = ROOT / "atena_evolution" / "production_center"
@@ -127,6 +128,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_gate.add_argument("--min-success-rate", type=float, default=0.95)
     p_gate.add_argument("--max-avg-latency-ms", type=int, default=500)
     p_gate.add_argument("--max-cost-units", type=float, default=100.0)
+
+    sub.add_parser("self-audit", help="Autoanálise completa de prontidão da ATENA")
 
     p_quota = sub.add_parser("quota-check", help="Valida uso atual contra quota")
     p_quota.add_argument("--rpm", type=int, required=True)
@@ -322,6 +325,11 @@ def main() -> int:
         decision = evaluate_go_live(readiness=readiness, remediation=remediation, slo_alert=slo_payload)
         _emit("go-live-gate", decision)
         return 0 if decision["decision"] == "GO" else 2
+
+    if args.cmd == "self-audit":
+        payload = run_self_audit(ROOT)
+        _emit("self-audit", payload)
+        return 0 if payload["status"] == "ok" else 2
 
     return 2
 

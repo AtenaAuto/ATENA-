@@ -22,6 +22,7 @@ REQUIRED_FIELDS: dict[str, set[str]] = {
     "perfection-plan": {"generated_at", "status", "tracks", "success_criteria"},
     "internet-challenge": {"topic", "status", "confidence", "sources", "recommendation"},
     "go-live-gate": {"decision", "blockers", "readiness_status", "slo_status", "pending_actions"},
+    "self-audit": {"status", "score", "passed", "total", "checks", "recommendations"},
 }
 
 

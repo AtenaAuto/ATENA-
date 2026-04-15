@@ -46,3 +46,8 @@ def test_validate_contract_slo_alert():
 def test_validate_contract_go_live_gate():
     payload = {"decision": "GO", "blockers": [], "readiness_status": "pass", "slo_status": "ok", "pending_actions": 1}
     assert validate_contract("go-live-gate", payload) == []
+
+
+def test_validate_contract_self_audit():
+    payload = {"status": "ok", "score": 1.0, "passed": 1, "total": 1, "checks": [], "recommendations": []}
+    assert validate_contract("self-audit", payload) == []

@@ -112,27 +112,37 @@ def run_objective_cycles(
     output_path: Path | None = None,
     core_factory: Callable[[], Any] | None = None,
     benchmark_fn: Callable[[str], dict[str, Any]] | None = None,
+    require_main_core: bool = True,
 ) -> dict[str, Any]:
     if cycles <= 0:
         raise ValueError("cycles deve ser > 0")
     if benchmark_window <= 0:
         raise ValueError("benchmark_window deve ser > 0")
 
+    core_source = "injected"
     if core_factory is None:
         try:
             from core.main import AtenaCore
 
             core_factory = AtenaCore
-        except Exception:
+            core_source = "core.main.AtenaCore"
+        except Exception as exc:
+            if require_main_core:
+                raise RuntimeError(
+                    "Falha ao carregar core.main.AtenaCore. Instale dependências e rode novamente."
+                ) from exc
             from modules.atena_engine import AtenaCore
 
             core_factory = AtenaCore
+            core_source = "modules.atena_engine.AtenaCore"
     if benchmark_fn is None:
         from core.internet_challenge import run_internet_challenge
 
         benchmark_fn = run_internet_challenge
 
     core = core_factory()
+    if core_source == "injected":
+        core_source = f"{core.__class__.__module__}.{core.__class__.__name__}"
     cycle_data: list[CycleSnapshot] = []
     benchmark_data: list[ExternalBenchmarkSnapshot] = []
 
@@ -183,6 +193,7 @@ def run_objective_cycles(
         "total_elapsed_sec": total_elapsed,
         "avg_cycle_sec": round(total_elapsed / max(1, len(cycle_data)), 4),
         "learning_assessment": learning,
+        "core_source": core_source,
     }
 
     payload = {
@@ -213,6 +224,11 @@ def main() -> int:
         action="store_true",
         help="Retorna exit code 2 se a avaliação indicar que não houve aprendizado consistente.",
     )
+    parser.add_argument(
+        "--allow-fallback-core",
+        action="store_true",
+        help="Permite fallback para modules.atena_engine.AtenaCore se o main não carregar.",
+    )
     args = parser.parse_args()
 
     output_path = Path(args.output).resolve() if args.output else None
@@ -221,6 +237,7 @@ def main() -> int:
         benchmark_window=args.benchmark_window,
         topic_template=args.topic_template,
         output_path=output_path,
+        require_main_core=not args.allow_fallback_core,
     )
 
     print(json.dumps(payload["summary"], ensure_ascii=False, indent=2))

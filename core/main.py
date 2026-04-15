@@ -707,6 +707,23 @@ class KnowledgeBase:
                     was_false_positive INTEGER DEFAULT 0, timestamp TEXT
                 );
 
+                -- v3.1: snapshots de inteligência (aprendizado + progresso)
+                CREATE TABLE IF NOT EXISTS intelligence_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT,
+                    generation INTEGER,
+                    best_score REAL,
+                    score_delta REAL,
+                    stagnation_cycles INTEGER,
+                    adaptive_delta REAL,
+                    vocabulary_size INTEGER,
+                    curiosity_topics INTEGER,
+                    rlhf_patterns INTEGER,
+                    success_ratio REAL,
+                    replaced INTEGER
+                );
+                CREATE INDEX IF NOT EXISTS idx_intel_snapshot_gen ON intelligence_snapshots(generation);
+
                 -- v3.1: Problemas
                 CREATE TABLE IF NOT EXISTS problems (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -755,6 +772,60 @@ class KnowledgeBase:
             logger.debug(f"Cache carregado com {len(self.function_cache)} funes")
         except Exception as e:
             logger.warning(f"Erro ao carregar cache: {e}")
+
+    def save_intelligence_snapshot(
+        self,
+        generation: int,
+        best_score: float,
+        score_delta: float,
+        stagnation_cycles: int,
+        adaptive_delta: float,
+        replaced: bool,
+    ) -> None:
+        """Persiste snapshot resumido da inteligência para auditoria de progresso."""
+        with self._lock:
+            vocab_size = self.conn.execute("SELECT COUNT(*) FROM lang_vocabulary").fetchone()[0]
+            curiosity_topics = self.conn.execute(
+                "SELECT COUNT(*) FROM curiosity_topics"
+            ).fetchone()[0] if self._table_exists("curiosity_topics") else 0
+            rlhf_patterns = self.conn.execute(
+                "SELECT COUNT(*) FROM rlhf_preferences"
+            ).fetchone()[0] if self._table_exists("rlhf_preferences") else 0
+            success_count = self.conn.execute(
+                "SELECT COUNT(*) FROM episodic_memory WHERE replaced = 1"
+            ).fetchone()[0]
+            total_count = self.conn.execute("SELECT COUNT(*) FROM episodic_memory").fetchone()[0]
+            success_ratio = (success_count / total_count) if total_count else 0.0
+            self.conn.execute(
+                """
+                INSERT INTO intelligence_snapshots (
+                    timestamp, generation, best_score, score_delta, stagnation_cycles,
+                    adaptive_delta, vocabulary_size, curiosity_topics, rlhf_patterns,
+                    success_ratio, replaced
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    datetime.now().isoformat(),
+                    generation,
+                    best_score,
+                    score_delta,
+                    stagnation_cycles,
+                    adaptive_delta,
+                    vocab_size,
+                    curiosity_topics,
+                    rlhf_patterns,
+                    success_ratio,
+                    int(replaced),
+                ),
+            )
+            self.conn.commit()
+
+    def _table_exists(self, table_name: str) -> bool:
+        row = self.conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
+            (table_name,),
+        ).fetchone()
+        return bool(row)
 
     def get_cached_eval(self, code_hash: str) -> Optional[Dict]:
         """Recupera avaliao em cache."""
@@ -6351,6 +6422,18 @@ class AtenaCore:
                     weights[k] *= v
         except Exception as e:
             logger.debug(f"Erro na Hiper-Evoluo: {e}")
+
+        try:
+            self.kb.save_intelligence_snapshot(
+                generation=self.generation,
+                best_score=self.best_score,
+                score_delta=self.last_cycle_delta,
+                stagnation_cycles=self.stagnation_cycles,
+                adaptive_delta=adaptive_delta,
+                replaced=replaced,
+            )
+        except Exception as e:
+            logger.debug(f"Erro ao salvar intelligence snapshot: {e}")
 
         gc.collect()
         return {

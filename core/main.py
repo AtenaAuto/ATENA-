@@ -5191,6 +5191,10 @@ class VocabularyHarvester(threading.Thread):
         "profiling", "memoization", "autotuning", "rlhf", "inference", "quantization", "distillation",
         "federated", "multimodal", "timeseries", "featurestore", "grpc", "protobuf", "websocket",
     }
+    SEED_ADVANCED_TERMS = {
+        "orchestrator", "telemetry", "kubernetes", "vectorstore", "retrieval", "optimizer",
+        "observability", "asyncio", "distributed", "inference",
+    }
 
     def __init__(self, kb: KnowledgeBase):
         super().__init__(daemon=True)
@@ -5214,6 +5218,7 @@ class VocabularyHarvester(threading.Thread):
                 terms.update(fn())
             except Exception as e:
                 logger.debug(f"Erro em fonte: {e}")
+        terms.update(self.SEED_ADVANCED_TERMS)
         if HAS_NLTK:
             try:
                 terms.update(self._expand_with_wordnet(terms))
@@ -5238,18 +5243,31 @@ class VocabularyHarvester(threading.Thread):
             logger.info("[] Nenhum termo avançado de alta confiança coletado nesta rodada.")
 
     def _is_high_signal_term(self, word: str) -> bool:
+        return self._term_signal_score(word) >= 2
+
+    def _term_signal_score(self, word: str) -> int:
         word = (word or "").strip().lower()
         if len(word) < 4 or not word.isidentifier():
-            return False
+            return 0
         if word in self.STOPWORDS:
-            return False
+            return -3
+        score = 0
         if word in self.ADVANCED_SIGNAL_TERMS:
-            return True
+            score += 3
         advanced_fragments = (
             "cloud", "vector", "graph", "quant", "model", "agent", "async", "cache", "cluster",
             "metric", "telemet", "kubern", "token", "embed", "optimizer", "federat", "distill",
         )
-        return any(fragment in word for fragment in advanced_fragments)
+        if any(fragment in word for fragment in advanced_fragments):
+            score += 1
+        if len(word) >= 10:
+            score += 1
+        if any(ch.isdigit() for ch in word):
+            score += 1
+        generic_noise = {"python", "function", "object", "system", "method", "variable"}
+        if word in generic_noise:
+            score -= 1
+        return score
 
     def _fetch_stackoverflow_terms(self, pages: int = 2) -> Set[str]:
         terms = set()

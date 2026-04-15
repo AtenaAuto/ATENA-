@@ -289,7 +289,7 @@ IS_CI = os.getenv("CI", "false").lower() == "true"
 IS_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS", "false").lower() == "true"
 
 # Flags de controle (podem ser sobrescritas por variveis de ambiente)
-ALLOW_DEEP_SELF_MOD  = os.getenv("ALLOW_DEEP_SELF_MOD",  "false").lower() == "true"
+ALLOW_DEEP_SELF_MOD  = os.getenv("ALLOW_DEEP_SELF_MOD",  "true").lower() == "true"
 ALLOW_CHECKER_EVOLVE = os.getenv("ALLOW_CHECKER_EVOLVE", "false").lower() == "true"
 SELF_MOD_INTERVAL    = int(os.getenv("SELF_MOD_INTERVAL", "10"))
 META_WINDOW          = int(os.getenv("META_WINDOW", "50"))
@@ -6582,7 +6582,7 @@ if __name__ == "__main__":
     parser.add_argument("--recon",     type=str, default="",  help="Hacker Recon sobre um tpico")
     parser.add_argument("--nocode",    action="store_true",   help="Modo criao de projeto No-Code")
     parser.add_argument("--desc",      type=str, default="",  help="Descrio do projeto No-Code")
-    parser.add_argument("--deep",      action="store_true",   help="Ativa ALLOW_DEEP_SELF_MOD")
+    parser.add_argument("--deep",      action="store_true",   help="Força ALLOW_DEEP_SELF_MOD=true (já vem ativo por padrão)")
     parser.add_argument("--checker",   action="store_true",   help="Ativa ALLOW_CHECKER_EVOLVE")
     parser.add_argument("--problem",   type=str, choices=["sorting", "fibonacci"], help="Problema a resolver")
     args = parser.parse_args()

@@ -24,6 +24,12 @@ REQUIRED_FIELDS: dict[str, set[str]] = {
     "go-live-gate": {"decision", "blockers", "readiness_status", "slo_status", "pending_actions"},
     "self-audit": {"status", "score", "passed", "total", "checks", "recommendations"},
     "programming-probe": {"status", "score", "passed", "total", "checks", "generated_projects", "recommendation"},
+    "eval-run": {"status", "passed", "total", "checks", "generated_at", "summary"},
+    "issue-to-pr-plan": {"status", "issue", "repository", "steps", "next_action"},
+    "rag-governance-check": {"status", "role", "data_classification", "checks", "recommendation"},
+    "security-check": {"status", "risk_score", "blocked", "reasons", "recommended_action"},
+    "finops-route": {"status", "mode", "reason", "estimated_cost_units", "budget_ok"},
+    "incident-commander": {"status", "scenario", "severity", "actions", "summary"},
 }
 
 

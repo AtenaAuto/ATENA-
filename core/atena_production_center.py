@@ -16,6 +16,14 @@ if str(ROOT) not in sys.path:
 from core.heavy_mode_selector import choose_mode
 from core.internet_challenge import run_internet_challenge
 from core.production_access import QuotaManager, TenantQuota
+from core.production_advanced_suite import (
+    build_issue_to_pr_plan,
+    run_eval_suite,
+    run_finops_route,
+    run_incident_commander,
+    run_rag_governance_check,
+    run_security_check,
+)
 from core.production_gate import evaluate_go_live
 from core.production_contracts import validate_contract
 from core.production_guardrails import Action, AuditLogger, PolicyEngine, Role
@@ -146,6 +154,29 @@ def build_parser() -> argparse.ArgumentParser:
     p_quota.add_argument("--limit-rpm", type=int, default=120)
     p_quota.add_argument("--limit-jobs", type=int, default=4)
     p_quota.add_argument("--limit-storage-mb", type=int, default=500)
+
+    sub.add_parser("eval-run", help="Executa avaliação contínua (evals-as-code MVP)")
+
+    p_i2p = sub.add_parser("issue-to-pr-plan", help="Gera plano de execução issue -> PR")
+    p_i2p.add_argument("--issue", required=True)
+    p_i2p.add_argument("--repository", default="ATENA-")
+
+    p_rag = sub.add_parser("rag-governance-check", help="Valida RBAC + citações para consulta RAG")
+    p_rag.add_argument("--role", required=True, choices=["viewer", "operator", "admin"])
+    p_rag.add_argument("--data-classification", required=True, choices=["public", "internal", "confidential"])
+    p_rag.add_argument("--has-citations", action="store_true")
+
+    p_sec = sub.add_parser("security-check", help="Scanner simples de risco (prompt/action)")
+    p_sec.add_argument("--prompt", required=True)
+    p_sec.add_argument("--action", default="open_url")
+
+    p_fin = sub.add_parser("finops-route", help="Roteia modo por custo x qualidade")
+    p_fin.add_argument("--complexity", type=int, required=True)
+    p_fin.add_argument("--budget", type=float, required=True)
+    p_fin.add_argument("--latency-sensitive", action="store_true")
+
+    p_ic = sub.add_parser("incident-commander", help="Gera plano de resposta a incidente (MVP)")
+    p_ic.add_argument("--scenario", default="latency-spike")
 
     return parser
 
@@ -343,6 +374,36 @@ def main() -> int:
         payload = run_programming_probe(ROOT, prefix=args.prefix, site_template=args.site_template)
         _emit("programming-probe", payload)
         return 0 if payload["status"] == "ok" else 2
+
+    if args.cmd == "eval-run":
+        payload = run_eval_suite(telemetry)
+        _emit("eval-run", payload)
+        return 0 if payload["status"] == "pass" else 2
+
+    if args.cmd == "issue-to-pr-plan":
+        payload = build_issue_to_pr_plan(args.issue, args.repository)
+        _emit("issue-to-pr-plan", payload)
+        return 0
+
+    if args.cmd == "rag-governance-check":
+        payload = run_rag_governance_check(args.role, args.data_classification, args.has_citations)
+        _emit("rag-governance-check", payload)
+        return 0 if payload["status"] == "ok" else 2
+
+    if args.cmd == "security-check":
+        payload = run_security_check(args.prompt, args.action)
+        _emit("security-check", payload)
+        return 0 if payload["status"] == "ok" else 2
+
+    if args.cmd == "finops-route":
+        payload = run_finops_route(args.complexity, args.budget, args.latency_sensitive)
+        _emit("finops-route", payload)
+        return 0 if payload["budget_ok"] else 2
+
+    if args.cmd == "incident-commander":
+        payload = run_incident_commander(args.scenario, EVOLUTION / "telemetry.jsonl")
+        _emit("incident-commander", payload)
+        return 0
 
     return 2
 

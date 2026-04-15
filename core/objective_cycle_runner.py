@@ -10,6 +10,7 @@ import json
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from statistics import mean
 from time import perf_counter
 from typing import Any, Callable
 
@@ -38,6 +39,69 @@ def _default_output_path(root: Path) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     return out_dir / f"objective_run_{stamp}.json"
+
+
+def _trend_slope(samples: list[float]) -> float:
+    """Retorna inclinação linear simples (ciclos x valor)."""
+    n = len(samples)
+    if n < 2:
+        return 0.0
+    xs = list(range(1, n + 1))
+    x_mean = mean(xs)
+    y_mean = mean(samples)
+    num = sum((x - x_mean) * (y - y_mean) for x, y in zip(xs, samples))
+    den = sum((x - x_mean) ** 2 for x in xs)
+    if den == 0:
+        return 0.0
+    return float(num / den)
+
+
+def _build_learning_assessment(
+    cycle_data: list[CycleSnapshot], benchmark_data: list[ExternalBenchmarkSnapshot]
+) -> dict[str, Any]:
+    if not cycle_data:
+        return {
+            "is_learning": False,
+            "reason": "no_cycles",
+            "score_trend_slope": 0.0,
+            "positive_score_delta_ratio": 0.0,
+            "benchmark_confidence_trend_slope": 0.0,
+            "intelligence_index": 0.0,
+        }
+
+    scores = [c.score for c in cycle_data]
+    score_deltas = [scores[i] - scores[i - 1] for i in range(1, len(scores))]
+    positive_ratio = (
+        sum(1 for d in score_deltas if d > 0) / len(score_deltas) if score_deltas else 0.0
+    )
+    score_slope = _trend_slope(scores)
+
+    bench_conf = [b.confidence for b in benchmark_data]
+    bench_slope = _trend_slope(bench_conf) if bench_conf else 0.0
+
+    # Índice composto simples (0..1+) para dar leitura rápida de inteligência operacional.
+    intelligence_index = (
+        max(0.0, score_slope) * 0.5
+        + positive_ratio * 0.3
+        + max(0.0, bench_slope) * 0.2
+    )
+
+    # Critério objetivo mínimo de aprendizagem.
+    is_learning = (
+        len(scores) >= 20
+        and score_slope > 0.0
+        and positive_ratio >= 0.5
+        and (not bench_conf or bench_slope >= 0.0)
+    )
+
+    return {
+        "is_learning": is_learning,
+        "reason": "ok" if is_learning else "insufficient_positive_trend",
+        "score_trend_slope": round(score_slope, 6),
+        "positive_score_delta_ratio": round(positive_ratio, 4),
+        "benchmark_confidence_trend_slope": round(bench_slope, 6),
+        "intelligence_index": round(float(intelligence_index), 6),
+    }
 
 
 def run_objective_cycles(
@@ -106,6 +170,7 @@ def run_objective_cycles(
 
     total_elapsed = round(perf_counter() - start, 4)
     accepted = sum(1 for item in cycle_data if item.replaced)
+    learning = _build_learning_assessment(cycle_data, benchmark_data)
     summary = {
         "started_at_utc": datetime.now(timezone.utc).isoformat(),
         "cycles_requested": cycles,
@@ -117,6 +182,7 @@ def run_objective_cycles(
         "final_score": cycle_data[-1].score if cycle_data else 0.0,
         "total_elapsed_sec": total_elapsed,
         "avg_cycle_sec": round(total_elapsed / max(1, len(cycle_data)), 4),
+        "learning_assessment": learning,
     }
 
     payload = {
@@ -142,6 +208,11 @@ def main() -> int:
         help="Template do tópico para benchmark externo. Suporta {cycle} e {generation}.",
     )
     parser.add_argument("--output", type=str, default="")
+    parser.add_argument(
+        "--strict-learning",
+        action="store_true",
+        help="Retorna exit code 2 se a avaliação indicar que não houve aprendizado consistente.",
+    )
     args = parser.parse_args()
 
     output_path = Path(args.output).resolve() if args.output else None
@@ -154,6 +225,8 @@ def main() -> int:
 
     print(json.dumps(payload["summary"], ensure_ascii=False, indent=2))
     print(f"report: {payload['output_path']}")
+    if args.strict_learning and not payload["summary"]["learning_assessment"]["is_learning"]:
+        return 2
     return 0
 
 

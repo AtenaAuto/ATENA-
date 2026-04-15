@@ -37,6 +37,11 @@ def test_sanitize_task_exec_commands_blocks_bare_python_repl() -> None:
     assert "python3 -m py_compile core/main.py" in out
 
 
+def test_extract_commands_from_plan_keeps_dot_slash_prefix() -> None:
+    out = assistant.extract_commands_from_plan("./atena doctor\n./atena modules-smoke")
+    assert out == ["./atena doctor", "./atena modules-smoke"]
+
+
 def test_run_task_exec_builds_nodes_when_extractor_returns_empty(monkeypatch, tmp_path) -> None:
     class FakeRouter:
         def generate(self, prompt: str, context: str = "") -> str:  # noqa: ARG002
@@ -53,3 +58,30 @@ def test_run_task_exec_builds_nodes_when_extractor_returns_empty(monkeypatch, tm
     assert status == "ok"
     assert len(report["dag_nodes"]) == 2
     assert report["results"][0]["command"] == "./atena doctor"
+
+
+def test_build_local_task_exec_fallback_for_tests_count() -> None:
+    commands = assistant.build_local_task_exec_fallback(
+        "Verifique se a pasta tests existe e me diga quantos arquivos .py há nela"
+    )
+    assert len(commands) == 1
+    assert commands[0].startswith("python3 -c ")
+
+
+def test_run_task_exec_uses_objective_fallback_when_plan_has_no_commands(monkeypatch, tmp_path) -> None:
+    class FakeRouter:
+        def generate(self, prompt: str, context: str = "") -> str:  # noqa: ARG002
+            return "resposta sem comandos"
+
+    monkeypatch.setattr(assistant, "ROOT", tmp_path)
+    monkeypatch.setattr(assistant, "append_learning_memory", lambda _payload: None)
+    monkeypatch.setattr(assistant, "run_safe_command", lambda command, **kwargs: (0, f"ok:{command}", ""))  # noqa: ARG005
+
+    status, report_path = assistant.run_task_exec(
+        FakeRouter(),
+        "Verifique se a pasta tests existe e me diga quantos arquivos .py há nela",
+    )
+    report = json.loads(Path(report_path).read_text(encoding="utf-8"))
+
+    assert status == "ok"
+    assert report["commands"][0].startswith("python3 -c ")

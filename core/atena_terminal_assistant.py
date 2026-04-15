@@ -330,7 +330,8 @@ def run_safe_command(command: str, timeout: int = 120, context: str = "interacti
 def extract_commands_from_plan(plan_text: str) -> list[str]:
     commands: list[str] = []
     for line in plan_text.splitlines():
-        candidate = line.strip().strip("`").lstrip("-*0123456789. ").strip()
+        candidate = line.strip().strip("`")
+        candidate = re.sub(r"^\s*(?:[-*]|\d+[.)])\s*", "", candidate).strip()
         if candidate.startswith(ALLOWED_PREFIXES):
             commands.append(candidate)
     unique = []
@@ -347,6 +348,20 @@ def extract_dag_commands(plan_text: str) -> list[dict[str, object]]:
         deps = [] if idx == 0 else [idx - 1]
         nodes.append({"id": idx, "command": cmd, "deps": deps})
     return nodes
+
+
+def build_local_task_exec_fallback(objective: str) -> list[str]:
+    """Gera fallback local útil quando o planner LLM não retorna comandos executáveis."""
+    text = objective.lower()
+    if "tests" in text and ("quant" in text or "count" in text or ".py" in text):
+        return [
+            "python3 -c \"from pathlib import Path; p=Path('tests'); files=list(p.rglob('*.py')) if p.exists() else []; print({'tests_exists': p.exists(), 'py_files': len(files)})\""
+        ]
+    if "git status" in text or ("status" in text and "git" in text):
+        return ["git status --short", "git status"]
+    if "listar" in text or "list" in text:
+        return ["python3 -c \"from pathlib import Path; print('\\n'.join(sorted(x.name for x in Path('.').iterdir())))\""]
+    return ["./atena doctor"]
 
 
 SAFE_ATENA_SUBCOMMANDS = {
@@ -426,7 +441,7 @@ def rollback_from_command(command: str) -> str:
 def run_task_exec(router: AtenaLLMRouter, objective: str) -> tuple[str, str]:
     planner_prompt = (
         "Retorne no máximo 5 comandos shell seguros para executar o objetivo. "
-        "Use somente: ./atena, python3, pytest, ls, cat, git status, git diff, echo. "
+        "Use somente: ./atena, python3, pytest, uv, pip. "
         "Responda com 1 comando por linha.\n\n"
         f"Objetivo: {objective}"
     )
@@ -441,11 +456,10 @@ def run_task_exec(router: AtenaLLMRouter, objective: str) -> tuple[str, str]:
         plan_text = (
             "fallback_plan_timeout\n"
             f"motivo={type(exc).__name__}\n"
-            "./atena doctor\n"
-            "./atena modules-smoke"
+            "./atena doctor"
         )
-    planned = extract_commands_from_plan(plan_text) or ["./atena doctor", "./atena modules-smoke"]
-    commands = sanitize_task_exec_commands(planned) or ["./atena doctor", "./atena modules-smoke"]
+    planned = extract_commands_from_plan(plan_text) or build_local_task_exec_fallback(objective)
+    commands = sanitize_task_exec_commands(planned) or build_local_task_exec_fallback(objective)
     dag_nodes = extract_dag_commands("\n".join(commands))
     if not dag_nodes and commands:
         dag_nodes = [{"id": i, "command": c, "deps": [] if i == 0 else [i - 1]} for i, c in enumerate(commands)]

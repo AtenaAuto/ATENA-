@@ -6559,6 +6559,9 @@ class AtenaApp:
             except KeyboardInterrupt:
                 print("")
                 continue
+            except EOFError:
+                ui.print_log("EOF no stdin detectado; encerrando loop interativo.", level="warning")
+                break
             except Exception as e:
                 ui.print_log(f"Erro crítico: {e}", level="error")
         

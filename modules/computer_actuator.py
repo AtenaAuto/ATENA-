@@ -10,6 +10,7 @@ import subprocess
 import shutil
 import platform
 import logging
+import time
 import psutil
 from pathlib import Path
 from typing import Dict, Any, Optional, List
@@ -95,13 +96,34 @@ class ComputerActuator(BaseActuator):
             }
         return self.execute_command(command=command, timeout=timeout)
 
-    def run_task_sequence(self, tasks: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def execute_safe_command_with_retry(
+        self,
+        command: str,
+        timeout: int = 30,
+        retries: int = 1,
+        retry_delay_seconds: float = 0.2,
+    ) -> Dict[str, Any]:
+        """Executa comando seguro com tentativas adicionais em caso de falha."""
+        attempts = max(1, retries + 1)
+        last_result: Dict[str, Any] = {"success": False, "error": "sem execução"}
+        for attempt in range(1, attempts + 1):
+            result = self.execute_safe_command(command=command, timeout=timeout)
+            result["attempt"] = attempt
+            if result.get("success"):
+                return result
+            last_result = result
+            if attempt < attempts:
+                time.sleep(max(0.0, retry_delay_seconds))
+        return last_result
+
+    def run_task_sequence(self, tasks: List[Dict[str, Any]], stop_on_error: bool = False) -> Dict[str, Any]:
         """
         Executa uma sequência de tarefas estruturadas para uso em diálogo.
         Suporta ações: execute_safe_command, list_files, read_file, write_file, get_system_stats.
         """
         results: List[Dict[str, Any]] = []
         for index, task in enumerate(tasks, start=1):
+            t0 = time.perf_counter()
             action = task.get("action")
             payload = task.get("payload", {})
             item_result: Dict[str, Any] = {"step": index, "action": action, "ok": True}
@@ -110,7 +132,14 @@ class ComputerActuator(BaseActuator):
                 if action == "execute_safe_command":
                     command = str(payload.get("command", ""))
                     timeout = int(payload.get("timeout", 30))
-                    exec_result = self.execute_safe_command(command=command, timeout=timeout)
+                    retries = int(payload.get("retries", 0))
+                    retry_delay = float(payload.get("retry_delay_seconds", 0.2))
+                    exec_result = self.execute_safe_command_with_retry(
+                        command=command,
+                        timeout=timeout,
+                        retries=retries,
+                        retry_delay_seconds=retry_delay,
+                    )
                     item_result["result"] = exec_result
                     item_result["ok"] = bool(exec_result.get("success"))
                 elif action == "list_files":
@@ -133,16 +162,57 @@ class ComputerActuator(BaseActuator):
             except Exception as exc:
                 item_result["ok"] = False
                 item_result["error"] = str(exc)
+            finally:
+                item_result["duration_ms"] = round((time.perf_counter() - t0) * 1000, 2)
 
             results.append(item_result)
+            if stop_on_error and not item_result.get("ok", False):
+                results.append(
+                    {
+                        "step": index + 1,
+                        "action": "sequence_control",
+                        "ok": True,
+                        "duration_ms": 0.0,
+                        "result": "Execução interrompida por stop_on_error=True.",
+                    }
+                )
+                break
 
         success_count = sum(1 for r in results if r.get("ok"))
         return {
             "total_steps": len(results),
             "successful_steps": success_count,
             "failed_steps": len(results) - success_count,
+            "stop_on_error": stop_on_error,
             "results": results,
         }
+
+    def execute(self, action: str, **kwargs) -> Any:
+        """Dispatcher genérico para integração com fluxos baseados em ação."""
+        if action == "execute_safe_command":
+            return self.execute_safe_command_with_retry(
+                command=str(kwargs.get("command", "")),
+                timeout=int(kwargs.get("timeout", 30)),
+                retries=int(kwargs.get("retries", 0)),
+                retry_delay_seconds=float(kwargs.get("retry_delay_seconds", 0.2)),
+            )
+        if action == "run_task_sequence":
+            return self.run_task_sequence(
+                tasks=list(kwargs.get("tasks", [])),
+                stop_on_error=bool(kwargs.get("stop_on_error", False)),
+            )
+        if action == "list_files":
+            return self.list_files(path=str(kwargs.get("path", ".")))
+        if action == "read_file":
+            return self.read_file(path=str(kwargs.get("path", "")))
+        if action == "write_file":
+            return self.write_file(
+                path=str(kwargs.get("path", "")),
+                content=str(kwargs.get("content", "")),
+            )
+        if action == "get_system_stats":
+            return self.get_system_stats()
+        raise ValueError(f"Ação não suportada pelo execute(): {action}")
 
     def list_files(self, path: str = ".") -> List[str]:
         """Lista arquivos em um diretório específico."""
@@ -203,12 +273,14 @@ class ComputerActuator(BaseActuator):
             "features": [
                 "execute_command",
                 "execute_safe_command",
+                "execute_safe_command_with_retry",
                 "list_files",
                 "read_file",
                 "write_file",
                 "get_system_stats",
                 "kill_process",
                 "run_task_sequence",
+                "execute(dispatcher)",
             ]
         }
 

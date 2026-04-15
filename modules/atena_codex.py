@@ -44,7 +44,14 @@ class CheckResult:
 class AtenaCodex:
     """Camada utilitária de operação/diagnóstico para a ATENA."""
 
+    # Módulos obrigatórios para o núcleo operacional da ATENA.
     ESSENTIAL_MODULES = [
+        "requests",
+        "astor",
+    ]
+
+    # Stack avançada recomendada para recursos de alto desempenho.
+    ADVANCED_STACK_MODULES = [
         "aiosqlite",
         "aiohttp",
         "numpy",
@@ -98,8 +105,9 @@ class AtenaCodex:
     def check_python_modules(self) -> Dict[str, List[Dict]]:
         """Valida módulos essenciais e opcionais de runtime."""
         essential = [asdict(self._check_single_module(name)) for name in self.ESSENTIAL_MODULES]
+        advanced = [asdict(self._check_single_module(name)) for name in self.ADVANCED_STACK_MODULES]
         optional = [asdict(self._check_single_module(name)) for name in self.OPTIONAL_MODULES]
-        return {"essential": essential, "optional": optional}
+        return {"essential": essential, "advanced": advanced, "optional": optional}
 
     def run_local_commands(self, timeout_seconds: int = 120) -> List[Dict]:
         """Executa comandos seguros de validação local na raiz do projeto."""
@@ -111,8 +119,14 @@ class AtenaCodex:
         if existing_targets:
             commands.append([sys.executable, "-m", "compileall", "-q"] + existing_targets)
         
-        # Tenta importar o core.main se possível
-        commands.append([sys.executable, "-c", "import sys; sys.path.append('core'); import main; print('Core Import: OK')"])
+        # Validação de import leve do launcher (evita acoplamento com stack científica pesada).
+        commands.append(
+            [
+                sys.executable,
+                "-c",
+                "import sys; sys.path.append('core'); import atena_launcher; print('Launcher Import: OK')",
+            ]
+        )
         
         out = []
         for cmd in commands:
@@ -199,13 +213,23 @@ class AtenaCodex:
             for item in diagnostic["modules"]["essential"]
             if not item.get("ok", False)
         ]
+        advanced_missing = [
+            item["name"]
+            for item in diagnostic["modules"].get("advanced", [])
+            if not item.get("ok", False)
+        ]
         command_failures = [
             item
             for item in diagnostic.get("commands", [])
             if item.get("returncode", 1) != 0
         ]
 
-        risk_score = min(1.0, (len(essential_missing) * 0.12) + (len(command_failures) * 0.18))
+        risk_score = min(
+            1.0,
+            (len(essential_missing) * 0.25)
+            + (len(command_failures) * 0.20)
+            + (len(advanced_missing) * 0.03),
+        )
         confidence = max(0.0, 1.0 - risk_score)
 
         action_plan: List[Dict[str, Any]] = []
@@ -225,6 +249,14 @@ class AtenaCodex:
                     "details": [f["command"] for f in command_failures],
                 }
             )
+        if advanced_missing:
+            action_plan.append(
+                {
+                    "priority": "P1",
+                    "title": "Completar stack avançada de IA",
+                    "details": f"Instalar gradualmente: {', '.join(advanced_missing)}",
+                }
+            )
         if not action_plan:
             action_plan.append(
                 {
@@ -240,6 +272,7 @@ class AtenaCodex:
             "risk_score": round(risk_score, 3),
             "confidence": round(confidence, 3),
             "missing_essential_modules": essential_missing,
+            "missing_advanced_modules": advanced_missing,
             "failing_commands_count": len(command_failures),
             "action_plan": action_plan,
             "diagnostic": diagnostic,

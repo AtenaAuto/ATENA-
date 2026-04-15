@@ -153,3 +153,12 @@ def test_self_audit_command():
     payload = json.loads(proc.stdout)
     assert payload["contract_valid"] is True
     assert "recommendations" in payload
+
+
+def test_programming_probe_command():
+    proc = run_cli("programming-probe", "--prefix", "test_probe")
+    assert proc.returncode in {0, 2}
+    payload = json.loads(proc.stdout)
+    assert payload["contract_valid"] is True
+    assert payload["total"] >= 3
+    assert "generated_projects" in payload

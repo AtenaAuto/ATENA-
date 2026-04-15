@@ -39,3 +39,11 @@ def test_internet_challenge_endpoint():
     response = client.post("/production/internet-challenge", json={"topic": "retrieval augmented generation"})
     assert response.status_code == 200
     assert "status" in response.json()
+
+
+def test_programming_probe_endpoint():
+    response = client.post("/production/programming-probe", json={"prefix": "api_probe_test", "site_template": "basic"})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] in {"ok", "warn"}
+    assert payload["total"] >= 3

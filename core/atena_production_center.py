@@ -23,6 +23,7 @@ from core.production_observability import TelemetryStore, dispatch_alert
 from core.production_onboarding import run_onboarding
 from core.production_quality_harness import score_profiles_with_baseline
 from core.production_perfection import build_perfection_plan
+from core.production_programming_probe import run_programming_probe
 from core.production_readiness import build_remediation_plan, run_readiness
 from core.production_resilience import run_incident_drill
 from core.production_self_audit import run_self_audit
@@ -130,6 +131,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_gate.add_argument("--max-cost-units", type=float, default=100.0)
 
     sub.add_parser("self-audit", help="Autoanálise completa de prontidão da ATENA")
+    p_prog = sub.add_parser("programming-probe", help="Testa se a ATENA consegue programar (site/api/cli)")
+    p_prog.add_argument("--prefix", default="probe")
+    p_prog.add_argument(
+        "--site-template",
+        choices=["basic", "landing-page", "portfolio", "dashboard", "blog"],
+        default="dashboard",
+    )
 
     p_quota = sub.add_parser("quota-check", help="Valida uso atual contra quota")
     p_quota.add_argument("--rpm", type=int, required=True)
@@ -329,6 +337,11 @@ def main() -> int:
     if args.cmd == "self-audit":
         payload = run_self_audit(ROOT)
         _emit("self-audit", payload)
+        return 0 if payload["status"] == "ok" else 2
+
+    if args.cmd == "programming-probe":
+        payload = run_programming_probe(ROOT, prefix=args.prefix, site_template=args.site_template)
+        _emit("programming-probe", payload)
         return 0 if payload["status"] == "ok" else 2
 
     return 2

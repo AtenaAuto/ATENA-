@@ -23,6 +23,7 @@ REQUIRED_FIELDS: dict[str, set[str]] = {
     "internet-challenge": {"topic", "status", "confidence", "sources", "recommendation"},
     "go-live-gate": {"decision", "blockers", "readiness_status", "slo_status", "pending_actions"},
     "self-audit": {"status", "score", "passed", "total", "checks", "recommendations"},
+    "programming-probe": {"status", "score", "passed", "total", "checks", "generated_projects", "recommendation"},
 }
 
 

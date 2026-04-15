@@ -463,7 +463,7 @@ def run_task_exec(router: AtenaLLMRouter, objective: str) -> tuple[str, str]:
     dag_nodes = extract_dag_commands("\n".join(commands))
     if not dag_nodes and commands:
         dag_nodes = [{"id": i, "command": c, "deps": [] if i == 0 else [i - 1]} for i, c in enumerate(commands)]
-    results = execute_command_dag(dag_nodes, context="task-exec", tier="tier1")
+    results = execute_command_dag(dag_nodes, context="task-exec", tier="tier2")
     rollback_logs: list[str] = []
     for item in results:
         if not item["ok"]:

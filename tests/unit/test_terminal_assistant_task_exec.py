@@ -103,3 +103,23 @@ def test_summarize_task_exec_report_returns_human_summary(tmp_path) -> None:
     summary = assistant.summarize_task_exec_report(str(report_path))
     assert "Comandos executados: 1" in summary
     assert "saída: ok" in summary
+
+
+def test_run_task_exec_uses_tier2_policy(monkeypatch, tmp_path) -> None:
+    class FakeRouter:
+        def generate(self, prompt: str, context: str = "") -> str:  # noqa: ARG002
+            return "git status --short"
+
+    seen_tiers: list[str] = []
+
+    def fake_run_safe_command(command: str, **kwargs):  # noqa: ARG001
+        seen_tiers.append(str(kwargs.get("tier")))
+        return 0, "ok", ""
+
+    monkeypatch.setattr(assistant, "ROOT", tmp_path)
+    monkeypatch.setattr(assistant, "append_learning_memory", lambda _payload: None)
+    monkeypatch.setattr(assistant, "run_safe_command", fake_run_safe_command)
+
+    status, _report_path = assistant.run_task_exec(FakeRouter(), "mostrar git status")
+    assert status == "ok"
+    assert seen_tiers and all(t == "tier2" for t in seen_tiers)

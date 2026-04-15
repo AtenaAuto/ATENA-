@@ -15,6 +15,7 @@ REQUIRED = [
     "numpy",
     "aiosqlite",
     "rich",
+    "psutil",
 ]
 
 

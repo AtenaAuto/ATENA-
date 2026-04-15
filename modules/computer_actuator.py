@@ -19,6 +19,16 @@ logger = logging.getLogger(__name__)
 
 class ComputerActuator(BaseActuator):
     """Atuador que fornece capacidades de interação direta com o computador."""
+    SAFE_COMMAND_PREFIXES = (
+        "echo",
+        "pwd",
+        "ls",
+        "cat",
+        "head",
+        "tail",
+        "wc",
+        "python3 -c",
+    )
 
     def _check_dependencies(self) -> None:
         """Valida dependências mínimas para operação do atuador."""
@@ -61,6 +71,78 @@ class ComputerActuator(BaseActuator):
         except Exception as e:
             logger.error(f"[ComputerActuator] Erro ao executar comando: {e}")
             return {"success": False, "error": str(e)}
+
+    def is_command_allowed(self, command: str) -> bool:
+        """Valida se o comando está em uma allowlist segura para uso conversacional."""
+        normalized = command.strip()
+        if not normalized:
+            return False
+        return any(
+            normalized == prefix or normalized.startswith(prefix + " ")
+            for prefix in self.SAFE_COMMAND_PREFIXES
+        )
+
+    def execute_safe_command(self, command: str, timeout: int = 30) -> Dict[str, Any]:
+        """
+        Executa comando apenas se estiver na allowlist.
+        Esse método é recomendado para modo conversacional com humanos.
+        """
+        if not self.is_command_allowed(command):
+            return {
+                "success": False,
+                "error": "Comando bloqueado pela política de segurança do ComputerActuator.",
+                "command": command,
+            }
+        return self.execute_command(command=command, timeout=timeout)
+
+    def run_task_sequence(self, tasks: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Executa uma sequência de tarefas estruturadas para uso em diálogo.
+        Suporta ações: execute_safe_command, list_files, read_file, write_file, get_system_stats.
+        """
+        results: List[Dict[str, Any]] = []
+        for index, task in enumerate(tasks, start=1):
+            action = task.get("action")
+            payload = task.get("payload", {})
+            item_result: Dict[str, Any] = {"step": index, "action": action, "ok": True}
+
+            try:
+                if action == "execute_safe_command":
+                    command = str(payload.get("command", ""))
+                    timeout = int(payload.get("timeout", 30))
+                    exec_result = self.execute_safe_command(command=command, timeout=timeout)
+                    item_result["result"] = exec_result
+                    item_result["ok"] = bool(exec_result.get("success"))
+                elif action == "list_files":
+                    path = str(payload.get("path", "."))
+                    item_result["result"] = self.list_files(path=path)
+                elif action == "read_file":
+                    path = str(payload.get("path", ""))
+                    item_result["result"] = self.read_file(path=path)
+                    item_result["ok"] = item_result["result"] is not None
+                elif action == "write_file":
+                    path = str(payload.get("path", ""))
+                    content = str(payload.get("content", ""))
+                    item_result["result"] = self.write_file(path=path, content=content)
+                    item_result["ok"] = bool(item_result["result"])
+                elif action == "get_system_stats":
+                    item_result["result"] = self.get_system_stats()
+                else:
+                    item_result["ok"] = False
+                    item_result["error"] = f"Ação não suportada: {action}"
+            except Exception as exc:
+                item_result["ok"] = False
+                item_result["error"] = str(exc)
+
+            results.append(item_result)
+
+        success_count = sum(1 for r in results if r.get("ok"))
+        return {
+            "total_steps": len(results),
+            "successful_steps": success_count,
+            "failed_steps": len(results) - success_count,
+            "results": results,
+        }
 
     def list_files(self, path: str = ".") -> List[str]:
         """Lista arquivos em um diretório específico."""
@@ -120,11 +202,13 @@ class ComputerActuator(BaseActuator):
             "os": self.os_info["system"],
             "features": [
                 "execute_command",
+                "execute_safe_command",
                 "list_files",
                 "read_file",
                 "write_file",
                 "get_system_stats",
-                "kill_process"
+                "kill_process",
+                "run_task_sequence",
             ]
         }
 

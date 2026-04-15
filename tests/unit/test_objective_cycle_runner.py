@@ -53,6 +53,7 @@ def test_run_objective_cycles_respects_window(tmp_path: Path):
     assert [b["cycle"] for b in payload["external_benchmarks"]] == [4, 8, 10]
     assert seen_topics == ["benchmark cycle 4", "benchmark cycle 8", "benchmark cycle 10"]
     assert output.exists()
+    assert payload["summary"]["core_source"].endswith("_FakeCore")
 
 
 def test_run_objective_cycles_validates_arguments():

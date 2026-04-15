@@ -68,6 +68,16 @@ def test_build_local_task_exec_fallback_for_tests_count() -> None:
     assert commands[0].startswith("python3 -c ")
 
 
+def test_build_local_task_exec_fallback_for_generic_json_count() -> None:
+    commands = assistant.build_local_task_exec_fallback(
+        "Verifique se existe pasta atena_evolution e conte arquivos json nela"
+    )
+    assert len(commands) == 1
+    assert "python3 -c " in commands[0]
+    assert "*.json" in commands[0]
+    assert "atena_evolution" in commands[0]
+
+
 def test_run_task_exec_uses_objective_fallback_when_plan_has_no_commands(monkeypatch, tmp_path) -> None:
     class FakeRouter:
         def generate(self, prompt: str, context: str = "") -> str:  # noqa: ARG002
@@ -85,6 +95,26 @@ def test_run_task_exec_uses_objective_fallback_when_plan_has_no_commands(monkeyp
 
     assert status == "ok"
     assert report["commands"][0].startswith("python3 -c ")
+
+
+def test_run_task_exec_fallback_counts_json_files(monkeypatch, tmp_path) -> None:
+    class FakeRouter:
+        def generate(self, prompt: str, context: str = "") -> str:  # noqa: ARG002
+            return "sem comandos executáveis"
+
+    monkeypatch.setattr(assistant, "ROOT", tmp_path)
+    monkeypatch.setattr(assistant, "append_learning_memory", lambda _payload: None)
+    monkeypatch.setattr(assistant, "run_safe_command", lambda command, **kwargs: (0, f"ok:{command}", ""))  # noqa: ARG005
+
+    status, report_path = assistant.run_task_exec(
+        FakeRouter(),
+        "Verifique se existe pasta atena_evolution e conte arquivos json nela",
+    )
+    report = json.loads(Path(report_path).read_text(encoding="utf-8"))
+
+    assert status == "ok"
+    assert report["commands"]
+    assert "*.json" in report["commands"][0]
 
 
 def test_summarize_task_exec_report_returns_human_summary(tmp_path) -> None:

@@ -357,6 +357,29 @@ def build_local_task_exec_fallback(objective: str) -> list[str]:
         return [
             "python3 -c \"from pathlib import Path; p=Path('tests'); files=list(p.rglob('*.py')) if p.exists() else []; print({'tests_exists': p.exists(), 'py_files': len(files)})\""
         ]
+    if ("quant" in text or "count" in text or "conte" in text) and "arquivo" in text:
+        folder_match = re.search(r"(?:pasta|diret[oó]rio|folder|dir)\s+([a-zA-Z0-9_./-]+)", text)
+        folder = folder_match.group(1).strip(".,;:") if folder_match else "."
+        ext = None
+        ext_match = re.search(r"\.([a-z0-9]{1,8})\b", text)
+        if ext_match:
+            ext = ext_match.group(1)
+        elif " json" in text:
+            ext = "json"
+        elif " py" in text or "python" in text:
+            ext = "py"
+        elif " md" in text or "markdown" in text:
+            ext = "md"
+        pattern = f"*.{ext}" if ext else "*"
+        return [
+            "python3 -c \"from pathlib import Path; p=Path('"
+            + folder
+            + "'); files=list(p.rglob('"
+            + pattern
+            + "')) if p.exists() else []; print({'path': str(p), 'exists': p.exists(), 'pattern': '"
+            + pattern
+            + "', 'count': len(files)})\""
+        ]
     if "git status" in text or ("status" in text and "git" in text):
         return ["git status --short", "git status"]
     if "listar" in text or "list" in text:

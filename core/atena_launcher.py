@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -42,6 +43,40 @@ ALIASES = {
     "atena-like": "assistant",
     "like": "assistant",
 }
+
+LLM_BOOTSTRAP_COMMANDS = {
+    "start",
+    "invoke",
+    "dashboard",
+    "codex-advanced",
+    "genius",
+    "kyros",
+    "orchestrator-mission",
+}
+
+
+def _maybe_prepare_local_model(command: str) -> bool:
+    """
+    Prepara automaticamente o modelo local sempre que a ATENA
+    for iniciada em fluxos que dependem de geração por LLM.
+    """
+    if command not in LLM_BOOTSTRAP_COMMANDS:
+        return True
+    if os.getenv("ATENA_AUTO_PREPARE_LOCAL_MODEL", "1") != "1":
+        return True
+    try:
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        from core.atena_llm_router import AtenaLLMRouter
+
+        router = AtenaLLMRouter()
+        ok, message = router.prepare_free_local_model()
+        status = "ok" if ok else "erro"
+        print(f"[ATENA bootstrap-model:{status}] {message}", flush=True)
+        return ok
+    except Exception as exc:  # noqa: BLE001
+        print(f"[ATENA bootstrap-model:erro] {exc}", flush=True)
+        return False
 
 
 def render_help() -> None:
@@ -150,6 +185,10 @@ def main(argv: list[str]) -> int:
         render_help()
         return 2
 
+    bootstrap_ok = _maybe_prepare_local_model(command)
+    if not bootstrap_ok and os.getenv("ATENA_STRICT_LLM_BOOTSTRAP", "1") == "1":
+        print("Execução abortada: bootstrap do LLM local falhou (modo estrito).")
+        return 3
     result = subprocess.run([sys.executable, str(script), *argv[2:]], cwd=str(ROOT))
     return result.returncode
 

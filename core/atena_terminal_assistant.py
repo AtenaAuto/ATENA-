@@ -784,6 +784,13 @@ def atena_thinking(message: str = "Pensando..."):
 def main():
     render_banner()
     router = AtenaLLMRouter()
+    if os.getenv("ATENA_AUTO_PREPARE_LOCAL_MODEL", "1") == "1":
+        ok, message = router.prepare_free_local_model()
+        status = "ok" if ok else "erro"
+        console_print(f"[ATENA assistant-model:{status}] {message}")
+        if not ok and os.getenv("ATENA_STRICT_LLM_BOOTSTRAP", "1") == "1":
+            console_print("Execução abortada: LLM local não inicializado (modo estrito).")
+            return 3
     
     # Silenciar logs barulhentos
     for logger_name in ["AtenaUltraBrain", "httpx", "huggingface_hub", "transformers"]:

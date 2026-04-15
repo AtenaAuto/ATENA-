@@ -73,6 +73,15 @@ class AtenaCodex:
         "requests",
         "yaml",
     ]
+    SOFT_DEPENDENCY_MODULES = {
+        "numpy",
+        "pandas",
+        "torch",
+        "transformers",
+        "chromadb",
+        "faiss",
+        "networkx",
+    }
 
     def __init__(self, root_path: Optional[str] = None):
         self.sysaware = AtenaSysAware()
@@ -127,6 +136,15 @@ class AtenaCodex:
                 "import sys; sys.path.append('core'); import atena_launcher; print('Launcher Import: OK')",
             ]
         )
+        # Validação opcional do core.main com classificação de soft-fail para
+        # ambientes sem stack científica pesada.
+        commands.append(
+            [
+                sys.executable,
+                "-c",
+                "import sys; sys.path.append('core'); import main; print('Core Import: OK')",
+            ]
+        )
         
         out = []
         for cmd in commands:
@@ -139,12 +157,26 @@ class AtenaCodex:
                     check=False,
                     cwd=str(self.root_path)
                 )
+                cmd_str = " ".join(cmd)
+                stderr = result.stderr.strip()
+                soft_failed = False
+                soft_reason = ""
+                if "import main" in cmd_str and result.returncode != 0:
+                    missing_soft_dep = any(
+                        f"No module named '{dep}'" in stderr for dep in self.SOFT_DEPENDENCY_MODULES
+                    )
+                    if missing_soft_dep:
+                        soft_failed = True
+                        soft_reason = "Dependência avançada ausente para import opcional de core.main"
+
                 out.append(
                     {
-                        "command": " ".join(cmd),
+                        "command": cmd_str,
                         "returncode": result.returncode,
                         "stdout": result.stdout.strip(),
-                        "stderr": result.stderr.strip(),
+                        "stderr": stderr,
+                        "soft_failed": soft_failed,
+                        "soft_reason": soft_reason,
                     }
                 )
             except subprocess.TimeoutExpired:
@@ -154,6 +186,8 @@ class AtenaCodex:
                         "returncode": -1,
                         "stdout": "",
                         "stderr": f"timeout>{timeout_seconds}s",
+                        "soft_failed": False,
+                        "soft_reason": "",
                     }
                 )
             except Exception as e:
@@ -163,6 +197,8 @@ class AtenaCodex:
                         "returncode": -2,
                         "stdout": "",
                         "stderr": str(e),
+                        "soft_failed": False,
+                        "soft_reason": "",
                     }
                 )
         return out
@@ -175,7 +211,11 @@ class AtenaCodex:
 
         essentials_ok = all(item["ok"] for item in module_checks["essential"])
         # Consideramos OK se os comandos que rodaram retornaram 0
-        commands_ok = all(item["returncode"] == 0 for item in command_checks) if command_checks else True
+        commands_ok = (
+            all(item["returncode"] == 0 or item.get("soft_failed", False) for item in command_checks)
+            if command_checks
+            else True
+        )
 
         status = "ok" if (essentials_ok and commands_ok) else "partial"
         diagnostic = {
@@ -221,7 +261,12 @@ class AtenaCodex:
         command_failures = [
             item
             for item in diagnostic.get("commands", [])
-            if item.get("returncode", 1) != 0
+            if item.get("returncode", 1) != 0 and not item.get("soft_failed", False)
+        ]
+        soft_command_warnings = [
+            item
+            for item in diagnostic.get("commands", [])
+            if item.get("soft_failed", False)
         ]
 
         risk_score = min(
@@ -257,6 +302,14 @@ class AtenaCodex:
                     "details": f"Instalar gradualmente: {', '.join(advanced_missing)}",
                 }
             )
+        if soft_command_warnings:
+            action_plan.append(
+                {
+                    "priority": "P1",
+                    "title": "Eliminar soft-fails de import avançado",
+                    "details": [w.get("soft_reason", "soft-fail detectado") for w in soft_command_warnings],
+                }
+            )
         if not action_plan:
             action_plan.append(
                 {
@@ -274,6 +327,7 @@ class AtenaCodex:
             "missing_essential_modules": essential_missing,
             "missing_advanced_modules": advanced_missing,
             "failing_commands_count": len(command_failures),
+            "soft_warning_commands_count": len(soft_command_warnings),
             "action_plan": action_plan,
             "diagnostic": diagnostic,
             "generated_at": datetime.utcnow().isoformat() + "Z",

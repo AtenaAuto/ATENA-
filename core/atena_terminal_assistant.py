@@ -63,6 +63,32 @@ def console_print(message: str) -> None:
     else:
         print(message)
 
+
+def router_generate_with_timeout(
+    router: AtenaLLMRouter,
+    prompt: str,
+    context: str,
+    timeout_seconds: float = 25.0,
+) -> str:
+    """Executa router.generate em thread daemon para evitar travas em TTY."""
+    done = threading.Event()
+    box: dict[str, Any] = {}
+
+    def _worker() -> None:
+        try:
+            box["value"] = router.generate(prompt, context=context)
+        except Exception as exc:  # noqa: BLE001
+            box["error"] = exc
+        finally:
+            done.set()
+
+    threading.Thread(target=_worker, daemon=True).start()
+    if not done.wait(timeout_seconds):
+        raise TimeoutError(f"router.generate timeout>{timeout_seconds}s")
+    if "error" in box:
+        raise box["error"]
+    return str(box.get("value", ""))
+
 @dataclass
 class EvolutionState:
     cycles: int = 0
@@ -323,6 +349,38 @@ def extract_dag_commands(plan_text: str) -> list[dict[str, object]]:
     return nodes
 
 
+SAFE_ATENA_SUBCOMMANDS = {
+    "doctor",
+    "modules-smoke",
+    "guardian",
+    "production-ready",
+    "orchestrator-mission",
+    "bootstrap",
+}
+
+
+def sanitize_task_exec_commands(commands: list[str]) -> list[str]:
+    """Remove comandos interativos/perigosos do /task-exec."""
+    sanitized: list[str] = []
+    for cmd in commands:
+        candidate = cmd.strip()
+        if candidate in {"python", "python3"}:
+            # Evita abrir REPL interativo que trava a sessão.
+            continue
+        if candidate.startswith("python ") or candidate.startswith("python3 "):
+            parts = shlex.split(candidate)
+            # permite apenas execuções explícitas de script/flags.
+            if len(parts) == 1:
+                continue
+        if candidate.startswith("./atena"):
+            parts = shlex.split(candidate)
+            sub = parts[1] if len(parts) > 1 else ""
+            if sub not in SAFE_ATENA_SUBCOMMANDS:
+                continue
+        sanitized.append(candidate)
+    return sanitized
+
+
 def execute_command_dag(nodes: list[dict[str, object]], context: str, tier: str = "tier1") -> list[dict[str, object]]:
     completed: set[int] = set()
     results: list[dict[str, object]] = []
@@ -372,9 +430,25 @@ def run_task_exec(router: AtenaLLMRouter, objective: str) -> tuple[str, str]:
         "Responda com 1 comando por linha.\n\n"
         f"Objetivo: {objective}"
     )
-    plan_text = router.generate(planner_prompt, context="Atena task executor")
-    commands = extract_commands_from_plan(plan_text) or ["./atena doctor", "./atena modules-smoke"]
+    try:
+        plan_text = router_generate_with_timeout(
+            router=router,
+            prompt=planner_prompt,
+            context="Atena task executor",
+            timeout_seconds=25,
+        )
+    except Exception as exc:
+        plan_text = (
+            "fallback_plan_timeout\n"
+            f"motivo={type(exc).__name__}\n"
+            "./atena doctor\n"
+            "./atena modules-smoke"
+        )
+    planned = extract_commands_from_plan(plan_text) or ["./atena doctor", "./atena modules-smoke"]
+    commands = sanitize_task_exec_commands(planned) or ["./atena doctor", "./atena modules-smoke"]
     dag_nodes = extract_dag_commands("\n".join(commands))
+    if not dag_nodes and commands:
+        dag_nodes = [{"id": i, "command": c, "deps": [] if i == 0 else [i - 1]} for i, c in enumerate(commands)]
     results = execute_command_dag(dag_nodes, context="task-exec", tier="tier1")
     rollback_logs: list[str] = []
     for item in results:
@@ -639,13 +713,14 @@ def run_device_control(request: str, confirmed: bool) -> tuple[str, str]:
 
 @contextmanager
 def atena_thinking(message: str = "Pensando..."):
-    if HAS_RICH:
+    use_live_spinner = HAS_RICH and os.getenv("ATENA_USE_LIVE_SPINNER", "0") == "1"
+    if use_live_spinner:
         with Live(Spinner("dots", text=Text(message, style="cyan"), style="magenta"), refresh_per_second=10, transient=True):
             yield
     else:
-        print(f"◐ {message}", end="\r")
+        print(f"◐ {message}")
         yield
-        print(" " * 50, end="\r")
+        print("✔ concluído")
 
 def main():
     render_banner()
@@ -784,7 +859,15 @@ def main():
             if user_input.startswith("/task "):
                 task_msg = user_input[6:].strip()
                 with atena_thinking("Processando tarefa..."):
-                    answer = router.generate(task_msg, context="Claude Code Style Assistant")
+                    try:
+                        answer = router_generate_with_timeout(
+                            router=router,
+                            prompt=task_msg,
+                            context="Claude Code Style Assistant",
+                            timeout_seconds=25,
+                        )
+                    except Exception as exc:
+                        answer = f"Timeout/erro ao gerar resposta ({type(exc).__name__}). Tente novamente com /task-exec."
                 
                 if HAS_RICH:
                     CONSOLE.print(Panel(Markdown(answer), title="[bold cyan]ATENA[/bold cyan]", border_style="cyan"))
@@ -795,7 +878,15 @@ def main():
             # Comando padrão (se não começar com / assume-se /task)
             if not user_input.startswith("/"):
                 with atena_thinking("Analisando..."):
-                    answer = router.generate(user_input, context="Claude Code Style Assistant")
+                    try:
+                        answer = router_generate_with_timeout(
+                            router=router,
+                            prompt=user_input,
+                            context="Claude Code Style Assistant",
+                            timeout_seconds=25,
+                        )
+                    except Exception as exc:
+                        answer = f"Timeout/erro ao gerar resposta ({type(exc).__name__}). Use /task-exec para fluxo estruturado."
                 if HAS_RICH:
                     CONSOLE.print(Panel(Markdown(answer), title="[bold cyan]ATENA[/bold cyan]", border_style="cyan"))
                 else:

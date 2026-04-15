@@ -5,6 +5,9 @@ from core.atena_llm_router import AtenaLLMRouter
 
 
 class _FakeBrain:
+    class cfg:
+        base_model_name = "Qwen/Qwen2.5-0.5B-Instruct"
+
     def prepare_runtime_model(self):
         return True, "ok"
 
@@ -15,6 +18,7 @@ def test_prepare_free_local_model_uses_local_brain(monkeypatch):
     ok, msg = router.prepare_free_local_model()
     assert ok is True
     assert msg == "ok"
+    assert router.cfg.model == "Qwen/Qwen2.5-0.5B-Instruct"
 
 
 def test_prepare_free_local_model_rejects_non_local_provider():

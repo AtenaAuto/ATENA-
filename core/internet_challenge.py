@@ -5,8 +5,10 @@
 from __future__ import annotations
 
 import json
+import time
 import urllib.parse
 import urllib.request
+from urllib.error import HTTPError
 from dataclasses import dataclass
 
 
@@ -18,8 +20,23 @@ class SourceResult:
 
 
 def _fetch_json(url: str, timeout: int = 15) -> dict:
-    with urllib.request.urlopen(url, timeout=timeout) as response:  # nosec - controlled URLs
-        return json.loads(response.read().decode("utf-8"))
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "ATENA/3.2 (+https://github.com/AtenaAuto/ATENA-)",
+            "Accept": "application/json",
+        },
+    )
+    for attempt in range(2):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as response:  # nosec - controlled URLs
+                return json.loads(response.read().decode("utf-8"))
+        except HTTPError as exc:
+            if exc.code == 403 and attempt == 0:
+                time.sleep(0.4)
+                continue
+            raise
+    return {}
 
 
 def run_internet_challenge(topic: str) -> dict[str, object]:
@@ -29,6 +46,8 @@ def run_internet_challenge(topic: str) -> dict[str, object]:
     # 1) Wikipedia summary
     try:
         wiki = _fetch_json(f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}")
+        if not wiki.get("extract"):
+            raise ValueError("Wikipedia summary vazio para query direta")
         sources.append(
             SourceResult(
                 source="wikipedia",
@@ -40,7 +59,37 @@ def run_internet_challenge(topic: str) -> dict[str, object]:
             )
         )
     except Exception as exc:  # noqa: BLE001
-        sources.append(SourceResult(source="wikipedia", ok=False, details={"error": str(exc)}))
+        try:
+            search = _fetch_json(
+                f"https://en.wikipedia.org/w/api.php?action=opensearch&search={query}&limit=1&namespace=0&format=json"
+            )
+            title = ""
+            if isinstance(search, list) and len(search) >= 2 and isinstance(search[1], list) and search[1]:
+                title = str(search[1][0]).strip()
+            if title:
+                title_q = urllib.parse.quote(title)
+                wiki = _fetch_json(f"https://en.wikipedia.org/api/rest_v1/page/summary/{title_q}")
+                sources.append(
+                    SourceResult(
+                        source="wikipedia",
+                        ok=True,
+                        details={
+                            "title": wiki.get("title") or title,
+                            "extract": str(wiki.get("extract", ""))[:280],
+                            "fallback_search": True,
+                        },
+                    )
+                )
+            else:
+                sources.append(SourceResult(source="wikipedia", ok=False, details={"error": str(exc)}))
+        except Exception as fallback_exc:  # noqa: BLE001
+            sources.append(
+                SourceResult(
+                    source="wikipedia",
+                    ok=False,
+                    details={"error": str(exc), "fallback_error": str(fallback_exc)},
+                )
+            )
 
     # 2) GitHub repositories relevance
     try:

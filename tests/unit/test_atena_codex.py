@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from modules.atena_codex import AtenaCodex
 
 
@@ -87,3 +89,32 @@ def test_run_advanced_autopilot_reports_soft_warning_and_advanced_missing(monkey
     assert result["failing_commands_count"] == 0
     assert result["soft_warning_commands_count"] == 1
     assert any(item["title"] == "Eliminar soft-fails de import avançado" for item in result["action_plan"])
+
+
+def test_extract_missing_import_from_stderr() -> None:
+    stderr = "ModuleNotFoundError: No module named 'psutil'"
+    assert AtenaCodex._extract_missing_import_from_stderr(stderr) == "psutil"
+    assert AtenaCodex._extract_missing_import_from_stderr("random error") is None
+
+
+def test_run_module_smoke_suite_retries_after_install(monkeypatch, tmp_path) -> None:
+    modules_dir = tmp_path / "modules"
+    modules_dir.mkdir(parents=True, exist_ok=True)
+    (modules_dir / "sample.py").write_text("x = 1\n", encoding="utf-8")
+
+    codex = AtenaCodex(root_path=str(tmp_path))
+    calls = {"run": 0}
+
+    def fake_run(cmd, capture_output, text, timeout, check, cwd):  # noqa: ANN001
+        calls["run"] += 1
+        cmd_text = " ".join(cmd)
+        if "pip install psutil" in cmd_text:
+            return SimpleNamespace(returncode=0, stdout="ok", stderr="")
+        if calls["run"] == 1:
+            return SimpleNamespace(returncode=1, stdout="", stderr="ModuleNotFoundError: No module named 'psutil'")
+        return SimpleNamespace(returncode=0, stdout="OK:sample", stderr="")
+
+    monkeypatch.setattr("modules.atena_codex.subprocess.run", fake_run)
+    report = codex.run_module_smoke_suite(timeout_seconds=3)
+    first_result = next(item for item in report["results"] if item["type"] == "module_import")
+    assert first_result["ok"] is True

@@ -6,6 +6,7 @@ import importlib
 import json
 import logging
 import platform
+import re
 import subprocess
 import sys
 import threading
@@ -81,6 +82,13 @@ class AtenaCodex:
         "chromadb",
         "faiss",
         "networkx",
+    }
+    RUNTIME_IMPORT_TO_PIP = {
+        "psutil": "psutil",
+        "numpy": "numpy",
+        "requests": "requests",
+        "rich": "rich",
+        "aiosqlite": "aiosqlite",
     }
 
     def __init__(self, root_path: Optional[str] = None):
@@ -376,6 +384,17 @@ class AtenaCodex:
                     check=False,
                     cwd=str(self.root_path),
                 )
+                missing_import = self._extract_missing_import_from_stderr(proc.stderr)
+                if proc.returncode != 0 and missing_import:
+                    if self._ensure_runtime_dependency(missing_import):
+                        proc = subprocess.run(
+                            cmd,
+                            capture_output=True,
+                            text=True,
+                            timeout=timeout_seconds,
+                            check=False,
+                            cwd=str(self.root_path),
+                        )
                 results.append(
                     {
                         "type": "module_import",
@@ -478,6 +497,30 @@ class AtenaCodex:
             json.dump(summary, f, ensure_ascii=False, indent=2)
         summary["report_path"] = str(report_path)
         return summary
+
+    @staticmethod
+    def _extract_missing_import_from_stderr(stderr: str) -> Optional[str]:
+        if not stderr:
+            return None
+        match = re.search(r"No module named '([^']+)'", stderr)
+        return match.group(1) if match else None
+
+    def _ensure_runtime_dependency(self, import_name: str) -> bool:
+        package_name = self.RUNTIME_IMPORT_TO_PIP.get(import_name)
+        if not package_name:
+            return False
+        try:
+            proc = subprocess.run(
+                [sys.executable, "-m", "pip", "install", package_name],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=False,
+                cwd=str(self.root_path),
+            )
+            return proc.returncode == 0
+        except Exception:
+            return False
 
     @staticmethod
     def _check_single_module(module_name: str) -> CheckResult:

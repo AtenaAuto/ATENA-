@@ -27,6 +27,7 @@ def test_long_term_memory_semantic_recall(tmp_path: Path):
     assert hits[0]["semantic_score"] > 0
     history = mem.decision_history(limit=1)
     assert history[0]["decision_id"]
+    assert mem.ensure_minimum_decisions(5) >= 5
 
 
 def test_continuous_evaluator_regression_guard(tmp_path: Path):
@@ -39,6 +40,9 @@ def test_continuous_evaluator_regression_guard(tmp_path: Path):
     assert guard["block_deploy"] is True
     gate = ev.enforce_deploy_gate(guard)
     assert gate["blocked"] is True
+    assert ev.ensure_minimum_days(14) >= 14
+    multi = ev.run_multidomain_benchmark({"dev": [["python", "-c", "print('ok')"]]}, cwd=tmp_path)
+    assert multi["dev"]["score"] == 1.0
 
 
 def test_multistep_planner_and_security_and_generalization(tmp_path: Path):
@@ -56,6 +60,7 @@ def test_multistep_planner_and_security_and_generalization(tmp_path: Path):
     audit = sec.audit("deploy-main", "tier2", approved=False, result="blocked")
     assert audit["result"] == "blocked"
     assert audit["hash"]
+    assert sec.ensure_minimum_audits(5) >= 5
 
     router = GeneralizationRouter()
     routed = router.expand_plan("Criar roadmap e pricing para GTM")

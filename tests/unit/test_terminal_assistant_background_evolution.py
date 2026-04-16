@@ -29,6 +29,42 @@ def test_background_internet_learning_cycle_records_payload(monkeypatch):
     assert recorded["sources"] == 1
 
 
+def test_background_cycle_does_not_materialize_assets_by_default(monkeypatch):
+    monkeypatch.delenv("ATENA_AUTO_BUILD_FROM_INTERNET", raising=False)
+    monkeypatch.setattr(
+        "core.atena_terminal_assistant.run_internet_challenge",
+        lambda topic: {"status": "ok", "confidence": 0.9, "sources": [{"source": "x"}], "topic": topic},
+    )
+    called = {"value": False}
+
+    def _fake_materialize(topic, payload):
+        called["value"] = True
+        return []
+
+    monkeypatch.setattr("core.atena_terminal_assistant.materialize_self_generated_assets", _fake_materialize)
+    monkeypatch.setattr("core.atena_terminal_assistant.append_learning_memory", lambda entry: None)
+    run_background_internet_learning_cycle("safe-default")
+    assert called["value"] is False
+
+
+def test_background_cycle_materializes_assets_when_enabled(monkeypatch):
+    monkeypatch.setenv("ATENA_AUTO_BUILD_FROM_INTERNET", "1")
+    monkeypatch.setattr(
+        "core.atena_terminal_assistant.run_internet_challenge",
+        lambda topic: {"status": "ok", "confidence": 0.9, "sources": [{"source": "x"}], "topic": topic},
+    )
+    called = {"value": False}
+
+    def _fake_materialize(topic, payload):
+        called["value"] = True
+        return []
+
+    monkeypatch.setattr("core.atena_terminal_assistant.materialize_self_generated_assets", _fake_materialize)
+    monkeypatch.setattr("core.atena_terminal_assistant.append_learning_memory", lambda entry: None)
+    run_background_internet_learning_cycle("explicit-enable")
+    assert called["value"] is True
+
+
 def test_parse_background_topics_defaults_and_custom():
     defaults = parse_background_topics(None)
     assert len(defaults) >= 2

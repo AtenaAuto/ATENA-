@@ -140,7 +140,7 @@ def run_background_internet_learning_cycle(topic: str) -> dict[str, object]:
             "sources": len(payload.get("sources", [])) if isinstance(payload.get("sources"), list) else 0,
         }
     )
-    if os.getenv("ATENA_AUTO_BUILD_FROM_INTERNET", "1") == "1":
+    if is_auto_build_from_internet_enabled():
         created = materialize_self_generated_assets(topic=topic, payload=payload)
         if created:
             append_learning_memory(
@@ -152,6 +152,10 @@ def run_background_internet_learning_cycle(topic: str) -> dict[str, object]:
                 }
             )
     return payload
+
+
+def is_auto_build_from_internet_enabled() -> bool:
+    return os.getenv("ATENA_AUTO_BUILD_FROM_INTERNET", "0") == "1"
 
 
 def _slugify(text: str) -> str:
@@ -492,6 +496,7 @@ def print_help():
             ("/run <cmd>", "Executa um comando no terminal"),
             ("/skills", "Valida skills conectadas ao runtime da ATENA"),
             ("/plugins", "Lista plugins locais detectados"),
+            ("/evolution-build-now [tema]", "Executa 1 ciclo imediato de evolução/internet"),
             ("/context", "Mostra o contexto atual da sessão"),
             ("/evolution-status", "Mostra status da evolução em background"),
             ("/model", "Gerencia o modelo de IA utilizado"),
@@ -1116,6 +1121,8 @@ def main():
     bg_thread = start_background_evolution(evolution_state)
     if bg_thread is not None:
         console_print("[ATENA evolution] background internet-learning ativo.")
+        auto_build_status = "ON" if is_auto_build_from_internet_enabled() else "OFF"
+        console_print(f"[ATENA evolution] auto-build-from-internet={auto_build_status} (use ATENA_AUTO_BUILD_FROM_INTERNET=1 para habilitar).")
     if os.getenv("ATENA_AUTO_PREPARE_LOCAL_MODEL", "1") == "1":
         ok, message = router.prepare_free_local_model()
         status = "ok" if ok else "erro"
@@ -1168,6 +1175,21 @@ def main():
                     CONSOLE.print(Panel(status, title="[bold cyan]Evolution Status[/bold cyan]", border_style="cyan"))
                 else:
                     print(status)
+                continue
+
+            if user_input.startswith("/evolution-build-now"):
+                parts = user_input.split(maxsplit=1)
+                topic = parts[1].strip() if len(parts) > 1 else choose_next_background_topic(
+                    evolution_state, parse_background_topics(os.getenv("ATENA_BG_TOPICS"))
+                )
+                with atena_thinking(f"Executando ciclo imediato para: {topic}"):
+                    payload = run_internet_challenge(topic)
+                    created = materialize_self_generated_assets(topic, payload)
+                status = str(payload.get("status", "unknown"))
+                confidence = float(payload.get("confidence", 0.0) or 0.0)
+                CONSOLE.print(
+                    f"[bold cyan]Evolution build now[/bold cyan] status={status} confidence={confidence:.2f} assets={len(created)}"
+                )
                 continue
 
             if user_input.startswith("/self-test"):

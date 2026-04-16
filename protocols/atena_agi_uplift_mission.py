@@ -19,6 +19,7 @@ from core.atena_agi_uplift import (
     LongTermMemoryEngine,
     MultiStepPlanner,
     SecurityAuditor,
+    SelfCorrectionEngine,
 )
 
 def main() -> int:
@@ -30,6 +31,7 @@ def main() -> int:
     planner = MultiStepPlanner()
     security = SecurityAuditor(ROOT)
     router = GeneralizationRouter()
+    autocorrect = SelfCorrectionEngine()
 
     memory.remember_decision(
         objective="reduzir falhas no deploy",
@@ -41,6 +43,11 @@ def main() -> int:
 
     evaluator.record_score(0.81, date=datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     regression = evaluator.regression_guard(min_drop=0.08, window=3)
+    deploy_gate = evaluator.enforce_deploy_gate(regression)
+    benchmark_run = evaluator.run_benchmark_commands(
+        commands=[[sys.executable, "-m", "py_compile", "core/atena_agi_uplift.py"]],
+        cwd=ROOT,
+    )
 
     plan_exec = planner.execute(
         objective="elevar confiabilidade operacional",
@@ -57,18 +64,28 @@ def main() -> int:
     )
 
     generalization = {
-        "dados": router.route("Criar pipeline ETL com métricas de qualidade"),
-        "estrategia": router.route("Criar roadmap e pricing de lançamento"),
-        "documentacao": router.route("Escrever runbook de incidentes"),
-        "infra": router.route("Melhorar observability e deploy SRE"),
-        "dev": router.route("Refactor de módulo Python com testes"),
+        "dados": router.expand_plan("Criar pipeline ETL com métricas de qualidade"),
+        "estrategia": router.expand_plan("Criar roadmap e pricing de lançamento"),
+        "documentacao": router.expand_plan("Escrever runbook de incidentes"),
+        "infra": router.expand_plan("Melhorar observability e deploy SRE"),
+        "dev": router.expand_plan("Refactor de módulo Python com testes"),
     }
+    self_correction = autocorrect.run_iterative(
+        test_cmd=[sys.executable, "-c", "print('ok')"],
+        patch_cmds=[[sys.executable, "-c", "print('patch-attempt')"]],
+        rollback_cmd=[sys.executable, "-c", "print('rollback')"],
+        cwd=ROOT,
+    )
 
     payload = {
         "status": "ok",
         "recalled_memories": recalled,
+        "decision_history_tail": memory.decision_history(limit=5),
         "regression_guard": regression,
+        "deploy_gate": deploy_gate,
+        "benchmark_run": benchmark_run,
         "plan_execution": plan_exec,
+        "self_correction": self_correction,
         "security": {"can_execute_tier2": sec_check, "audit": sec_audit},
         "generalization_samples": generalization,
         "generated_at": datetime.now(timezone.utc).isoformat(),

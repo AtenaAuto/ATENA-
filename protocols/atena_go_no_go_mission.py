@@ -60,34 +60,14 @@ def main() -> int:
     checks.append(CheckResult("production-ready", "./atena production-ready", rc == 0, out))
 
     # 4) Programação no assistant deve devolver código Python
-    prompt = "/task Responda apenas com código Python e inclua print('ok')\\n:q\\n"
-    out = ""
-    rc = 1
-    has_python_code = False
-    for _ in range(2):
-        rc, out = run_cmd(
-            ["bash", "-lc", f"ATENA_STRICT_LLM_BOOTSTRAP=0 printf \"{prompt}\" | ./atena assistant"],
-            timeout=240,
-        )
-        has_python_code = any(
-            marker in out
-            for marker in [
-                "```python",
-                "print('ok')",
-                'print(\"ok\")',
-                "print(\"ok\")",
-                "print('ok')",
-                "python",
-            ]
-        )
-        if rc == 0 and has_python_code:
-            break
-    assistant_ok = rc == 0
+    prompt = "/task Gere um script Python mínimo que imprima 'ok'\\n:q\\n"
+    rc, out = run_cmd(["bash", "-lc", f"printf \"{prompt}\" | ./atena assistant"], timeout=120)
+    has_python_code = "```python" in out or "def main():" in out or "print(\"ok\")" in out
     checks.append(
         CheckResult(
             "assistant-programming",
             "printf '/task ...' | ./atena assistant",
-            assistant_ok,
+            rc == 0 and has_python_code,
             out,
         )
     )

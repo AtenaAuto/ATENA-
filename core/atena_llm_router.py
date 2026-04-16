@@ -24,7 +24,7 @@ DEFAULT_QWEN_MODEL = os.getenv("ATENA_QWEN_MODEL") or "qwen-turbo"
 @dataclass
 class LLMConfig:
     provider: str = "local"  # local | openai | compat | deepseek | anthropic | qwen
-    model: str = "local-llm"
+    model: str = "local-simbrain"
     base_url: Optional[str] = None
 
 
@@ -41,7 +41,7 @@ class AtenaLLMRouter:
             self.set_backend(f"qwen:{DEFAULT_QWEN_MODEL}")
 
     def list_options(self) -> list[str]:
-        opts = ["local:local-llm (requer modelo local preparado)"]
+        opts = ["local:local-simbrain (sempre disponível)"]
         if os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY"):
             opts.append("deepseek:light (deepseek-chat)")
             opts.append("deepseek:heavy (deepseek-reasoner)")
@@ -76,7 +76,7 @@ class AtenaLLMRouter:
         model = model.strip()
 
         if provider == "local":
-            self.cfg = LLMConfig(provider="local", model="local-llm")
+            self.cfg = LLMConfig(provider="local", model="local-simbrain")
             return True, "backend local ativado"
 
         if provider == "deepseek":
@@ -141,10 +141,7 @@ class AtenaLLMRouter:
         if self.cfg.provider != "local":
             return False, "Preparação de modelo local disponível apenas para provider local."
         brain = self._get_local_brain()
-        ok, message = brain.prepare_runtime_model()
-        if ok:
-            self.cfg.model = brain.cfg.base_model_name
-        return ok, message
+        return brain.prepare_runtime_model()
 
     def generate(self, prompt: str, context: str = "") -> str:
         if self.cfg.provider == "local":

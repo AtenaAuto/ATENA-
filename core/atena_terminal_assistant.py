@@ -27,7 +27,6 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from core.atena_llm_router import AtenaLLMRouter
-from core.internet_challenge import run_internet_challenge
 
 try:
     from rich.console import Console
@@ -64,30 +63,6 @@ def console_print(message: str) -> None:
     else:
         print(message)
 
-def inspect_local_plugins() -> dict[str, object]:
-    plugins_root = ROOT / "plugins"
-    plugin_entries: list[dict[str, str]] = []
-    if plugins_root.exists():
-        for readme in sorted(plugins_root.rglob("README.md")):
-            plugin_dir = readme.parent
-            plugin_entries.append(
-                {
-                    "name": plugin_dir.name,
-                    "path": str(plugin_dir.relative_to(ROOT)),
-                    "readme": str(readme.relative_to(ROOT)),
-                }
-            )
-    return {
-        "count": len(plugin_entries),
-        "items": plugin_entries,
-    }
-
-
-def run_skills_validation() -> tuple[int, str, str]:
-    cmd = [sys.executable, str(ROOT / "core" / "atena_skills.py")]
-    proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
-    return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
-
 
 def router_generate_with_timeout(
     router: AtenaLLMRouter,
@@ -122,312 +97,8 @@ class EvolutionState:
     last_finished_at: Optional[str] = None
     last_success: Optional[bool] = None
     last_error: Optional[str] = None
-    topic_cursor: int = 0
-    dynamic_interval_s: int = 900
-    avg_confidence: float = 0.0
     lock: threading.Lock = field(default_factory=threading.Lock)
     wake_event: threading.Event = field(default_factory=threading.Event)
-
-
-def run_background_internet_learning_cycle(topic: str) -> dict[str, object]:
-    payload = run_internet_challenge(topic)
-    append_learning_memory(
-        {
-            "event": "background_internet_learning",
-            "topic": topic,
-            "status": payload.get("status", "unknown"),
-            "confidence": payload.get("confidence", 0),
-            "sources": len(payload.get("sources", [])) if isinstance(payload.get("sources"), list) else 0,
-        }
-    )
-    if is_auto_build_from_internet_enabled():
-        created = materialize_self_generated_assets(topic=topic, payload=payload)
-        if created:
-            append_learning_memory(
-                {
-                    "event": "background_self_build",
-                    "topic": topic,
-                    "created_assets": len(created),
-                    "manifest_paths": [item["manifest_key"] for item in created],
-                }
-            )
-    return payload
-
-
-def is_auto_build_from_internet_enabled() -> bool:
-    return os.getenv("ATENA_AUTO_BUILD_FROM_INTERNET", "0") == "1"
-
-
-def _slugify(text: str) -> str:
-    raw = re.sub(r"[^a-zA-Z0-9]+", "_", text.strip().lower()).strip("_")
-    return raw[:48] if raw else "insight"
-
-
-def _extract_internet_signals(payload: dict[str, object]) -> list[dict[str, str]]:
-    signals: list[dict[str, str]] = []
-    sources = payload.get("sources", [])
-    if not isinstance(sources, list):
-        return signals
-    for src in sources:
-        if not isinstance(src, dict) or not src.get("ok"):
-            continue
-        source_name = str(src.get("source", "unknown"))
-        details = src.get("details")
-        if not isinstance(details, dict):
-            continue
-        for key in ("top_repos", "hits", "papers"):
-            items = details.get(key)
-            if not isinstance(items, list):
-                continue
-            for item in items[:3]:
-                if not isinstance(item, dict):
-                    continue
-                title = str(item.get("full_name") or item.get("title") or "").strip()
-                if not title:
-                    continue
-                signals.append({"source": source_name, "title": title})
-    return signals
-
-
-def _load_self_build_manifest() -> dict[str, object]:
-    manifest_path = ROOT / "atena_evolution" / "self_generated_assets.json"
-    if not manifest_path.exists():
-        return {"assets": {}, "updated_at": None}
-    try:
-        data = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if isinstance(data, dict):
-            data.setdefault("assets", {})
-            return data
-    except Exception:  # noqa: BLE001
-        pass
-    return {"assets": {}, "updated_at": None}
-
-
-def materialize_self_generated_assets(topic: str, payload: dict[str, object]) -> list[dict[str, str]]:
-    if str(payload.get("status", "")).lower() != "ok":
-        return []
-    signals = _extract_internet_signals(payload)
-    if not signals:
-        return []
-
-    manifest = _load_self_build_manifest()
-    assets = manifest.get("assets")
-    if not isinstance(assets, dict):
-        assets = {}
-        manifest["assets"] = assets
-
-    created: list[dict[str, str]] = []
-    auto_modules_dir = ROOT / "modules" / "auto_generated"
-    auto_skills_dir = ROOT / "skills" / "auto-evolution"
-    auto_plugins_dir = ROOT / "plugins" / "auto-evolution"
-    auto_modules_dir.mkdir(parents=True, exist_ok=True)
-    auto_skills_dir.mkdir(parents=True, exist_ok=True)
-    auto_plugins_dir.mkdir(parents=True, exist_ok=True)
-
-    for signal in signals[:2]:
-        manifest_key = f"{signal['source']}::{_slugify(signal['title'])}"
-        if manifest_key in assets:
-            continue
-        slug = _slugify(signal["title"])
-
-        module_path = auto_modules_dir / f"auto_{slug}.py"
-        module_path.write_text(
-            (
-                "# Auto-generated by ATENA background evolution\n"
-                f"INSIGHT_SOURCE = {signal['source']!r}\n"
-                f"INSIGHT_TITLE = {signal['title']!r}\n\n"
-                "def describe() -> str:\n"
-                "    return f\"Auto-module from {INSIGHT_SOURCE}: {INSIGHT_TITLE}\"\n"
-            ),
-            encoding="utf-8",
-        )
-
-        skill_dir = auto_skills_dir / slug
-        skill_dir.mkdir(parents=True, exist_ok=True)
-        (skill_dir / "SKILL.md").write_text(
-            (
-                f"# Skill: {slug}\n\n"
-                f"- Origem: `{signal['source']}`\n"
-                f"- Sinal: `{signal['title']}`\n"
-                f"- Tema alvo: `{topic}`\n"
-            ),
-            encoding="utf-8",
-        )
-
-        plugin_dir = auto_plugins_dir / slug
-        plugin_dir.mkdir(parents=True, exist_ok=True)
-        (plugin_dir / "README.md").write_text(
-            (
-                f"# Plugin Auto-Evolution: {slug}\n\n"
-                f"Gerado pela ATENA com base no insight `{signal['title']}` ({signal['source']}).\n"
-            ),
-            encoding="utf-8",
-        )
-
-        assets[manifest_key] = {
-            "topic": topic,
-            "source": signal["source"],
-            "title": signal["title"],
-            "module_path": str(module_path.relative_to(ROOT)),
-            "skill_path": str((skill_dir / "SKILL.md").relative_to(ROOT)),
-            "plugin_path": str((plugin_dir / "README.md").relative_to(ROOT)),
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-        created.append({"manifest_key": manifest_key, "module_path": str(module_path.relative_to(ROOT))})
-
-    if created:
-        manifest["updated_at"] = datetime.now(timezone.utc).isoformat()
-        manifest_path = ROOT / "atena_evolution" / "self_generated_assets.json"
-        manifest_path.parent.mkdir(parents=True, exist_ok=True)
-        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
-    return created
-
-
-def parse_background_topics(raw: str | None) -> list[str]:
-    if not raw:
-        return [
-            "autonomous coding agents reliability evals and safety hardening",
-            "llm red teaming prompt injection mitigation latest techniques",
-            "benchmarking agentic workflows latency cost quality tradeoffs",
-        ]
-    items = [item.strip() for item in raw.split(",")]
-    topics = [item for item in items if item]
-    return topics or ["autonomous coding agents reliability evals and safety hardening"]
-
-
-def load_recent_background_events(limit: int = 500) -> list[dict[str, object]]:
-    memory_path = ROOT / "atena_evolution" / "assistant_learning_memory.jsonl"
-    if not memory_path.exists():
-        return []
-    lines = memory_path.read_text(encoding="utf-8").splitlines()[-limit:]
-    events: list[dict[str, object]] = []
-    for line in lines:
-        try:
-            item = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if item.get("event") == "background_internet_learning":
-            events.append(item)
-    return events
-
-
-def rank_topics_for_background(topics: list[str], events: list[dict[str, object]]) -> list[tuple[str, float]]:
-    ranked: list[tuple[str, float]] = []
-    for topic in topics:
-        topic_events = [e for e in events if str(e.get("topic", "")).strip().lower() == topic.lower()]
-        count = len(topic_events)
-        avg_conf = 0.0
-        if count:
-            weighted_sum = 0.0
-            total_weight = 0.0
-            now = datetime.now(timezone.utc)
-            for e in topic_events:
-                conf = float(e.get("confidence", 0) or 0)
-                ts_raw = str(e.get("timestamp", "")).strip()
-                age_h = 48.0
-                try:
-                    if ts_raw:
-                        dt = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
-                        age_h = max((now - dt).total_seconds() / 3600.0, 0.0)
-                except Exception:  # noqa: BLE001
-                    age_h = 48.0
-                recency = 1.0 / (1.0 + age_h / 24.0)
-                weighted_sum += conf * recency
-                total_weight += recency
-            avg_conf = (weighted_sum / total_weight) if total_weight else 0.0
-        exploration = 1.0 / (1.0 + count)
-        uncertainty = 1.0 - avg_conf
-        score = 0.7 * exploration + 0.3 * uncertainty
-        ranked.append((topic, score))
-    ranked.sort(key=lambda x: x[1], reverse=True)
-    return ranked
-
-
-def choose_next_background_topic(state: EvolutionState, topics: list[str]) -> str:
-    events = load_recent_background_events()
-    ranked = rank_topics_for_background(topics, events)
-    top_score = ranked[0][1] if ranked else 0.0
-    tied = [topic for topic, score in ranked if abs(score - top_score) < 1e-9] or topics
-    with state.lock:
-        topic = tied[state.topic_cursor % len(tied)]
-        state.topic_cursor += 1
-    return topic
-
-
-def compute_dynamic_interval_s(events: list[dict[str, object]], base_interval_s: int) -> int:
-    if not events:
-        return base_interval_s
-    vals = [float(e.get("confidence", 0) or 0) for e in events[-20:]]
-    avg_conf = sum(vals) / len(vals) if vals else 0.0
-    if avg_conf >= 0.85:
-        return min(base_interval_s * 2, 3600)
-    if avg_conf < 0.55:
-        return max(base_interval_s // 2, 120)
-    return base_interval_s
-
-
-def get_evolution_status(state: EvolutionState) -> str:
-    with state.lock:
-        return (
-            f"cycles={state.cycles} "
-            f"last_success={state.last_success} "
-            f"last_started_at={state.last_started_at} "
-            f"last_finished_at={state.last_finished_at} "
-            f"avg_confidence={state.avg_confidence:.2f} "
-            f"dynamic_interval_s={state.dynamic_interval_s} "
-            f"last_error={state.last_error or '-'}"
-        )
-
-
-def start_background_evolution(state: EvolutionState) -> threading.Thread | None:
-    if os.getenv("ATENA_BACKGROUND_EVOLUTION", "1") != "1":
-        return None
-
-    base_interval_s = int(os.getenv("ATENA_BACKGROUND_EVOLUTION_INTERVAL_S", "900"))
-    with state.lock:
-        state.dynamic_interval_s = base_interval_s
-    topics = parse_background_topics(
-        os.getenv("ATENA_BACKGROUND_TOPICS") or os.getenv("ATENA_BACKGROUND_TOPIC")
-    )
-
-    def _worker() -> None:
-        while state.running:
-            topic = choose_next_background_topic(state, topics)
-            with state.lock:
-                state.last_started_at = datetime.now(timezone.utc).isoformat()
-            try:
-                payload = run_background_internet_learning_cycle(topic)
-                recent = load_recent_background_events()
-                next_interval = compute_dynamic_interval_s(recent, base_interval_s)
-                with state.lock:
-                    state.cycles += 1
-                    state.last_success = str(payload.get("status", "")).lower() == "ok"
-                    state.avg_confidence = float(payload.get("confidence", 0) or 0)
-                    state.dynamic_interval_s = next_interval
-                    state.last_error = None
-            except Exception as exc:  # noqa: BLE001
-                append_learning_memory(
-                    {
-                        "event": "background_internet_learning",
-                        "topic": topic,
-                        "status": "error",
-                        "error": str(exc),
-                    }
-                )
-                with state.lock:
-                    state.cycles += 1
-                    state.last_success = False
-                    state.last_error = str(exc)
-            finally:
-                with state.lock:
-                    state.last_finished_at = datetime.now(timezone.utc).isoformat()
-                    wait_interval = state.dynamic_interval_s
-            state.wake_event.wait(wait_interval)
-            state.wake_event.clear()
-
-    thread = threading.Thread(target=_worker, daemon=True, name="atena-bg-evolution")
-    thread.start()
-    return thread
 
 def git_branch() -> str:
     try:
@@ -494,11 +165,7 @@ def print_help():
             ("/review", "Revisa as mudanças atuais no código (git diff)"),
             ("/commit <msg>", "Realiza o commit das alterações atuais"),
             ("/run <cmd>", "Executa um comando no terminal"),
-            ("/skills", "Valida skills conectadas ao runtime da ATENA"),
-            ("/plugins", "Lista plugins locais detectados"),
-            ("/evolution-build-now [tema]", "Executa 1 ciclo imediato de evolução/internet"),
             ("/context", "Mostra o contexto atual da sessão"),
-            ("/evolution-status", "Mostra status da evolução em background"),
             ("/model", "Gerencia o modelo de IA utilizado"),
             ("/clear", "Limpa o terminal"),
             ("/exit", "Encerra o assistente")
@@ -509,7 +176,7 @@ def print_help():
         
         CONSOLE.print(Panel(table, title="[bold cyan]Comandos Disponíveis[/bold cyan]", border_style="cyan"))
     else:
-        print("\nComandos: /task, /task-exec, /self-test, /release-governor, /saas-bootstrap, /telemetry-insights, /orchestrate, /memory-suggest, /benchmark, /device-control, /policy, /plan, /review, /commit, /run, /context, /evolution-status, /model, /clear, /exit\n")
+        print("\nComandos: /task, /task-exec, /self-test, /release-governor, /saas-bootstrap, /telemetry-insights, /orchestrate, /memory-suggest, /benchmark, /device-control, /policy, /plan, /review, /commit, /run, /context, /model, /clear, /exit\n")
 
 
 def run_self_test(mode: str = "full") -> tuple[str, str]:
@@ -1117,19 +784,6 @@ def atena_thinking(message: str = "Pensando..."):
 def main():
     render_banner()
     router = AtenaLLMRouter()
-    evolution_state = EvolutionState()
-    bg_thread = start_background_evolution(evolution_state)
-    if bg_thread is not None:
-        console_print("[ATENA evolution] background internet-learning ativo.")
-        auto_build_status = "ON" if is_auto_build_from_internet_enabled() else "OFF"
-        console_print(f"[ATENA evolution] auto-build-from-internet={auto_build_status} (use ATENA_AUTO_BUILD_FROM_INTERNET=1 para habilitar).")
-    if os.getenv("ATENA_AUTO_PREPARE_LOCAL_MODEL", "1") == "1":
-        ok, message = router.prepare_free_local_model()
-        status = "ok" if ok else "erro"
-        console_print(f"[ATENA assistant-model:{status}] {message}")
-        if not ok and os.getenv("ATENA_STRICT_LLM_BOOTSTRAP", "1") == "1":
-            console_print("Execução abortada: LLM local não inicializado (modo estrito).")
-            return 3
     
     # Silenciar logs barulhentos
     for logger_name in ["AtenaUltraBrain", "httpx", "huggingface_hub", "transformers"]:
@@ -1149,8 +803,6 @@ def main():
             
             if user_input in ["/exit", "exit", "quit", "/quit", "/q", ":q", "/sair", "sair"]:
                 console_print("[bold red]Encerrando ATENA... Até logo![/bold red]" if HAS_RICH else "Encerrando ATENA... Até logo!")
-                evolution_state.running = False
-                evolution_state.wake_event.set()
                 break
             
             if user_input == "/help":
@@ -1167,29 +819,6 @@ def main():
                         f"CWD: [cyan]{ROOT}[/cyan]\nBranch: [magenta]{git_branch()}[/magenta]\nModelo: [green]{router.current()}[/green]",
                         title="Contexto Atual", border_style="blue"
                     ))
-                continue
-
-            if user_input == "/evolution-status":
-                status = get_evolution_status(evolution_state)
-                if HAS_RICH:
-                    CONSOLE.print(Panel(status, title="[bold cyan]Evolution Status[/bold cyan]", border_style="cyan"))
-                else:
-                    print(status)
-                continue
-
-            if user_input.startswith("/evolution-build-now"):
-                parts = user_input.split(maxsplit=1)
-                topic = parts[1].strip() if len(parts) > 1 else choose_next_background_topic(
-                    evolution_state, parse_background_topics(os.getenv("ATENA_BG_TOPICS"))
-                )
-                with atena_thinking(f"Executando ciclo imediato para: {topic}"):
-                    payload = run_internet_challenge(topic)
-                    created = materialize_self_generated_assets(topic, payload)
-                status = str(payload.get("status", "unknown"))
-                confidence = float(payload.get("confidence", 0.0) or 0.0)
-                CONSOLE.print(
-                    f"[bold cyan]Evolution build now[/bold cyan] status={status} confidence={confidence:.2f} assets={len(created)}"
-                )
                 continue
 
             if user_input.startswith("/self-test"):
@@ -1263,38 +892,6 @@ def main():
                 CONSOLE.print(f"[dim]returncode={rc}[/dim]")
                 continue
 
-            if user_input == "/skills":
-                with atena_thinking("Validando skills conectadas..."):
-                    rc, out, err = run_skills_validation()
-                color = "green" if rc == 0 else "red"
-                CONSOLE.print(f"[bold {color}]Skills check: {'OK' if rc == 0 else 'ERRO'}[/bold {color}]")
-                if out:
-                    CONSOLE.print(out)
-                if err:
-                    CONSOLE.print(f"[yellow]{err}[/yellow]")
-                continue
-
-            if user_input == "/plugins":
-                payload = inspect_local_plugins()
-                items = payload.get("items", [])
-                count = int(payload.get("count", 0))
-                if HAS_RICH:
-                    table = Table(box=ROUNDED, show_header=True, header_style="bold cyan")
-                    table.add_column("Plugin")
-                    table.add_column("Path")
-                    if isinstance(items, list) and items:
-                        for item in items:
-                            if not isinstance(item, dict):
-                                continue
-                            table.add_row(str(item.get("name", "unknown")), str(item.get("path", "")))
-                    CONSOLE.print(table)
-                else:
-                    print(f"Plugins detectados: {count}")
-                    for item in items:
-                        print(f"- {item['name']}: {item['path']}")
-                CONSOLE.print(f"[dim]Total de plugins: {count}[/dim]")
-                continue
-
             if user_input.startswith("/task-exec "):
                 objective = user_input[len("/task-exec "):].strip()
                 with atena_thinking("Planejando e executando tarefa..."):
@@ -1365,8 +962,6 @@ def main():
             )
 
         except EOFError:
-            evolution_state.running = False
-            evolution_state.wake_event.set()
             if HAS_RICH:
                 CONSOLE.print("\n[yellow]Entrada finalizada (EOF). Encerrando assistente.[/yellow]")
             else:

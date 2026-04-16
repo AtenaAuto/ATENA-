@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import subprocess
 import sys
-import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -36,8 +35,6 @@ COMMANDS = {
     "kyros": ROOT / "core" / "atena_kyros_mode.py",
     "production-center": ROOT / "core" / "atena_production_center.py",
     "orchestrator-mission": ROOT / "protocols" / "atena_orchestrator_mission.py",
-    "internet-challenge": ROOT / "protocols" / "atena_internet_challenge_mission.py",
-    "advanced-assessment": ROOT / "protocols" / "atena_advanced_assessment_mission.py",
     "bootstrap": ROOT / "core" / "atena_env_bootstrap.py",
 }
 
@@ -45,40 +42,6 @@ ALIASES = {
     "atena-like": "assistant",
     "like": "assistant",
 }
-
-LLM_BOOTSTRAP_COMMANDS = {
-    "start",
-    "invoke",
-    "dashboard",
-    "codex-advanced",
-    "genius",
-    "kyros",
-    "orchestrator-mission",
-}
-
-
-def _maybe_prepare_local_model(command: str) -> bool:
-    """
-    Prepara automaticamente o modelo local sempre que a ATENA
-    for iniciada em fluxos que dependem de geração por LLM.
-    """
-    if command not in LLM_BOOTSTRAP_COMMANDS:
-        return True
-    if os.getenv("ATENA_AUTO_PREPARE_LOCAL_MODEL", "1") != "1":
-        return True
-    try:
-        if str(ROOT) not in sys.path:
-            sys.path.insert(0, str(ROOT))
-        from core.atena_llm_router import AtenaLLMRouter
-
-        router = AtenaLLMRouter()
-        ok, message = router.prepare_free_local_model()
-        status = "ok" if ok else "erro"
-        print(f"[ATENA bootstrap-model:{status}] {message}", flush=True)
-        return ok
-    except Exception as exc:  # noqa: BLE001
-        print(f"[ATENA bootstrap-model:erro] {exc}", flush=True)
-        return False
 
 
 def render_help() -> None:
@@ -126,8 +89,6 @@ def render_help() -> None:
         table.add_row("./atena kyros", "Modo Kyros: prontidão operacional + execução guiada")
         table.add_row("./atena production-center", "CLI de integração dos módulos de produção (RBAC/telemetria/quality)")
         table.add_row("./atena orchestrator-mission", "Missão avançada com orquestrador (checkpoint+retry+fallback)")
-        table.add_row("./atena internet-challenge", "Desafio extraordinário multi-fonte na internet")
-        table.add_row("./atena advanced-assessment", "Análise completa + recomendações avançadas acionáveis")
         table.add_row("./atena bootstrap", "Instala dependências mínimas para guardian/produção")
         table.add_row("./atena atena-like", "Alias do modo assistant")
         table.add_row("./atena help", "Exibe esta ajuda")
@@ -163,8 +124,6 @@ def render_help() -> None:
         print("  ./atena kyros            # modo Kyros (prontidão + execução guiada)")
         print("  ./atena production-center # CLI de integração dos módulos de produção")
         print("  ./atena orchestrator-mission # missão avançada com orquestrador")
-        print("  ./atena internet-challenge # desafio extraordinário multi-fonte na internet")
-        print("  ./atena advanced-assessment # análise completa + recomendações avançadas")
         print("  ./atena bootstrap        # instala dependências mínimas de runtime")
         print("  ./atena atena-like      # alias do assistant")
         print("  ./atena help            # ajuda")
@@ -191,10 +150,6 @@ def main(argv: list[str]) -> int:
         render_help()
         return 2
 
-    bootstrap_ok = _maybe_prepare_local_model(command)
-    if not bootstrap_ok and os.getenv("ATENA_STRICT_LLM_BOOTSTRAP", "1") == "1":
-        print("Execução abortada: bootstrap do LLM local falhou (modo estrito).")
-        return 3
     result = subprocess.run([sys.executable, str(script), *argv[2:]], cwd=str(ROOT))
     return result.returncode
 

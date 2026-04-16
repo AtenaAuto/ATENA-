@@ -18,6 +18,17 @@ from modules.atena_codex import AtenaCodex
 from modules.atena_telemetry_hub import AtenaTelemetryHub, TelemetryEvent
 
 
+def is_autopilot_acceptable(autopilot: dict[str, object]) -> bool:
+    status = str(autopilot.get("status", "")).lower()
+    if status == "ok":
+        return True
+    if status != "partial":
+        return False
+    risk = float(autopilot.get("risk_score", 1.0) or 1.0)
+    confidence = float(autopilot.get("confidence", 0.0) or 0.0)
+    return risk <= 0.50 and confidence >= 0.50
+
+
 def main() -> int:
     t0 = time.perf_counter()
     codex = AtenaCodex(root_path=str(ROOT))
@@ -33,12 +44,13 @@ def main() -> int:
     now = datetime.now(timezone.utc)
     stamp = now.strftime("%Y-%m-%d")
 
-    guardian_ok = autopilot.get("status") == "ok" and smoke.get("status") == "ok"
+    autopilot_acceptable = is_autopilot_acceptable(autopilot)
+    guardian_ok = autopilot_acceptable and smoke.get("status") == "ok"
 
     failed_smoke = [r for r in smoke.get("results", []) if not r.get("ok", False)]
     blockers = []
-    if autopilot.get("status") != "ok":
-        blockers.append("Autopilot retornou status diferente de ok")
+    if not autopilot_acceptable:
+        blockers.append("Autopilot fora da faixa aceitável (ok ou partial com risco/confiança mínimos)")
     if failed_smoke:
         blockers.append(f"Smoke suite com {len(failed_smoke)} falhas")
 

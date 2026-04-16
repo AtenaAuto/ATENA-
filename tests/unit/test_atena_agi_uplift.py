@@ -4,6 +4,7 @@
 from pathlib import Path
 
 from core.atena_agi_uplift import (
+    AGIMaturityAssessor,
     ContinuousEvaluator,
     GeneralizationRouter,
     LongTermMemoryEngine,
@@ -71,3 +72,11 @@ def test_self_correction_iterative(tmp_path: Path):
         cwd=tmp_path,
     )
     assert result["status"] == "ok"
+
+
+def test_agi_maturity_assessor_returns_score_and_plan(tmp_path: Path):
+    assessor = AGIMaturityAssessor(tmp_path)
+    assessment = assessor.assess()
+    assert 1.0 <= assessment["score_1_to_10"] <= 10.0
+    plan = assessor.plan_to_ten(assessment)
+    assert plan

@@ -98,6 +98,7 @@ class EvolutionState:
     last_finished_at: Optional[str] = None
     last_success: Optional[bool] = None
     last_error: Optional[str] = None
+    topic_cursor: int = 0
     lock: threading.Lock = field(default_factory=threading.Lock)
     wake_event: threading.Event = field(default_factory=threading.Event)
 
@@ -116,20 +117,50 @@ def run_background_internet_learning_cycle(topic: str) -> dict[str, object]:
     return payload
 
 
+def parse_background_topics(raw: str | None) -> list[str]:
+    if not raw:
+        return [
+            "autonomous coding agents reliability evals and safety hardening",
+            "llm red teaming prompt injection mitigation latest techniques",
+            "benchmarking agentic workflows latency cost quality tradeoffs",
+        ]
+    items = [item.strip() for item in raw.split(",")]
+    topics = [item for item in items if item]
+    return topics or ["autonomous coding agents reliability evals and safety hardening"]
+
+
+def get_evolution_status(state: EvolutionState) -> str:
+    with state.lock:
+        return (
+            f"cycles={state.cycles} "
+            f"last_success={state.last_success} "
+            f"last_started_at={state.last_started_at} "
+            f"last_finished_at={state.last_finished_at} "
+            f"last_error={state.last_error or '-'}"
+        )
+
+
 def start_background_evolution(state: EvolutionState) -> threading.Thread | None:
     if os.getenv("ATENA_BACKGROUND_EVOLUTION", "1") != "1":
         return None
 
     interval_s = int(os.getenv("ATENA_BACKGROUND_EVOLUTION_INTERVAL_S", "900"))
-    topic = os.getenv(
-        "ATENA_BACKGROUND_TOPIC",
-        "autonomous coding agents reliability evals and safety hardening",
+    topics = parse_background_topics(
+        os.getenv("ATENA_BACKGROUND_TOPICS") or os.getenv("ATENA_BACKGROUND_TOPIC")
     )
 
     def _worker() -> None:
         while state.running:
+            with state.lock:
+                topic = topics[state.topic_cursor % len(topics)]
+                state.topic_cursor += 1
+                state.last_started_at = datetime.now(timezone.utc).isoformat()
             try:
-                run_background_internet_learning_cycle(topic)
+                payload = run_background_internet_learning_cycle(topic)
+                with state.lock:
+                    state.cycles += 1
+                    state.last_success = str(payload.get("status", "")).lower() == "ok"
+                    state.last_error = None
             except Exception as exc:  # noqa: BLE001
                 append_learning_memory(
                     {
@@ -139,6 +170,13 @@ def start_background_evolution(state: EvolutionState) -> threading.Thread | None
                         "error": str(exc),
                     }
                 )
+                with state.lock:
+                    state.cycles += 1
+                    state.last_success = False
+                    state.last_error = str(exc)
+            finally:
+                with state.lock:
+                    state.last_finished_at = datetime.now(timezone.utc).isoformat()
             state.wake_event.wait(interval_s)
             state.wake_event.clear()
 
@@ -212,6 +250,7 @@ def print_help():
             ("/commit <msg>", "Realiza o commit das alterações atuais"),
             ("/run <cmd>", "Executa um comando no terminal"),
             ("/context", "Mostra o contexto atual da sessão"),
+            ("/evolution-status", "Mostra status da evolução em background"),
             ("/model", "Gerencia o modelo de IA utilizado"),
             ("/clear", "Limpa o terminal"),
             ("/exit", "Encerra o assistente")
@@ -222,7 +261,7 @@ def print_help():
         
         CONSOLE.print(Panel(table, title="[bold cyan]Comandos Disponíveis[/bold cyan]", border_style="cyan"))
     else:
-        print("\nComandos: /task, /task-exec, /self-test, /release-governor, /saas-bootstrap, /telemetry-insights, /orchestrate, /memory-suggest, /benchmark, /device-control, /policy, /plan, /review, /commit, /run, /context, /model, /clear, /exit\n")
+        print("\nComandos: /task, /task-exec, /self-test, /release-governor, /saas-bootstrap, /telemetry-insights, /orchestrate, /memory-suggest, /benchmark, /device-control, /policy, /plan, /review, /commit, /run, /context, /evolution-status, /model, /clear, /exit\n")
 
 
 def run_self_test(mode: str = "full") -> tuple[str, str]:
@@ -878,6 +917,14 @@ def main():
                         f"CWD: [cyan]{ROOT}[/cyan]\nBranch: [magenta]{git_branch()}[/magenta]\nModelo: [green]{router.current()}[/green]",
                         title="Contexto Atual", border_style="blue"
                     ))
+                continue
+
+            if user_input == "/evolution-status":
+                status = get_evolution_status(evolution_state)
+                if HAS_RICH:
+                    CONSOLE.print(Panel(status, title="[bold cyan]Evolution Status[/bold cyan]", border_style="cyan"))
+                else:
+                    print(status)
                 continue
 
             if user_input.startswith("/self-test"):

@@ -320,3 +320,76 @@ class GeneralizationRouter:
             "dev": ["reproduzir problema", "escrever testes", "aplicar patch mínimo"],
         }
         return {"domain": domain, "template": routed["template"], "playbook": playbooks.get(domain, playbooks["dev"])}
+
+
+class AGIMaturityAssessor:
+    """Avaliador objetivo de maturidade AGI-like (escala 1-10) com plano para chegar no 10."""
+
+    def __init__(self, root: Path):
+        self.root = root
+        self.evolution = self.root / "atena_evolution"
+
+    def _read_json(self, path: Path, default: Any) -> Any:
+        if not path.exists():
+            return default
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return default
+
+    def assess(self) -> dict[str, Any]:
+        memory_rows = []
+        mem_path = self.evolution / "long_term_memory.jsonl"
+        if mem_path.exists():
+            memory_rows = [ln for ln in mem_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+
+        scores = self._read_json(self.evolution / "daily_benchmark_scores.json", [])
+        gate = self._read_json(self.evolution / "deploy_gate_status.json", {})
+        audit_rows = []
+        audit_path = self.evolution / "critical_actions_audit.jsonl"
+        if audit_path.exists():
+            audit_rows = [ln for ln in audit_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+
+        smoke_reports = sorted(self.evolution.glob("module_smoke_suite_*.json"))
+        smoke_ok = False
+        if smoke_reports:
+            smoke_latest = self._read_json(smoke_reports[-1], {})
+            smoke_ok = smoke_latest.get("status") == "ok"
+
+        dimensions = {
+            "memory": 1.5 if len(memory_rows) >= 5 else (1.0 if memory_rows else 0.3),
+            "evaluation": 1.5 if len(scores) >= 7 else (1.0 if scores else 0.4),
+            "deploy_gate": 1.0 if gate else 0.2,
+            "security_audit": 1.5 if len(audit_rows) >= 5 else (1.0 if audit_rows else 0.3),
+            "runtime_reliability": 1.5 if smoke_ok else 0.6,
+            "planning_autocorrect_generalization": 2.0,  # disponível no core uplift
+        }
+        raw = 1.0 + sum(dimensions.values())
+        score = min(10.0, round(raw, 1))
+        return {
+            "score_1_to_10": score,
+            "dimensions": dimensions,
+            "memory_rows": len(memory_rows),
+            "daily_scores": len(scores),
+            "audit_rows": len(audit_rows),
+            "smoke_ok": smoke_ok,
+        }
+
+    def plan_to_ten(self, assessment: dict[str, Any]) -> list[dict[str, str]]:
+        actions: list[dict[str, str]] = []
+        if assessment.get("memory_rows", 0) < 50:
+            actions.append({"priority": "P1", "action": "Aumentar memória de decisões para >50 casos reais com feedback."})
+        if assessment.get("daily_scores", 0) < 14:
+            actions.append({"priority": "P1", "action": "Rodar benchmark diário por 14+ dias e ativar bloqueio automático de deploy em regressão."})
+        if assessment.get("audit_rows", 0) < 20:
+            actions.append({"priority": "P1", "action": "Expandir auditoria crítica para 20+ eventos com revisão periódica."})
+        if not assessment.get("smoke_ok", False):
+            actions.append({"priority": "P1", "action": "Manter modules-smoke em 100% antes de releases."})
+        actions.extend(
+            [
+                {"priority": "P2", "action": "Adicionar benchmarks multi-domínio (dados, estratégia, docs, infra) com score separado."},
+                {"priority": "P2", "action": "Adicionar auto-correção orientada por testes reais (não só comandos demonstrativos)."},
+                {"priority": "P3", "action": "Introduzir avaliação adversarial de segurança e robustez semanal."},
+            ]
+        )
+        return actions

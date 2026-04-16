@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from core.atena_agi_uplift import (
+    AGIMaturityAssessor,
     ContinuousEvaluator,
     GeneralizationRouter,
     LongTermMemoryEngine,
@@ -32,6 +33,7 @@ def main() -> int:
     security = SecurityAuditor(ROOT)
     router = GeneralizationRouter()
     autocorrect = SelfCorrectionEngine()
+    assessor = AGIMaturityAssessor(ROOT)
 
     memory.remember_decision(
         objective="reduzir falhas no deploy",
@@ -77,6 +79,7 @@ def main() -> int:
         cwd=ROOT,
     )
 
+    maturity = assessor.assess()
     payload = {
         "status": "ok",
         "recalled_memories": recalled,
@@ -88,6 +91,8 @@ def main() -> int:
         "self_correction": self_correction,
         "security": {"can_execute_tier2": sec_check, "audit": sec_audit},
         "generalization_samples": generalization,
+        "maturity_assessment": maturity,
+        "plan_to_ten": assessor.plan_to_ten(maturity),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
     out = evolution / f"agi_uplift_report_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"

@@ -1,4 +1,4 @@
-# 🔱 ATENA Ω (Atena-code) v3.2.0
+# 🔱 ATENA Ω (Atena-AGI) v3.2.0
 
 [![CI/CD Pipeline](https://github.com/AtenaAuto/ATENA-/actions/workflows/ci.yml/badge.svg)](https://github.com/AtenaAuto/ATENA-/actions)
 [![Code Coverage](https://codecov.io/gh/AtenaAuto/ATENA-/branch/main/graph/badge.svg)](https://codecov.io/gh/AtenaAuto/ATENA-)

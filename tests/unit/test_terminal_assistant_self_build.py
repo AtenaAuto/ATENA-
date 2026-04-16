@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import json
+from types import SimpleNamespace
 
 from core import atena_terminal_assistant as ta
 
@@ -43,3 +44,33 @@ def test_materialize_self_generated_assets_deduplicates(monkeypatch, tmp_path):
     second = ta.materialize_self_generated_assets("topic", payload)
     assert len(first) == 1
     assert second == []
+
+
+def test_inspect_local_plugins_lists_readmes(monkeypatch, tmp_path):
+    monkeypatch.setattr(ta, "ROOT", tmp_path)
+    plugin_dir = tmp_path / "plugins" / "auto-evolution" / "demo-plugin"
+    plugin_dir.mkdir(parents=True, exist_ok=True)
+    (plugin_dir / "README.md").write_text("# demo", encoding="utf-8")
+
+    payload = ta.inspect_local_plugins()
+    assert payload["count"] == 1
+    assert payload["items"][0]["path"] == "plugins/auto-evolution/demo-plugin"
+
+
+def test_run_skills_validation_executes_atena_skills(monkeypatch, tmp_path):
+    monkeypatch.setattr(ta, "ROOT", tmp_path)
+    (tmp_path / "core").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "core" / "atena_skills.py").write_text("print('ok')\n", encoding="utf-8")
+
+    def fake_run(cmd, cwd, capture_output, text):  # noqa: ANN001
+        assert cmd[-1].endswith("core/atena_skills.py")
+        assert cwd == str(tmp_path)
+        assert capture_output is True
+        assert text is True
+        return SimpleNamespace(returncode=0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(ta.subprocess, "run", fake_run)
+    rc, out, err = ta.run_skills_validation()
+    assert rc == 0
+    assert out == "ok"
+    assert err == ""

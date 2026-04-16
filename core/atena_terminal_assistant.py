@@ -64,6 +64,30 @@ def console_print(message: str) -> None:
     else:
         print(message)
 
+def inspect_local_plugins() -> dict[str, object]:
+    plugins_root = ROOT / "plugins"
+    plugin_entries: list[dict[str, str]] = []
+    if plugins_root.exists():
+        for readme in sorted(plugins_root.rglob("README.md")):
+            plugin_dir = readme.parent
+            plugin_entries.append(
+                {
+                    "name": plugin_dir.name,
+                    "path": str(plugin_dir.relative_to(ROOT)),
+                    "readme": str(readme.relative_to(ROOT)),
+                }
+            )
+    return {
+        "count": len(plugin_entries),
+        "items": plugin_entries,
+    }
+
+
+def run_skills_validation() -> tuple[int, str, str]:
+    cmd = [sys.executable, str(ROOT / "core" / "atena_skills.py")]
+    proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
+    return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
+
 
 def router_generate_with_timeout(
     router: AtenaLLMRouter,
@@ -466,6 +490,8 @@ def print_help():
             ("/review", "Revisa as mudanças atuais no código (git diff)"),
             ("/commit <msg>", "Realiza o commit das alterações atuais"),
             ("/run <cmd>", "Executa um comando no terminal"),
+            ("/skills", "Valida skills conectadas ao runtime da ATENA"),
+            ("/plugins", "Lista plugins locais detectados"),
             ("/context", "Mostra o contexto atual da sessão"),
             ("/evolution-status", "Mostra status da evolução em background"),
             ("/model", "Gerencia o modelo de IA utilizado"),
@@ -1213,6 +1239,38 @@ def main():
                 if err:
                     CONSOLE.print(f"[yellow]{err.rstrip()}[/yellow]")
                 CONSOLE.print(f"[dim]returncode={rc}[/dim]")
+                continue
+
+            if user_input == "/skills":
+                with atena_thinking("Validando skills conectadas..."):
+                    rc, out, err = run_skills_validation()
+                color = "green" if rc == 0 else "red"
+                CONSOLE.print(f"[bold {color}]Skills check: {'OK' if rc == 0 else 'ERRO'}[/bold {color}]")
+                if out:
+                    CONSOLE.print(out)
+                if err:
+                    CONSOLE.print(f"[yellow]{err}[/yellow]")
+                continue
+
+            if user_input == "/plugins":
+                payload = inspect_local_plugins()
+                items = payload.get("items", [])
+                count = int(payload.get("count", 0))
+                if HAS_RICH:
+                    table = Table(box=ROUNDED, show_header=True, header_style="bold cyan")
+                    table.add_column("Plugin")
+                    table.add_column("Path")
+                    if isinstance(items, list) and items:
+                        for item in items:
+                            if not isinstance(item, dict):
+                                continue
+                            table.add_row(str(item.get("name", "unknown")), str(item.get("path", "")))
+                    CONSOLE.print(table)
+                else:
+                    print(f"Plugins detectados: {count}")
+                    for item in items:
+                        print(f"- {item['name']}: {item['path']}")
+                CONSOLE.print(f"[dim]Total de plugins: {count}[/dim]")
                 continue
 
             if user_input.startswith("/task-exec "):

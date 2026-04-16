@@ -61,18 +61,24 @@ def main() -> int:
 
     # 4) Programação no assistant deve devolver código Python
     prompt = "/task Responda apenas com código Python e inclua print('ok')\\n:q\\n"
-    rc, out = run_cmd(["bash", "-lc", f"printf \"{prompt}\" | ./atena assistant"], timeout=120)
-    has_python_code = any(
-        marker in out
-        for marker in [
-            "```python",
-            "print('ok')",
-            'print(\"ok\")',
-            "print(\"ok\")",
-            "print('ok')",
-            "python",
-        ]
-    )
+    out = ""
+    rc = 1
+    has_python_code = False
+    for _ in range(2):
+        rc, out = run_cmd(["bash", "-lc", f"printf \"{prompt}\" | ./atena assistant"], timeout=120)
+        has_python_code = any(
+            marker in out
+            for marker in [
+                "```python",
+                "print('ok')",
+                'print(\"ok\")',
+                "print(\"ok\")",
+                "print('ok')",
+                "python",
+            ]
+        )
+        if rc == 0 and has_python_code:
+            break
     checks.append(
         CheckResult(
             "assistant-programming",

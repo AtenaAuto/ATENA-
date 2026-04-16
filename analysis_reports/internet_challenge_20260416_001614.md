@@ -1,0 +1,90 @@
+# ATENA Internet Challenge (Extraordinary Mode)
+
+**Topic:** production readiness of autonomous coding agents 2026 reliability and safety hardening
+**Status:** ok
+**Confidence:** 0.75
+
+## Ranked Sources
+- **github** | score=13 | ok=True
+- **hackernews** | score=13 | ok=True
+- **arxiv** | score=13 | ok=True
+- **wikipedia** | score=1 | ok=False
+
+## Recommendation
+Use os resultados para montar análise comparativa e validar consistência entre fontes.
+
+## Raw JSON
+```json
+{
+  "topic": "production readiness of autonomous coding agents 2026 reliability and safety hardening",
+  "status": "ok",
+  "confidence": 0.75,
+  "sources": [
+    {
+      "source": "wikipedia",
+      "ok": false,
+      "details": {
+        "error": "HTTP Error 404: Not Found"
+      }
+    },
+    {
+      "source": "github",
+      "ok": true,
+      "details": {
+        "top_repos": [
+          {
+            "full_name": "OS-Copilot/ScienceBoard",
+            "stars": 126
+          },
+          {
+            "full_name": "cybersharkvin/llmitm_v2",
+            "stars": 14
+          },
+          {
+            "full_name": "tinlaboratory/RExBench",
+            "stars": 7
+          }
+        ]
+      }
+    },
+    {
+      "source": "hackernews",
+      "ok": true,
+      "details": {
+        "hits": [
+          {
+            "title": "How to Run a Pool of Autonomous Coding Agents on Your Jira Backlog",
+            "points": 2
+          },
+          {
+            "title": "Show HN: OctopusGarden – An autonomous software factory (specs in, code out)",
+            "points": 8
+          },
+          {
+            "title": "Show HN: Securing the Ralph Wiggum Loop – DevSecOps for Autonomous Coding Agents",
+            "points": 4
+          }
+        ]
+      }
+    },
+    {
+      "source": "arxiv",
+      "ok": true,
+      "details": {
+        "papers": [
+          {
+            "title": "Deception and Communication in Autonomous Multi-Agent Systems: An Experimental Study with Among Us"
+          },
+          {
+            "title": "Distributed Quantum Gaussian Processes for Multi-Agent Systems"
+          },
+          {
+            "title": "Learning the Value Systems of Agents with Preference-based and Inverse Reinforcement Learning"
+          }
+        ]
+      }
+    }
+  ],
+  "recommendation": "Use os resultados para montar análise comparativa e validar consistência entre fontes."
+}
+```

@@ -99,6 +99,8 @@ class EvolutionState:
     last_success: Optional[bool] = None
     last_error: Optional[str] = None
     topic_cursor: int = 0
+    dynamic_interval_s: int = 900
+    avg_confidence: float = 0.0
     lock: threading.Lock = field(default_factory=threading.Lock)
     wake_event: threading.Event = field(default_factory=threading.Event)
 
@@ -152,8 +154,23 @@ def rank_topics_for_background(topics: list[str], events: list[dict[str, object]
         count = len(topic_events)
         avg_conf = 0.0
         if count:
-            vals = [float(e.get("confidence", 0) or 0) for e in topic_events]
-            avg_conf = sum(vals) / len(vals)
+            weighted_sum = 0.0
+            total_weight = 0.0
+            now = datetime.now(timezone.utc)
+            for e in topic_events:
+                conf = float(e.get("confidence", 0) or 0)
+                ts_raw = str(e.get("timestamp", "")).strip()
+                age_h = 48.0
+                try:
+                    if ts_raw:
+                        dt = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
+                        age_h = max((now - dt).total_seconds() / 3600.0, 0.0)
+                except Exception:  # noqa: BLE001
+                    age_h = 48.0
+                recency = 1.0 / (1.0 + age_h / 24.0)
+                weighted_sum += conf * recency
+                total_weight += recency
+            avg_conf = (weighted_sum / total_weight) if total_weight else 0.0
         exploration = 1.0 / (1.0 + count)
         uncertainty = 1.0 - avg_conf
         score = 0.7 * exploration + 0.3 * uncertainty
@@ -173,6 +190,18 @@ def choose_next_background_topic(state: EvolutionState, topics: list[str]) -> st
     return topic
 
 
+def compute_dynamic_interval_s(events: list[dict[str, object]], base_interval_s: int) -> int:
+    if not events:
+        return base_interval_s
+    vals = [float(e.get("confidence", 0) or 0) for e in events[-20:]]
+    avg_conf = sum(vals) / len(vals) if vals else 0.0
+    if avg_conf >= 0.85:
+        return min(base_interval_s * 2, 3600)
+    if avg_conf < 0.55:
+        return max(base_interval_s // 2, 120)
+    return base_interval_s
+
+
 def get_evolution_status(state: EvolutionState) -> str:
     with state.lock:
         return (
@@ -180,6 +209,8 @@ def get_evolution_status(state: EvolutionState) -> str:
             f"last_success={state.last_success} "
             f"last_started_at={state.last_started_at} "
             f"last_finished_at={state.last_finished_at} "
+            f"avg_confidence={state.avg_confidence:.2f} "
+            f"dynamic_interval_s={state.dynamic_interval_s} "
             f"last_error={state.last_error or '-'}"
         )
 
@@ -188,7 +219,9 @@ def start_background_evolution(state: EvolutionState) -> threading.Thread | None
     if os.getenv("ATENA_BACKGROUND_EVOLUTION", "1") != "1":
         return None
 
-    interval_s = int(os.getenv("ATENA_BACKGROUND_EVOLUTION_INTERVAL_S", "900"))
+    base_interval_s = int(os.getenv("ATENA_BACKGROUND_EVOLUTION_INTERVAL_S", "900"))
+    with state.lock:
+        state.dynamic_interval_s = base_interval_s
     topics = parse_background_topics(
         os.getenv("ATENA_BACKGROUND_TOPICS") or os.getenv("ATENA_BACKGROUND_TOPIC")
     )
@@ -200,9 +233,13 @@ def start_background_evolution(state: EvolutionState) -> threading.Thread | None
                 state.last_started_at = datetime.now(timezone.utc).isoformat()
             try:
                 payload = run_background_internet_learning_cycle(topic)
+                recent = load_recent_background_events()
+                next_interval = compute_dynamic_interval_s(recent, base_interval_s)
                 with state.lock:
                     state.cycles += 1
                     state.last_success = str(payload.get("status", "")).lower() == "ok"
+                    state.avg_confidence = float(payload.get("confidence", 0) or 0)
+                    state.dynamic_interval_s = next_interval
                     state.last_error = None
             except Exception as exc:  # noqa: BLE001
                 append_learning_memory(
@@ -220,7 +257,8 @@ def start_background_evolution(state: EvolutionState) -> threading.Thread | None
             finally:
                 with state.lock:
                     state.last_finished_at = datetime.now(timezone.utc).isoformat()
-            state.wake_event.wait(interval_s)
+                    wait_interval = state.dynamic_interval_s
+            state.wake_event.wait(wait_interval)
             state.wake_event.clear()
 
     thread = threading.Thread(target=_worker, daemon=True, name="atena-bg-evolution")

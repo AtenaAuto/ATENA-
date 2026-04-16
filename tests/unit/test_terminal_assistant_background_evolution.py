@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from core.atena_terminal_assistant import (
+    compute_dynamic_interval_s,
     EvolutionState,
     choose_next_background_topic,
     get_evolution_status,
@@ -40,6 +41,7 @@ def test_get_evolution_status_contains_core_fields():
     status = get_evolution_status(state)
     assert "cycles=3" in status
     assert "last_success=True" in status
+    assert "dynamic_interval_s" in status
 
 
 def test_rank_topics_for_background_prioritizes_low_coverage():
@@ -57,3 +59,12 @@ def test_choose_next_background_topic_uses_ranking(monkeypatch):
     )
     chosen = choose_next_background_topic(state, ["topic-a", "topic-b"])
     assert chosen == "topic-b"
+
+
+def test_compute_dynamic_interval_s_adapts_to_confidence():
+    low = compute_dynamic_interval_s([{"confidence": 0.2}], 900)
+    high = compute_dynamic_interval_s([{"confidence": 0.95}], 900)
+    mid = compute_dynamic_interval_s([{"confidence": 0.7}], 900)
+    assert low < 900
+    assert high > 900
+    assert mid == 900

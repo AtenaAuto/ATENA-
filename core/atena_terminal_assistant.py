@@ -27,6 +27,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from core.atena_llm_router import AtenaLLMRouter
+from core.internet_challenge import run_internet_challenge
 
 try:
     from rich.console import Console
@@ -99,6 +100,51 @@ class EvolutionState:
     last_error: Optional[str] = None
     lock: threading.Lock = field(default_factory=threading.Lock)
     wake_event: threading.Event = field(default_factory=threading.Event)
+
+
+def run_background_internet_learning_cycle(topic: str) -> dict[str, object]:
+    payload = run_internet_challenge(topic)
+    append_learning_memory(
+        {
+            "event": "background_internet_learning",
+            "topic": topic,
+            "status": payload.get("status", "unknown"),
+            "confidence": payload.get("confidence", 0),
+            "sources": len(payload.get("sources", [])) if isinstance(payload.get("sources"), list) else 0,
+        }
+    )
+    return payload
+
+
+def start_background_evolution(state: EvolutionState) -> threading.Thread | None:
+    if os.getenv("ATENA_BACKGROUND_EVOLUTION", "1") != "1":
+        return None
+
+    interval_s = int(os.getenv("ATENA_BACKGROUND_EVOLUTION_INTERVAL_S", "900"))
+    topic = os.getenv(
+        "ATENA_BACKGROUND_TOPIC",
+        "autonomous coding agents reliability evals and safety hardening",
+    )
+
+    def _worker() -> None:
+        while state.running:
+            try:
+                run_background_internet_learning_cycle(topic)
+            except Exception as exc:  # noqa: BLE001
+                append_learning_memory(
+                    {
+                        "event": "background_internet_learning",
+                        "topic": topic,
+                        "status": "error",
+                        "error": str(exc),
+                    }
+                )
+            state.wake_event.wait(interval_s)
+            state.wake_event.clear()
+
+    thread = threading.Thread(target=_worker, daemon=True, name="atena-bg-evolution")
+    thread.start()
+    return thread
 
 def git_branch() -> str:
     try:
@@ -784,6 +830,10 @@ def atena_thinking(message: str = "Pensando..."):
 def main():
     render_banner()
     router = AtenaLLMRouter()
+    evolution_state = EvolutionState()
+    bg_thread = start_background_evolution(evolution_state)
+    if bg_thread is not None:
+        console_print("[ATENA evolution] background internet-learning ativo.")
     if os.getenv("ATENA_AUTO_PREPARE_LOCAL_MODEL", "1") == "1":
         ok, message = router.prepare_free_local_model()
         status = "ok" if ok else "erro"
@@ -810,6 +860,8 @@ def main():
             
             if user_input in ["/exit", "exit", "quit", "/quit", "/q", ":q", "/sair", "sair"]:
                 console_print("[bold red]Encerrando ATENA... Até logo![/bold red]" if HAS_RICH else "Encerrando ATENA... Até logo!")
+                evolution_state.running = False
+                evolution_state.wake_event.set()
                 break
             
             if user_input == "/help":
@@ -969,6 +1021,8 @@ def main():
             )
 
         except EOFError:
+            evolution_state.running = False
+            evolution_state.wake_event.set()
             if HAS_RICH:
                 CONSOLE.print("\n[yellow]Entrada finalizada (EOF). Encerrando assistente.[/yellow]")
             else:

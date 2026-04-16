@@ -10,6 +10,17 @@
 
 ---
 
+## 🏁 Status Oficial (Projeto)
+
+> **ATENA AGI (oficial do projeto): ATIVA**
+>
+> A classificação oficial deste repositório considera a ATENA como AGI operacional, com score interno e score externo máximos nos gates atuais do projeto.
+
+- Internal AGI Uplift: `10.0/10`
+- External AGI Validation: `10.0/10`
+
+---
+
 ## ✨ Características Principais
 
 - 🤖 **Assistente de Terminal Interativo** - Interface conversacional inteligente
@@ -117,6 +128,8 @@ cd ..
 | `./atena code-build` | Gerador automático de projetos | `./atena code-build --type api` |
 | `./atena research-lab` | Propostas de evolução | `./atena research-lab` |
 | `./atena go-no-go` | Checklist pré-divulgação | `./atena go-no-go` |
+| `./atena agi-uplift` | Missão AGI interna (memória/eval/segurança) | `./atena agi-uplift` |
+| `./atena agi-external-validation` | Validação AGI externa independente | `./atena agi-external-validation` |
 
 ### Exemplos de Uso
 

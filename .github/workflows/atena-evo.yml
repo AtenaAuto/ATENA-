@@ -1,0 +1,42 @@
+name: ATENA-EVO
+
+on:
+  workflow_dispatch:
+    inputs:
+      generations:
+        description: "Quantidade de ciclos automáticos"
+        default: "30"
+  schedule:
+    - cron: "30 * * * *"
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  run-evolution:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Deps
+        run: |
+          pip install requests torch transformers accelerate faiss-cpu astor sentence-transformers aiosqlite aiohttp
+
+      - name: Run
+        run: |
+          export PYTHONPATH="$PYTHONPATH:$(pwd):$(pwd)/core"
+          python core/main.py --auto --cycles "${{ github.event.inputs.generations || '30' }}"
+
+      - name: Save
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atena-brain
+          path: atena_evolution/

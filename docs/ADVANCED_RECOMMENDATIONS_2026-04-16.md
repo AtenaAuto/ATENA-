@@ -1,8 +1,8 @@
 # ATENA Advanced Assessment (2026-04-16)
 
 ## Snapshot
-- Module smoke: `ok` (/workspace/ATENA-/atena_evolution/module_smoke_suite_20260416_004451.json)
-- Production gate: `approved` (/workspace/ATENA-/atena_evolution/production_gate_20260416_004452.json)
+- Module smoke: `ok` (/workspace/ATENA-/atena_evolution/module_smoke_suite_20260416_005140.json)
+- Production gate: `approved` (/workspace/ATENA-/atena_evolution/production_gate_20260416_005141.json)
 - Internet challenge confidence: `0.75` (/workspace/ATENA-/analysis_reports/internet_challenge_20260416_001614.json)
 
 ## Recomendações avançadas
@@ -15,10 +15,10 @@
 ## JSON
 ```json
 {
-  "timestamp": "2026-04-16T00:45:48.807745+00:00",
+  "timestamp": "2026-04-16T00:52:02.640583+00:00",
   "inputs": {
-    "module_smoke_path": "/workspace/ATENA-/atena_evolution/module_smoke_suite_20260416_004451.json",
-    "prod_gate_path": "/workspace/ATENA-/atena_evolution/production_gate_20260416_004452.json",
+    "module_smoke_path": "/workspace/ATENA-/atena_evolution/module_smoke_suite_20260416_005140.json",
+    "prod_gate_path": "/workspace/ATENA-/atena_evolution/production_gate_20260416_005141.json",
     "internet_path": "/workspace/ATENA-/analysis_reports/internet_challenge_20260416_001614.json"
   },
   "recommendations": [

@@ -3,7 +3,9 @@
 
 from core.atena_terminal_assistant import (
     EvolutionState,
+    choose_next_background_topic,
     get_evolution_status,
+    rank_topics_for_background,
     parse_background_topics,
     run_background_internet_learning_cycle,
 )
@@ -38,3 +40,20 @@ def test_get_evolution_status_contains_core_fields():
     status = get_evolution_status(state)
     assert "cycles=3" in status
     assert "last_success=True" in status
+
+
+def test_rank_topics_for_background_prioritizes_low_coverage():
+    topics = ["topic-a", "topic-b"]
+    events = [{"event": "background_internet_learning", "topic": "topic-a", "confidence": 0.9}]
+    ranked = rank_topics_for_background(topics, events)
+    assert ranked[0][0] == "topic-b"
+
+
+def test_choose_next_background_topic_uses_ranking(monkeypatch):
+    state = EvolutionState()
+    monkeypatch.setattr(
+        "core.atena_terminal_assistant.load_recent_background_events",
+        lambda limit=500: [{"event": "background_internet_learning", "topic": "topic-a", "confidence": 0.9}],
+    )
+    chosen = choose_next_background_topic(state, ["topic-a", "topic-b"])
+    assert chosen == "topic-b"

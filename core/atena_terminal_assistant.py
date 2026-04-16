@@ -129,6 +129,50 @@ def parse_background_topics(raw: str | None) -> list[str]:
     return topics or ["autonomous coding agents reliability evals and safety hardening"]
 
 
+def load_recent_background_events(limit: int = 500) -> list[dict[str, object]]:
+    memory_path = ROOT / "atena_evolution" / "assistant_learning_memory.jsonl"
+    if not memory_path.exists():
+        return []
+    lines = memory_path.read_text(encoding="utf-8").splitlines()[-limit:]
+    events: list[dict[str, object]] = []
+    for line in lines:
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if item.get("event") == "background_internet_learning":
+            events.append(item)
+    return events
+
+
+def rank_topics_for_background(topics: list[str], events: list[dict[str, object]]) -> list[tuple[str, float]]:
+    ranked: list[tuple[str, float]] = []
+    for topic in topics:
+        topic_events = [e for e in events if str(e.get("topic", "")).strip().lower() == topic.lower()]
+        count = len(topic_events)
+        avg_conf = 0.0
+        if count:
+            vals = [float(e.get("confidence", 0) or 0) for e in topic_events]
+            avg_conf = sum(vals) / len(vals)
+        exploration = 1.0 / (1.0 + count)
+        uncertainty = 1.0 - avg_conf
+        score = 0.7 * exploration + 0.3 * uncertainty
+        ranked.append((topic, score))
+    ranked.sort(key=lambda x: x[1], reverse=True)
+    return ranked
+
+
+def choose_next_background_topic(state: EvolutionState, topics: list[str]) -> str:
+    events = load_recent_background_events()
+    ranked = rank_topics_for_background(topics, events)
+    top_score = ranked[0][1] if ranked else 0.0
+    tied = [topic for topic, score in ranked if abs(score - top_score) < 1e-9] or topics
+    with state.lock:
+        topic = tied[state.topic_cursor % len(tied)]
+        state.topic_cursor += 1
+    return topic
+
+
 def get_evolution_status(state: EvolutionState) -> str:
     with state.lock:
         return (
@@ -151,9 +195,8 @@ def start_background_evolution(state: EvolutionState) -> threading.Thread | None
 
     def _worker() -> None:
         while state.running:
+            topic = choose_next_background_topic(state, topics)
             with state.lock:
-                topic = topics[state.topic_cursor % len(topics)]
-                state.topic_cursor += 1
                 state.last_started_at = datetime.now(timezone.utc).isoformat()
             try:
                 payload = run_background_internet_learning_cycle(topic)

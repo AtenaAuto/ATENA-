@@ -54,7 +54,7 @@ class AtenaCognitiveConfig:
     memory_dir: Path = Path("./atena_brain/memory")
     
     # Modelo Local de produção (sem modo de simulação heurística)
-    base_model_name: str = os.environ.get("LLM_MODEL_NAME", "Salesforce/codegen-350M-mono")
+    base_model_name: str = os.environ.get("LLM_MODEL_NAME", "Qwen/Qwen2.5-0.5B-Instruct")
     device: str = "cuda" if os.environ.get("USE_CUDA") == "1" else "cpu"
     enable_transformers: bool = os.environ.get("ATENA_ENABLE_HEAVY_LOCAL_LM", "1") == "1"
     

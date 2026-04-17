@@ -4,7 +4,12 @@
 import json
 from pathlib import Path
 
-from core.atena_digital_organism_live_cycle import _pick_project_type, run_live_cycle, run_live_cycles
+from core.atena_digital_organism_live_cycle import (
+    _pick_project_type,
+    run_live_cycle,
+    run_live_cycles,
+    run_live_daemon,
+)
 
 
 def test_pick_project_type_prefers_api_when_sources_strong():
@@ -65,3 +70,31 @@ def test_run_live_cycles_batch_summary(monkeypatch, tmp_path: Path):
     assert summary["consistently_learning"] is True
     assert Path(summary["batch_json"]).exists()
     assert Path(summary["batch_markdown"]).exists()
+
+
+def test_run_live_daemon_generates_global_summary(monkeypatch, tmp_path: Path):
+    monkeypatch.setattr(
+        "core.atena_digital_organism_live_cycle.run_internet_challenge",
+        lambda topic: {
+            "status": "ok",
+            "confidence": 0.92,
+            "weighted_confidence": 0.82,
+            "source_count": 5,
+            "recommendation": "triangulate",
+            "sources": [{"source": "github", "quality_score": 0.91}],
+        },
+    )
+
+    payload = run_live_daemon(
+        tmp_path,
+        seed_topic="agentic systems",
+        batches=2,
+        iterations_per_batch=2,
+        strict=True,
+    )
+    summary = payload["summary"]
+    assert summary["status"] == "ok"
+    assert summary["batches"] == 2
+    assert summary["avg_success_rate"] >= 0.9
+    assert Path(summary["daemon_json"]).exists()
+    assert Path(summary["daemon_markdown"]).exists()

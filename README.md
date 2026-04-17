@@ -130,6 +130,7 @@ cd ..
 | `./atena go-no-go` | Checklist pré-divulgação | `./atena go-no-go` |
 | `./atena agi-uplift` | Missão AGI interna (memória/eval/segurança) | `./atena agi-uplift` |
 | `./atena agi-external-validation` | Validação AGI externa independente | `./atena agi-external-validation` |
+| `./atena digital-organism-audit` | Auditoria automática de maturidade como organismo digital | `./atena digital-organism-audit` |
 
 ### Exemplos de Uso
 

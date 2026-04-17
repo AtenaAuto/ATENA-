@@ -234,3 +234,23 @@ def pytest_collection_modifyitems(config, items):
         # Adiciona marker 'integration' se estiver em tests/integration/
         elif "integration" in str(item.fspath):
             item.add_marker(pytest.mark.integration)
+
+
+def pytest_pyfunc_call(pyfuncitem):
+    """Executa testes async mesmo sem plugin pytest-asyncio."""
+    test_func = pyfuncitem.obj
+    if not asyncio.iscoroutinefunction(test_func):
+        return None
+
+    loop = pyfuncitem.funcargs.get("event_loop")
+    if loop is None:
+        loop = asyncio.new_event_loop()
+        try:
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(test_func(**pyfuncitem.funcargs))
+        finally:
+            loop.close()
+        return True
+
+    loop.run_until_complete(test_func(**pyfuncitem.funcargs))
+    return True

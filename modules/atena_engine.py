@@ -82,7 +82,10 @@ class AtenaCore:
         """Exibe o status atual do motor."""
         total = len(self._results)
         ok = sum(1 for r in self._results if r.get("success"))
-        logger.info(
+        message = (
             f"[AtenaCore] Status: {ok}/{total} ciclos bem-sucedidos | "
+            f"Geração atual: {self.generation} | "
             f"Melhor score: {self.best_score:.4f}"
         )
+        print(message)
+        logger.info(message)

@@ -167,7 +167,7 @@ def main(argv: list[str]) -> int:
         return 2
 
     env = os.environ.copy()
-    if env.get("ATENA_AUTO_BOOTSTRAP", "1") == "1" and command not in {"help", "bootstrap"}:
+    if env.get("ATENA_AUTO_BOOTSTRAP", "1") == "1" and command not in {"help", "bootstrap", "production-center"}:
         bootstrap_cmd = [sys.executable, str(ROOT / "core" / "atena_env_bootstrap.py")]
         print("🔧 ATENA bootstrap: verificando dependências mínimas...")
         bootstrap_timeout = int(env.get("ATENA_BOOTSTRAP_TIMEOUT_S", "180"))

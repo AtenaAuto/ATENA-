@@ -66,3 +66,21 @@ def test_launcher_executes_enterprise_readiness_command(monkeypatch):
     assert len(calls) == 1
     assert calls[0]["cmd"][1].endswith("protocols/atena_enterprise_readiness_mission.py")
     assert calls[0]["cmd"][2:] == ["--pilots", "5"]
+
+
+def test_launcher_executes_enterprise_advanced_command(monkeypatch):
+    calls = []
+
+    def _fake_run(cmd, cwd=None, check=False, env=None, timeout=None):
+        calls.append({"cmd": cmd, "cwd": cwd, "check": check, "env": env, "timeout": timeout})
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(atena_launcher.subprocess, "run", _fake_run)
+    monkeypatch.setenv("ATENA_AUTO_BOOTSTRAP", "0")
+
+    rc = atena_launcher.main(["./atena", "enterprise-advanced", "--tenant", "corp-a"])
+
+    assert rc == 0
+    assert len(calls) == 1
+    assert calls[0]["cmd"][1].endswith("protocols/atena_enterprise_advanced_mission.py")
+    assert calls[0]["cmd"][2:] == ["--tenant", "corp-a"]

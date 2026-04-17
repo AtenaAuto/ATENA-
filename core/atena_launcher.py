@@ -161,8 +161,17 @@ def main(argv: list[str]) -> int:
     if env.get("ATENA_AUTO_BOOTSTRAP", "1") == "1" and command not in {"help", "bootstrap"}:
         bootstrap_cmd = [sys.executable, str(ROOT / "core" / "atena_env_bootstrap.py")]
         print("🔧 ATENA bootstrap: verificando dependências mínimas...")
-        bootstrap_proc = subprocess.run(bootstrap_cmd, cwd=str(ROOT), check=False)
+        bootstrap_timeout = int(env.get("ATENA_BOOTSTRAP_TIMEOUT_S", "180"))
+        bootstrap_proc = subprocess.run(
+            bootstrap_cmd,
+            cwd=str(ROOT),
+            check=False,
+            timeout=bootstrap_timeout,
+        )
         if bootstrap_proc.returncode != 0:
+            if env.get("ATENA_STRICT_BOOTSTRAP", "0") == "1":
+                print("❌ Bootstrap falhou e ATENA_STRICT_BOOTSTRAP=1: abortando execução.")
+                return bootstrap_proc.returncode
             print("⚠️ Bootstrap retornou falha; continuando execução mesmo assim.")
 
     if command in {"start", "assistant"} and env.get("ATENA_AUTO_PREPARE_LOCAL_MODEL", "1") == "1":
@@ -178,7 +187,11 @@ def main(argv: list[str]) -> int:
                 "raise SystemExit(0 if ok else 0)"
             ),
         ]
-        subprocess.run(prep_cmd, cwd=str(ROOT), check=False)
+        prepare_timeout = int(env.get("ATENA_MODEL_PREP_TIMEOUT_S", "300"))
+        try:
+            subprocess.run(prep_cmd, cwd=str(ROOT), check=False, timeout=prepare_timeout)
+        except subprocess.TimeoutExpired:
+            print(f"⚠️ Preparação do LLM local excedeu {prepare_timeout}s; seguindo com fallback.")
         # Evita repetir preparação pesada no processo filho do assistant/start.
         env["ATENA_AUTO_PREPARE_LOCAL_MODEL"] = "0"
 

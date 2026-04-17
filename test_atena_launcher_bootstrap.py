@@ -48,3 +48,21 @@ def test_launcher_aborts_when_strict_bootstrap_fails(monkeypatch):
     assert rc == 2
     # Deve parar no bootstrap sem chamar prepare/assistant
     assert len(calls) == 1
+
+
+def test_launcher_executes_enterprise_readiness_command(monkeypatch):
+    calls = []
+
+    def _fake_run(cmd, cwd=None, check=False, env=None, timeout=None):
+        calls.append({"cmd": cmd, "cwd": cwd, "check": check, "env": env, "timeout": timeout})
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(atena_launcher.subprocess, "run", _fake_run)
+    monkeypatch.setenv("ATENA_AUTO_BOOTSTRAP", "0")
+
+    rc = atena_launcher.main(["./atena", "enterprise-readiness", "--pilots", "5"])
+
+    assert rc == 0
+    assert len(calls) == 1
+    assert calls[0]["cmd"][1].endswith("protocols/atena_enterprise_readiness_mission.py")
+    assert calls[0]["cmd"][2:] == ["--pilots", "5"]

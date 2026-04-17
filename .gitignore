@@ -90,6 +90,9 @@ api_keys/
 docs/GUARDIAN_REPORT_*.md
 docs/PRODUCTION_GATE_*.md
 docs/GO_NO_GO_REPORT_*.md
+docs/EXTERNAL_AGI_VALIDATION_*.md
+analysis_reports/ATENA_Avaliacao_Organismo_Digital_Automatica_*.md
+analysis_reports/ATENA_Organismo_Digital_*.md
 atena_evolution/
 !atena_evolution/.gitkeep
 

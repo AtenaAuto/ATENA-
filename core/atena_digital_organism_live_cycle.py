@@ -22,7 +22,38 @@ def _slugify(text: str) -> str:
     return safe or "atena-project"
 
 
-def _pick_project_type(learning_payload: dict[str, Any]) -> str:
+def _memory_success_bias(root: Path) -> dict[str, float]:
+    memory_path = root / "atena_evolution" / "digital_organism_memory.jsonl"
+    if not memory_path.exists():
+        return {}
+
+    stats: dict[str, dict[str, float]] = {}
+    for raw in memory_path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except Exception:
+            continue
+        ptype = str(entry.get("build", {}).get("project_type", "")).strip()
+        if not ptype:
+            continue
+        ok = bool(entry.get("execution", {}).get("ok", False))
+        bucket = stats.setdefault(ptype, {"total": 0.0, "ok": 0.0})
+        bucket["total"] += 1.0
+        if ok:
+            bucket["ok"] += 1.0
+
+    bias: dict[str, float] = {}
+    for ptype, bucket in stats.items():
+        total = bucket["total"]
+        if total > 0:
+            bias[ptype] = round(bucket["ok"] / total, 3)
+    return bias
+
+
+def _pick_project_type(learning_payload: dict[str, Any], memory_bias: dict[str, float] | None = None) -> str:
     sources = {item.get("source"): item for item in learning_payload.get("sources", [])}
     weighted_conf = float(learning_payload.get("weighted_confidence", 0.0))
 
@@ -30,10 +61,23 @@ def _pick_project_type(learning_payload: dict[str, Any]) -> str:
     gh_q = float(sources.get("github", {}).get("quality_score", 0.0))
 
     if weighted_conf >= 0.70 and (npm_q >= 0.70 or gh_q >= 0.70):
-        return "api"
-    if weighted_conf >= 0.60:
-        return "site"
-    return "cli"
+        base = "api"
+    elif weighted_conf >= 0.60:
+        base = "site"
+    else:
+        base = "cli"
+
+    # Ajuste inteligente com memória histórica (evita repetir tipo com baixa taxa de sucesso).
+    memory_bias = memory_bias or {}
+    if not memory_bias:
+        return base
+
+    best = max(memory_bias.items(), key=lambda kv: kv[1])[0]
+    best_rate = float(memory_bias.get(best, 0.0))
+    base_rate = float(memory_bias.get(base, 0.0))
+    if best_rate - base_rate >= 0.20:
+        return best
+    return base
 
 
 def _validate_execution(project_type: str, project_dir: Path) -> dict[str, Any]:
@@ -124,7 +168,8 @@ def _save_cycle_artifacts(root: Path, payload: dict[str, Any]) -> tuple[Path, Pa
 
 def run_live_cycle(root: Path, topic: str) -> dict[str, Any]:
     learning = run_internet_challenge(topic)
-    project_type = _pick_project_type(learning)
+    memory_bias = _memory_success_bias(root)
+    project_type = _pick_project_type(learning, memory_bias=memory_bias)
 
     code_module = AtenaCodeModule(root)
     project_name = f"{_slugify(topic)}-{datetime.now(timezone.utc).strftime('%H%M%S')}"
@@ -155,6 +200,7 @@ def run_live_cycle(root: Path, topic: str) -> dict[str, Any]:
             "source_count": learning.get("source_count"),
             "recommendation": learning.get("recommendation"),
         },
+        "memory_bias": memory_bias,
         "build": {
             "ok": build.ok,
             "project_type": build.project_type,
@@ -180,4 +226,75 @@ def run_live_cycle(root: Path, topic: str) -> dict[str, Any]:
     payload["memory_path"] = str(memory_path)
     payload["json_path"] = str(json_path)
     payload["markdown_path"] = str(md_path)
+    return payload
+
+
+def _next_topic(previous_topic: str, cycle_payload: dict[str, Any], step: int) -> str:
+    if cycle_payload.get("status") == "ok":
+        return f"{previous_topic} optimization cycle {step}"
+    recommendation = str(cycle_payload.get("learning", {}).get("recommendation", "")).strip().lower()
+    if "específicos" in recommendation or "specific" in recommendation:
+        return f"{previous_topic} production reliability"
+    return f"{previous_topic} resilient architecture"
+
+
+def run_live_cycles(root: Path, seed_topic: str, iterations: int = 3, strict: bool = False) -> dict[str, Any]:
+    if iterations <= 0:
+        raise ValueError("iterations deve ser > 0")
+
+    cycles: list[dict[str, Any]] = []
+    topic = seed_topic
+    for idx in range(1, iterations + 1):
+        cycle_payload = run_live_cycle(root, topic)
+        cycle_payload["cycle"] = idx
+        cycles.append(cycle_payload)
+        topic = _next_topic(topic, cycle_payload, idx + 1)
+
+    ok_count = sum(1 for c in cycles if c.get("status") == "ok")
+    learning_scores = [float(c.get("learning", {}).get("weighted_confidence", 0.0) or 0.0) for c in cycles]
+    avg_learning = round(sum(learning_scores) / max(1, len(learning_scores)), 3)
+    success_rate = round(ok_count / len(cycles), 3)
+    consistently_learning = success_rate >= 0.67 and avg_learning >= 0.65
+
+    status = "ok" if consistently_learning else "partial"
+    if strict and not consistently_learning:
+        status = "fail"
+
+    summary = {
+        "status": status,
+        "seed_topic": seed_topic,
+        "iterations": iterations,
+        "ok_cycles": ok_count,
+        "success_rate": success_rate,
+        "avg_learning_confidence": avg_learning,
+        "consistently_learning": consistently_learning,
+    }
+
+    root_evo = root / "atena_evolution"
+    root_reports = root / "analysis_reports"
+    root_evo.mkdir(parents=True, exist_ok=True)
+    root_reports.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    batch_json = root_evo / f"digital_organism_live_batch_{ts}.json"
+    batch_md = root_reports / f"ATENA_Organismo_Digital_Live_Batch_{date}.md"
+    payload = {"summary": summary, "cycles": cycles}
+    batch_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    batch_md.write_text(
+        "\n".join(
+            [
+                f"# ATENA — Live Batch de Organismo Digital ({date})",
+                "",
+                f"- status={summary['status']}",
+                f"- iterations={summary['iterations']}",
+                f"- success_rate={summary['success_rate']}",
+                f"- avg_learning_confidence={summary['avg_learning_confidence']}",
+                f"- consistently_learning={summary['consistently_learning']}",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    summary["batch_json"] = str(batch_json)
+    summary["batch_markdown"] = str(batch_md)
     return payload

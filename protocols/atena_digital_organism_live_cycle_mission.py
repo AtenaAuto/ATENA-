@@ -12,13 +12,33 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from core.atena_digital_organism_live_cycle import run_live_cycle
+from core.atena_digital_organism_live_cycle import run_live_cycle, run_live_cycles
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Executa live cycle de organismo digital")
     parser.add_argument("--topic", default="autonomous ai engineering", help="Tópico para aprendizado na internet")
+    parser.add_argument("--iterations", type=int, default=1, help="Quantidade de ciclos autônomos encadeados")
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Falha se a batch não demonstrar aprendizado consistente",
+    )
     args = parser.parse_args()
+
+    if args.iterations > 1:
+        payload = run_live_cycles(ROOT, seed_topic=args.topic, iterations=args.iterations, strict=args.strict)
+        summary = payload["summary"]
+        print("🧠⚙️🧪 ATENA Digital Organism Live Batch")
+        print(f"seed_topic={summary['seed_topic']}")
+        print(f"iterations={summary['iterations']}")
+        print(f"status={summary['status']}")
+        print(f"success_rate={summary['success_rate']}")
+        print(f"avg_learning_confidence={summary['avg_learning_confidence']}")
+        print(f"consistently_learning={summary['consistently_learning']}")
+        print(f"json={summary['batch_json']}")
+        print(f"markdown={summary['batch_markdown']}")
+        return 0 if summary["status"] == "ok" else 2
 
     payload = run_live_cycle(ROOT, topic=args.topic)
     print("🧠⚙️🧪 ATENA Digital Organism Live Cycle")

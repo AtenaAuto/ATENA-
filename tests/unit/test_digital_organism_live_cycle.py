@@ -4,7 +4,7 @@
 import json
 from pathlib import Path
 
-from core.atena_digital_organism_live_cycle import _pick_project_type, run_live_cycle
+from core.atena_digital_organism_live_cycle import _pick_project_type, run_live_cycle, run_live_cycles
 
 
 def test_pick_project_type_prefers_api_when_sources_strong():
@@ -43,3 +43,25 @@ def test_run_live_cycle_creates_memory_and_artifacts(monkeypatch, tmp_path: Path
     assert memory_lines
     last = json.loads(memory_lines[-1])
     assert last["topic"] == "autonomous coding"
+
+
+def test_run_live_cycles_batch_summary(monkeypatch, tmp_path: Path):
+    monkeypatch.setattr(
+        "core.atena_digital_organism_live_cycle.run_internet_challenge",
+        lambda topic: {
+            "status": "ok",
+            "confidence": 0.9,
+            "weighted_confidence": 0.8,
+            "source_count": 4,
+            "recommendation": "triangulate",
+            "sources": [{"source": "github", "quality_score": 0.9}],
+        },
+    )
+
+    payload = run_live_cycles(tmp_path, seed_topic="agentic coding", iterations=2, strict=True)
+    summary = payload["summary"]
+    assert summary["iterations"] == 2
+    assert summary["status"] == "ok"
+    assert summary["consistently_learning"] is True
+    assert Path(summary["batch_json"]).exists()
+    assert Path(summary["batch_markdown"]).exists()

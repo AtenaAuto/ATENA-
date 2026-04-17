@@ -166,23 +166,53 @@ def _save_cycle_artifacts(root: Path, payload: dict[str, Any]) -> tuple[Path, Pa
     return json_path, md_path
 
 
-def run_live_cycle(root: Path, topic: str) -> dict[str, Any]:
+def _build_and_validate(
+    root: Path,
+    topic: str,
+    project_type: str,
+    code_module: AtenaCodeModule,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    project_name = f"{_slugify(topic)}-{datetime.now(timezone.utc).strftime('%H%M%S')}"
+    build = code_module.build(project_type=project_type, project_name=project_name)
+    build_payload = {
+        "ok": build.ok,
+        "project_type": build.project_type,
+        "project_name": build.project_name,
+        "output_dir": build.output_dir,
+        "message": build.message,
+    }
+    execution = {"ok": False, "reason": "build_failed"}
+    if build.ok:
+        execution = _validate_execution(build.project_type, Path(build.output_dir))
+    return build_payload, execution
+
+
+def run_live_cycle(root: Path, topic: str, max_recovery_attempts: int = 1) -> dict[str, Any]:
     learning = run_internet_challenge(topic)
     memory_bias = _memory_success_bias(root)
     project_type = _pick_project_type(learning, memory_bias=memory_bias)
 
     code_module = AtenaCodeModule(root)
-    project_name = f"{_slugify(topic)}-{datetime.now(timezone.utc).strftime('%H%M%S')}"
-    build = code_module.build(project_type=project_type, project_name=project_name)
+    build_payload, execution = _build_and_validate(root, topic, project_type, code_module)
+    recovery_chain: list[dict[str, Any]] = []
 
-    execution = {
-        "ok": False,
-        "reason": "build_failed",
-    }
-    if build.ok:
-        execution = _validate_execution(build.project_type, Path(build.output_dir))
+    if (not execution.get("ok")) and max_recovery_attempts > 0:
+        fallback_order = [ptype for ptype in ("cli", "site", "api") if ptype != project_type]
+        for fallback_type in fallback_order[:max_recovery_attempts]:
+            retry_build, retry_exec = _build_and_validate(root, f"{topic}-recovery", fallback_type, code_module)
+            recovery_chain.append(
+                {
+                    "fallback_type": fallback_type,
+                    "build": retry_build,
+                    "execution": retry_exec,
+                }
+            )
+            if retry_build.get("ok") and retry_exec.get("ok"):
+                build_payload = retry_build
+                execution = retry_exec
+                break
 
-    overall_ok = bool(build.ok and execution.get("ok"))
+    overall_ok = bool(build_payload.get("ok") and execution.get("ok"))
     next_action = (
         "Promover baseline e iniciar iteração com testes mais profundos."
         if overall_ok
@@ -201,14 +231,10 @@ def run_live_cycle(root: Path, topic: str) -> dict[str, Any]:
             "recommendation": learning.get("recommendation"),
         },
         "memory_bias": memory_bias,
-        "build": {
-            "ok": build.ok,
-            "project_type": build.project_type,
-            "project_name": build.project_name,
-            "output_dir": build.output_dir,
-            "message": build.message,
-        },
+        "build": build_payload,
         "execution": execution,
+        "recovery_used": bool(recovery_chain),
+        "recovery_chain": recovery_chain,
         "next_action": next_action,
     }
 

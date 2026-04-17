@@ -131,7 +131,7 @@ cd ..
 | `./atena agi-uplift` | Missão AGI interna (memória/eval/segurança) | `./atena agi-uplift` |
 | `./atena agi-external-validation` | Validação AGI externa independente | `./atena agi-external-validation` |
 | `./atena digital-organism-audit` | Auditoria automática de maturidade como organismo digital | `./atena digital-organism-audit` |
-| `./atena digital-organism-live-cycle` | Aprende na internet, cria software, executa/testa, roda em batch e daemon autônomo | `./atena digital-organism-live-cycle --topic "autonomous ai engineering" --iterations 3 --batches 2 --strict` |
+| `./atena digital-organism-live-cycle` | Aprende na internet, cria software, executa/testa, auto-recupera falhas e roda em daemon | `./atena digital-organism-live-cycle --topic "autonomous ai engineering" --iterations 3 --batches 2 --strict --recovery-attempts 2` |
 
 ### Exemplos de Uso
 

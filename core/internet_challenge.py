@@ -270,6 +270,38 @@ def run_internet_challenge(topic: str) -> dict[str, object]:
     weighted_confidence = round((weighted_ok / weighted_total), 2) if weighted_total else 0.0
 
     primary_sources = scored_sources[:3]
+    high_quality_sources = [
+        s["source"] for s in scored_sources if s.get("ok") and float(s.get("quality_score", 0.0)) >= 0.7
+    ]
+    failed_sources = [s["source"] for s in scored_sources if not s.get("ok")]
+    synthesis = {
+        "coverage_summary": (
+            f"{len(successful)}/{len(sources)} fontes responderam com sucesso "
+            f"(alta qualidade: {len(high_quality_sources)})."
+        ),
+        "high_quality_sources": high_quality_sources,
+        "failed_sources": failed_sources,
+        "release_risk": (
+            "high"
+            if weighted_confidence < 0.7 or len(high_quality_sources) < 3
+            else "medium"
+            if weighted_confidence < 0.85
+            else "low"
+        ),
+        "next_action": (
+            "Expandir consulta com palavras-chave mais específicas e validar achados em pelo menos 3 fontes de alta qualidade."
+            if weighted_confidence < 0.85
+            else "Consolidar síntese final e transformar em plano executável com milestones."
+        ),
+    }
+    difficulty_score = round(
+        min(
+            1.0,
+            (0.5 * (len(failed_sources) / max(1, len(sources))))
+            + (0.5 * max(0.0, 1.0 - weighted_confidence)),
+        ),
+        2,
+    )
     return {
         "topic": topic,
         "status": "ok" if weighted_confidence >= 0.65 else "partial",
@@ -279,6 +311,8 @@ def run_internet_challenge(topic: str) -> dict[str, object]:
         "all_sources": scored_sources,
         "source_count": len(primary_sources),
         "all_source_count": len(sources),
+        "difficulty_score": difficulty_score,
+        "synthesis": synthesis,
         "recommendation": (
             "Use triangulação entre fontes acadêmicas, técnicas e comunidade, priorizando quality_score >= 0.70."
             if weighted_confidence >= 0.65

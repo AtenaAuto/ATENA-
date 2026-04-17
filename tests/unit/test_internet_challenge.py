@@ -32,3 +32,6 @@ def test_run_internet_challenge_mocked():
     assert payload["status"] == "ok"
     assert payload["confidence"] == 1.0
     assert len(payload["sources"]) == 3
+    assert "synthesis" in payload
+    assert payload["synthesis"]["release_risk"] in {"low", "medium", "high"}
+    assert 0.0 <= payload["difficulty_score"] <= 1.0

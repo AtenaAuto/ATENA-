@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -156,7 +157,32 @@ def main(argv: list[str]) -> int:
         render_help()
         return 2
 
-    result = subprocess.run([sys.executable, str(script), *argv[2:]], cwd=str(ROOT))
+    env = os.environ.copy()
+    if env.get("ATENA_AUTO_BOOTSTRAP", "1") == "1" and command not in {"help", "bootstrap"}:
+        bootstrap_cmd = [sys.executable, str(ROOT / "core" / "atena_env_bootstrap.py")]
+        print("🔧 ATENA bootstrap: verificando dependências mínimas...")
+        bootstrap_proc = subprocess.run(bootstrap_cmd, cwd=str(ROOT), check=False)
+        if bootstrap_proc.returncode != 0:
+            print("⚠️ Bootstrap retornou falha; continuando execução mesmo assim.")
+
+    if command in {"start", "assistant"} and env.get("ATENA_AUTO_PREPARE_LOCAL_MODEL", "1") == "1":
+        print("🧠 ATENA: preparando LLM local padrão (download automático quando necessário)...")
+        prep_cmd = [
+            sys.executable,
+            "-c",
+            (
+                "from core.atena_llm_router import AtenaLLMRouter;"
+                "r=AtenaLLMRouter();"
+                "ok,msg=(r.auto_prepare_result or r.prepare_free_local_model());"
+                "print(msg);"
+                "raise SystemExit(0 if ok else 0)"
+            ),
+        ]
+        subprocess.run(prep_cmd, cwd=str(ROOT), check=False)
+        # Evita repetir preparação pesada no processo filho do assistant/start.
+        env["ATENA_AUTO_PREPARE_LOCAL_MODEL"] = "0"
+
+    result = subprocess.run([sys.executable, str(script), *argv[2:]], cwd=str(ROOT), env=env)
     return result.returncode
 
 

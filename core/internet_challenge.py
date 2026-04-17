@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 import json
+import os
+import time
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
@@ -18,22 +20,71 @@ class SourceResult:
     details: dict[str, object]
 
 
-def _fetch_json(url: str, timeout: int = 15) -> dict:
+SOURCE_WEIGHTS: dict[str, float] = {
+    "wikipedia": 0.6,
+    "github": 0.9,
+    "hackernews": 0.5,
+    "arxiv": 1.0,
+    "crossref": 1.0,
+    "openalex": 0.95,
+    "stackoverflow": 0.7,
+    "reddit": 0.45,
+    "npm": 0.65,
+    "europepmc": 0.95,
+}
+
+
+def _fetch_raw(url: str, timeout: int = 15) -> str:
+    retries = max(1, int(os.getenv("ATENA_INTERNET_RETRIES", "2")))
+    backoff_s = max(0.1, float(os.getenv("ATENA_INTERNET_BACKOFF_S", "0.5")))
+    last_err: Exception | None = None
+
     req = urllib.request.Request(
         url=url,
-        headers={"User-Agent": "ATENA-Internet-Challenge/1.0 (+https://github.com/AtenaAuto/ATENA-)"},
+        headers={
+            "User-Agent": "ATENA-Internet-Challenge/1.0 (+https://github.com/AtenaAuto/ATENA-)",
+            "Accept": "application/json, application/xml;q=0.9, text/plain;q=0.8",
+        },
     )
-    with urllib.request.urlopen(req, timeout=timeout) as response:  # nosec - controlled URLs
-        return json.loads(response.read().decode("utf-8"))
+    for attempt in range(1, retries + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as response:  # nosec - controlled URLs
+                return response.read().decode("utf-8", errors="ignore")
+        except Exception as exc:  # noqa: BLE001
+            last_err = exc
+            if attempt < retries:
+                time.sleep(backoff_s * attempt)
+
+    raise RuntimeError(f"falha após {retries} tentativas: {last_err}")
+
+
+def _fetch_json(url: str, timeout: int = 15) -> dict:
+    return json.loads(_fetch_raw(url, timeout=timeout))
 
 
 def _fetch_text(url: str, timeout: int = 15) -> str:
-    req = urllib.request.Request(
-        url=url,
-        headers={"User-Agent": "ATENA-Internet-Challenge/1.0 (+https://github.com/AtenaAuto/ATENA-)"},
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as response:  # nosec - controlled URLs
-        return response.read().decode("utf-8", errors="ignore")
+    return _fetch_raw(url, timeout=timeout)
+
+
+def _estimate_source_quality(source: str, details: dict[str, object], ok: bool) -> float:
+    if not ok:
+        return 0.0
+    weight = SOURCE_WEIGHTS.get(source, 0.5)
+    signals = 0.0
+
+    for key in ("top_repos", "hits", "papers", "works", "questions", "posts", "packages"):
+        value = details.get(key)
+        if isinstance(value, list):
+            signals += min(len(value), 3) / 3
+
+    if details.get("extract"):
+        signals += 0.25
+    if details.get("error"):
+        signals = max(0.0, signals - 0.5)
+
+    # Normaliza para [0,1] e combina com peso de credibilidade da fonte
+    normalized = min(1.0, signals)
+    return round((0.6 * weight) + (0.4 * normalized), 3)
 
 
 def run_internet_challenge(topic: str) -> dict[str, object]:
@@ -201,15 +252,33 @@ def run_internet_challenge(topic: str) -> dict[str, object]:
 
     successful = [s for s in sources if s.ok]
     confidence = round(len(successful) / len(sources), 2) if sources else 0.0
+    scored_sources = []
+    weighted_total = 0.0
+    weighted_ok = 0.0
+    for s in sources:
+        weight = SOURCE_WEIGHTS.get(s.source, 0.5)
+        quality = _estimate_source_quality(s.source, s.details, s.ok)
+        weighted_total += weight
+        weighted_ok += weight if s.ok else 0.0
+        scored_sources.append(
+            {
+                **s.__dict__,
+                "weight": round(weight, 2),
+                "quality_score": quality,
+            }
+        )
+    weighted_confidence = round((weighted_ok / weighted_total), 2) if weighted_total else 0.0
 
     return {
         "topic": topic,
-        "status": "ok" if confidence >= 0.6 else "partial",
+        "status": "ok" if weighted_confidence >= 0.65 else "partial",
         "confidence": confidence,
-        "sources": [s.__dict__ for s in sources],
+        "weighted_confidence": weighted_confidence,
+        "sources": scored_sources,
+        "source_count": len(sources),
         "recommendation": (
-            "Use triangulação entre fontes acadêmicas, técnicas e comunidade para reduzir viés."
-            if confidence >= 0.6
-            else "Repita com outro tópico, retries e timeout maior para coletar sinais mais consistentes."
+            "Use triangulação entre fontes acadêmicas, técnicas e comunidade, priorizando quality_score >= 0.70."
+            if weighted_confidence >= 0.65
+            else "Amplie timeout/retries e use tópicos mais específicos para aumentar cobertura e qualidade."
         ),
     }

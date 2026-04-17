@@ -219,7 +219,6 @@ class AtenaUltraBrain:
                 "-m",
                 "pip",
                 "install",
-                "-q",
                 "transformers>=4.41.0",
                 "accelerate>=0.30.0",
                 "safetensors>=0.4.0",

@@ -225,6 +225,68 @@ def materialize_self_generated_assets(topic: str, payload: dict[str, object]) ->
     return created
 
 
+def validate_self_generated_assets(created_assets: list[dict[str, str]]) -> dict[str, object]:
+    """
+    Valida assets recém-gerados:
+    - módulo Python: compila com py_compile
+    - skill/plugin: verifica existência do arquivo
+    """
+    total = len(created_assets)
+    checks: list[dict[str, object]] = []
+    passed = 0
+
+    for asset in created_assets:
+        module_path = ROOT / str(asset.get("module_path", ""))
+        skill_path = ROOT / str(asset.get("skill_path", ""))
+        plugin_path = ROOT / str(asset.get("plugin_path", ""))
+        key = str(asset.get("manifest_key", "unknown"))
+
+        module_ok = False
+        module_error = ""
+        if module_path.exists():
+            try:
+                proc = subprocess.run(
+                    [sys.executable, "-m", "py_compile", str(module_path)],
+                    cwd=str(ROOT),
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                module_ok = proc.returncode == 0
+                if not module_ok:
+                    module_error = (proc.stderr or proc.stdout or "").strip()[:400]
+            except Exception as exc:  # noqa: BLE001
+                module_error = str(exc)
+        else:
+            module_error = "module file not found"
+
+        skill_ok = skill_path.exists()
+        plugin_ok = plugin_path.exists()
+        ok = module_ok and skill_ok and plugin_ok
+        if ok:
+            passed += 1
+
+        checks.append(
+            {
+                "manifest_key": key,
+                "ok": ok,
+                "module_ok": module_ok,
+                "skill_ok": skill_ok,
+                "plugin_ok": plugin_ok,
+                "module_error": module_error if not module_ok else None,
+            }
+        )
+
+    status = "ok" if passed == total else ("partial" if passed > 0 else "failed")
+    return {
+        "status": status if total > 0 else "skipped",
+        "total": total,
+        "passed": passed,
+        "failed": max(0, total - passed),
+        "checks": checks,
+    }
+
+
 def parse_background_topics(raw: Optional[str]) -> list[str]:
     if raw:
         values = [part.strip() for part in raw.split(",") if part.strip()]
@@ -256,6 +318,28 @@ def run_background_internet_learning_cycle(topic: str) -> dict[str, object]:
                 "topic": topic,
                 "created_assets": len(created),
                 "manifest_paths": [item["manifest_key"] for item in created],
+            }
+        )
+        validation = validate_self_generated_assets(created)
+        append_learning_memory(
+            {
+                "event": "background_self_build_validation",
+                "topic": topic,
+                "status": validation.get("status"),
+                "total": validation.get("total"),
+                "passed": validation.get("passed"),
+                "failed": validation.get("failed"),
+            }
+        )
+    else:
+        append_learning_memory(
+            {
+                "event": "background_self_build_validation",
+                "topic": topic,
+                "status": "skipped",
+                "total": 0,
+                "passed": 0,
+                "failed": 0,
             }
         )
     return payload

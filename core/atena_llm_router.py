@@ -33,12 +33,31 @@ class AtenaLLMRouter:
         self.cfg = LLMConfig()
         self._local_brain: Optional[AtenaUltraBrain] = None
         self._openai_client = None
+        self.auto_prepare_result: Optional[tuple[bool, str]] = None
         self._auto_select_default_backend()
+        self._maybe_prepare_default_local_model()
 
     def _auto_select_default_backend(self) -> None:
         """Seleciona backend remoto por padrão quando chaves estão disponíveis."""
         if os.getenv("DASHSCOPE_API_KEY") and OpenAI is not None:
             self.set_backend(f"qwen:{DEFAULT_QWEN_MODEL}")
+
+    def _maybe_prepare_default_local_model(self) -> None:
+        """
+        Tenta preparar automaticamente um LLM local no boot, quando o provider atual é local.
+        Pode ser desativado com ATENA_AUTO_PREPARE_LOCAL_MODEL=0.
+        """
+        if os.getenv("ATENA_AUTO_PREPARE_LOCAL_MODEL", "1") != "1":
+            return
+        # Evita downloads/instalações em suíte de testes por padrão.
+        if os.getenv("PYTEST_CURRENT_TEST"):
+            return
+        if self.cfg.provider != "local":
+            return
+        try:
+            self.auto_prepare_result = self.prepare_free_local_model()
+        except Exception as exc:  # noqa: BLE001
+            self.auto_prepare_result = (False, f"falha no auto-prepare local: {exc}")
 
     def list_options(self) -> list[str]:
         opts = ["local:local-simbrain (sempre disponível)"]

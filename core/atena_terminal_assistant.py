@@ -992,6 +992,12 @@ def atena_thinking(message: str = "Pensando..."):
 def main():
     render_banner()
     router = AtenaLLMRouter()
+    if router.auto_prepare_result is not None:
+        ok_auto, msg_auto = router.auto_prepare_result
+        if ok_auto:
+            console_print(f"[ATENA model] {msg_auto}")
+        else:
+            console_print(f"[ATENA model] aviso: {msg_auto}")
     evolution_state = EvolutionState()
     bg_thread = start_background_evolution(evolution_state)
     if bg_thread is not None:

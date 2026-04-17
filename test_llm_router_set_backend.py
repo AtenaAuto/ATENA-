@@ -35,3 +35,41 @@ def test_set_backend_compat_requires_base_url(monkeypatch):
 
     assert ok is False
     assert "ATENA_OPENAI_BASE_URL" in msg
+
+
+def test_auto_prepare_local_model_runs_by_default(monkeypatch):
+    monkeypatch.setattr(atena_llm_router, "OpenAI", _FakeOpenAI)
+    monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.setenv("ATENA_AUTO_PREPARE_LOCAL_MODEL", "1")
+
+    called = {"value": False}
+
+    def _fake_prepare(self):
+        called["value"] = True
+        return True, "prepared"
+
+    monkeypatch.setattr(AtenaLLMRouter, "prepare_free_local_model", _fake_prepare)
+
+    router = AtenaLLMRouter()
+    assert called["value"] is True
+    assert router.auto_prepare_result == (True, "prepared")
+
+
+def test_auto_prepare_local_model_can_be_disabled(monkeypatch):
+    monkeypatch.setattr(atena_llm_router, "OpenAI", _FakeOpenAI)
+    monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.setenv("ATENA_AUTO_PREPARE_LOCAL_MODEL", "0")
+
+    called = {"value": False}
+
+    def _fake_prepare(self):
+        called["value"] = True
+        return True, "prepared"
+
+    monkeypatch.setattr(AtenaLLMRouter, "prepare_free_local_model", _fake_prepare)
+
+    router = AtenaLLMRouter()
+    assert called["value"] is False
+    assert router.auto_prepare_result is None

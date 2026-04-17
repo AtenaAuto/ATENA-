@@ -41,6 +41,8 @@ def test_internet_challenge_collects_extended_sources(monkeypatch):
 
     assert result["status"] == "ok"
     assert result["confidence"] == 1.0
+    assert result["weighted_confidence"] == 1.0
+    assert result["source_count"] == 10
     source_names = [s["source"] for s in result["sources"]]
     assert source_names == [
         "wikipedia",
@@ -54,3 +56,6 @@ def test_internet_challenge_collects_extended_sources(monkeypatch):
         "npm",
         "europepmc",
     ]
+    for source in result["sources"]:
+        assert "quality_score" in source
+        assert "weight" in source

@@ -50,6 +50,49 @@ def test_run_live_cycle_creates_memory_and_artifacts(monkeypatch, tmp_path: Path
     assert last["topic"] == "autonomous coding"
 
 
+def test_run_live_cycle_recovery_fallback(monkeypatch, tmp_path: Path):
+    monkeypatch.setattr(
+        "core.atena_digital_organism_live_cycle.run_internet_challenge",
+        lambda topic: {
+            "status": "ok",
+            "confidence": 0.9,
+            "weighted_confidence": 0.8,
+            "source_count": 4,
+            "recommendation": "triangulate",
+            "sources": [{"source": "github", "quality_score": 0.9}],
+        },
+    )
+
+    def fake_build_and_validate(root, topic, project_type, code_module):  # noqa: ANN001
+        if project_type == "api":
+            return (
+                {
+                    "ok": True,
+                    "project_type": "api",
+                    "project_name": "x",
+                    "output_dir": str(tmp_path / "x"),
+                    "message": "ok",
+                },
+                {"ok": False, "reason": "simulated fail"},
+            )
+        return (
+            {
+                "ok": True,
+                "project_type": project_type,
+                "project_name": "fallback",
+                "output_dir": str(tmp_path / "fallback"),
+                "message": "ok",
+            },
+            {"ok": True, "reason": "fallback success"},
+        )
+
+    monkeypatch.setattr("core.atena_digital_organism_live_cycle._build_and_validate", fake_build_and_validate)
+    payload = run_live_cycle(tmp_path, "self-heal-cycle", max_recovery_attempts=2)
+    assert payload["status"] == "ok"
+    assert payload["recovery_used"] is True
+    assert payload["build"]["project_type"] in {"cli", "site"}
+
+
 def test_run_live_cycles_batch_summary(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(
         "core.atena_digital_organism_live_cycle.run_internet_challenge",

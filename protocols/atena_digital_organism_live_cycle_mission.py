@@ -21,6 +21,12 @@ def main() -> int:
     parser.add_argument("--iterations", type=int, default=1, help="Quantidade de ciclos autônomos encadeados")
     parser.add_argument("--batches", type=int, default=1, help="Quantidade de batches autônomas em modo daemon")
     parser.add_argument(
+        "--recovery-attempts",
+        type=int,
+        default=1,
+        help="Tentativas de auto-recuperação com tipo alternativo quando execução falhar",
+    )
+    parser.add_argument(
         "--strict",
         action="store_true",
         help="Falha se a batch não demonstrar aprendizado consistente",
@@ -62,13 +68,14 @@ def main() -> int:
         print(f"markdown={summary['batch_markdown']}")
         return 0 if summary["status"] == "ok" else 2
 
-    payload = run_live_cycle(ROOT, topic=args.topic)
+    payload = run_live_cycle(ROOT, topic=args.topic, max_recovery_attempts=max(0, args.recovery_attempts))
     print("🧠⚙️🧪 ATENA Digital Organism Live Cycle")
     print(f"topic={payload['topic']}")
     print(f"status={payload['status']}")
     print(f"project_type={payload['build']['project_type']}")
     print(f"build_ok={payload['build']['ok']}")
     print(f"execution_ok={payload['execution']['ok']}")
+    print(f"recovery_used={payload.get('recovery_used', False)}")
     print(f"memory={payload['memory_path']}")
     print(f"json={payload['json_path']}")
     print(f"markdown={payload['markdown_path']}")

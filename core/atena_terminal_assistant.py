@@ -1026,6 +1026,49 @@ def main():
             if user_input == "/clear":
                 os.system("clear")
                 continue
+
+            if user_input == "/model":
+                options = "\n".join(f"- {item}" for item in router.list_options())
+                message = (
+                    f"Atual: {router.current()}\n\n"
+                    "Uso:\n"
+                    "- /model list\n"
+                    "- /model set <provider:modelo>\n"
+                    "- /model set custom:<modelo>@<base_url>\n"
+                    "- /model prepare-local\n\n"
+                    f"Opções disponíveis:\n{options}"
+                )
+                if HAS_RICH:
+                    CONSOLE.print(Panel(message, title="[bold cyan]Model Router[/bold cyan]", border_style="cyan"))
+                else:
+                    print(message)
+                continue
+
+            if user_input == "/model list":
+                options = "\n".join(f"- {item}" for item in router.list_options())
+                console_print(f"Modelos/provedores:\n{options}")
+                continue
+
+            if user_input.startswith("/model set "):
+                spec = user_input[len("/model set "):].strip()
+                ok, msg = router.set_backend(spec)
+                color = "green" if ok else "red"
+                console_print(
+                    f"[bold {color}]{msg}[/bold {color}]"
+                    if HAS_RICH
+                    else msg
+                )
+                continue
+
+            if user_input == "/model prepare-local":
+                ok, msg = router.prepare_free_local_model()
+                color = "green" if ok else "yellow"
+                console_print(
+                    f"[bold {color}]{msg}[/bold {color}]"
+                    if HAS_RICH
+                    else msg
+                )
+                continue
             
             if user_input == "/context":
                 if HAS_RICH:

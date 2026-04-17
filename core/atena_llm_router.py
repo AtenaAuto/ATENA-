@@ -23,7 +23,7 @@ DEFAULT_QWEN_MODEL = os.getenv("ATENA_QWEN_MODEL") or "qwen-turbo"
 
 @dataclass
 class LLMConfig:
-    provider: str = "local"  # local | openai | compat | deepseek | anthropic | qwen
+    provider: str = "local"  # local | openai | compat | custom | deepseek | anthropic | qwen
     model: str = "local-simbrain"
     base_url: Optional[str] = None
 
@@ -50,8 +50,10 @@ class AtenaLLMRouter:
         if OpenAI is not None and os.getenv("OPENAI_API_KEY"):
             opts.append("openai:<model> (usa OPENAI_API_KEY)")
             opts.append("compat:<model> (usa OPENAI_API_KEY + ATENA_OPENAI_BASE_URL)")
+            opts.append("custom:<model>@<base_url> (usa ATENA_CUSTOM_API_KEY ou OPENAI_API_KEY)")
         else:
             opts.append("openai/compat indisponível (faltando pacote openai ou OPENAI_API_KEY)")
+            opts.append("custom indisponível (faltando pacote openai + chave)")
         if os.getenv("ANTHROPIC_API_KEY"):
             opts.append("anthropic:<model> (usa ANTHROPIC_API_KEY)")
         else:
@@ -93,18 +95,36 @@ class AtenaLLMRouter:
             self.cfg = LLMConfig(provider="deepseek", model=model_name, base_url="https://api.deepseek.com/v1")
             return True, f"backend deepseek ativado com modelo {model_name}"
 
-        if provider in {"openai", "compat"}:
+        if provider in {"openai", "compat", "custom"}:
             if OpenAI is None:
                 return False, "pacote openai não instalado"
-            api_key = os.getenv("OPENAI_API_KEY")
+            api_key = os.getenv("ATENA_CUSTOM_API_KEY") if provider == "custom" else os.getenv("OPENAI_API_KEY")
             if not api_key:
-                return False, "OPENAI_API_KEY não configurada"
+                api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                return False, "OPENAI_API_KEY/ATENA_CUSTOM_API_KEY não configurada"
             if not model:
                 return False, "informe modelo no formato provider:modelo"
-            base_url = os.getenv("ATENA_OPENAI_BASE_URL") if provider == "compat" else None
+            base_url = None
+            model_name = model
+            if provider == "compat":
+                base_url = os.getenv("ATENA_OPENAI_BASE_URL")
+                if not base_url:
+                    return False, "ATENA_OPENAI_BASE_URL não configurada para provider compat"
+            elif provider == "custom":
+                if "@" in model:
+                    model_name, parsed_base_url = model.rsplit("@", 1)
+                    model_name = model_name.strip()
+                    base_url = parsed_base_url.strip()
+                else:
+                    base_url = os.getenv("ATENA_OPENAI_BASE_URL")
+                if not model_name:
+                    return False, "informe modelo no formato custom:modelo@base_url"
+                if not base_url:
+                    return False, "informe base_url no formato custom:modelo@base_url"
             self._openai_client = OpenAI(api_key=api_key, base_url=base_url)
-            self.cfg = LLMConfig(provider=provider, model=model, base_url=base_url)
-            return True, f"backend {provider} ativado com modelo {model}"
+            self.cfg = LLMConfig(provider=provider, model=model_name, base_url=base_url)
+            return True, f"backend {provider} ativado com modelo {model_name}"
 
         if provider == "qwen":
             if OpenAI is None:

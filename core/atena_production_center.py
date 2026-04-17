@@ -115,6 +115,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_roll.add_argument("--to-version", required=True)
 
     sub.add_parser("skill-list", help="Lista skills")
+    p_sval = sub.add_parser("skill-validate", help="Validação formal para ativação de skill")
+    p_sval.add_argument("--id", required=True)
+    p_sval.add_argument("--version", required=True)
+    p_sval.add_argument("--sandbox-pass", action="store_true")
+    p_sval.add_argument("--contract-pass", action="store_true")
+    p_sval.add_argument("--security-pass", action="store_true")
 
     p_mode = sub.add_parser("mode-select", help="Seleciona modo leve/pesado")
     p_mode.add_argument("--complexity", type=int, required=True)
@@ -293,6 +299,27 @@ def main() -> int:
     if args.cmd == "skill-list":
         _emit("skill-list", market.list_records())
         return 0
+
+    if args.cmd == "skill-validate":
+        ok = market.validate(
+            args.id,
+            args.version,
+            sandbox_passed=args.sandbox_pass,
+            contract_passed=args.contract_pass,
+            security_passed=args.security_pass,
+        )
+        _emit(
+            "skill-validate",
+            {
+                "status": "validated" if ok else "not-found",
+                "id": args.id,
+                "version": args.version,
+                "sandbox_passed": bool(args.sandbox_pass),
+                "contract_passed": bool(args.contract_pass),
+                "security_passed": bool(args.security_pass),
+            },
+        )
+        return 0 if ok else 2
 
     if args.cmd == "mode-select":
         decision = choose_mode(args.complexity, args.budget, args.latency_sensitive)

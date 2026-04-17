@@ -38,6 +38,7 @@ COMMANDS = {
     "orchestrator-mission": ROOT / "protocols" / "atena_orchestrator_mission.py",
     "agi-uplift": ROOT / "protocols" / "atena_agi_uplift_mission.py",
     "agi-external-validation": ROOT / "protocols" / "atena_agi_external_validation_mission.py",
+    "digital-organism-audit": ROOT / "protocols" / "atena_digital_organism_audit_mission.py",
     "bootstrap": ROOT / "core" / "atena_env_bootstrap.py",
 }
 
@@ -94,6 +95,7 @@ def render_help() -> None:
         table.add_row("./atena orchestrator-mission", "Missão avançada com orquestrador (checkpoint+retry+fallback)")
         table.add_row("./atena agi-uplift", "Missão de elevação AGI-like (memória/avaliação/segurança)")
         table.add_row("./atena agi-external-validation", "Validação externa AGI-like com score independente")
+        table.add_row("./atena digital-organism-audit", "Auditoria automática: score + estágio de organismo digital")
         table.add_row("./atena bootstrap", "Instala dependências mínimas para guardian/produção")
         table.add_row("./atena atena-like", "Alias do modo assistant")
         table.add_row("./atena help", "Exibe esta ajuda")
@@ -131,6 +133,7 @@ def render_help() -> None:
         print("  ./atena orchestrator-mission # missão avançada com orquestrador")
         print("  ./atena agi-uplift      # missão de elevação AGI-like")
         print("  ./atena agi-external-validation # validação externa AGI-like")
+        print("  ./atena digital-organism-audit # auditoria automática de organismo digital")
         print("  ./atena bootstrap        # instala dependências mínimas de runtime")
         print("  ./atena atena-like      # alias do assistant")
         print("  ./atena help            # ajuda")

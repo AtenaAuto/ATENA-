@@ -32,6 +32,7 @@ COMMANDS = {
     "code-build": ROOT / "protocols" / "atena_code_build_mission.py",
     "telemetry-report": ROOT / "protocols" / "atena_telemetry_report_mission.py",
     "professional-launch": ROOT / "protocols" / "atena_professional_launch_mission.py",
+    "enterprise-readiness": ROOT / "protocols" / "atena_enterprise_readiness_mission.py",
     "go-no-go": ROOT / "protocols" / "atena_go_no_go_mission.py",
     "kyros": ROOT / "core" / "atena_kyros_mode.py",
     "production-center": ROOT / "core" / "atena_production_center.py",
@@ -90,6 +91,7 @@ def render_help() -> None:
         table.add_row("./atena code-build", "Módulo programação: cria site/api/cli (templates para site)")
         table.add_row("./atena telemetry-report", "Consolida métricas das missões")
         table.add_row("./atena professional-launch", "Cria plano de lançamento profissional (GTM + operação)")
+        table.add_row("./atena enterprise-readiness", "Trilha empresarial com score/threshold (doctor+gate+launch+code-build)")
         table.add_row("./atena go-no-go", "Executa checklist com 5 testes de prontidão para divulgação")
         table.add_row("./atena kyros", "Modo Kyros: prontidão operacional + execução guiada")
         table.add_row("./atena production-center", "CLI de integração dos módulos de produção (RBAC/telemetria/quality)")
@@ -129,6 +131,7 @@ def render_help() -> None:
         print("  ./atena code-build       # gera app/site/software (site com templates)")
         print("  ./atena telemetry-report # relatório de telemetria")
         print("  ./atena professional-launch # plano de lançamento profissional")
+        print("  ./atena enterprise-readiness # trilha empresarial com score de aprovação")
         print("  ./atena go-no-go         # checklist com 5 testes de prontidão")
         print("  ./atena kyros            # modo Kyros (prontidão + execução guiada)")
         print("  ./atena production-center # CLI de integração dos módulos de produção")

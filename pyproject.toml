@@ -95,7 +95,6 @@ markers = [
     "unit: marks tests as unit tests",
     "asyncio: marks tests as async",
 ]
-asyncio_mode = "auto"
 
 [tool.coverage.run]
 source = ["core", "modules"]

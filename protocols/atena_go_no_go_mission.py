@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -24,13 +25,17 @@ class CheckResult:
     details: str
 
 
-def run_cmd(cmd: list[str], timeout: int = 120) -> tuple[int, str]:
+def run_cmd(cmd: list[str], timeout: int = 120, extra_env: dict[str, str] | None = None) -> tuple[int, str]:
+    env = os.environ.copy()
+    if extra_env:
+        env.update(extra_env)
     proc = subprocess.run(
         cmd,
         cwd=str(ROOT),
         capture_output=True,
         text=True,
         timeout=timeout,
+        env=env,
     )
     out = (proc.stdout or "") + (("\n" + proc.stderr) if proc.stderr else "")
     return proc.returncode, out.strip()
@@ -61,7 +66,14 @@ def main() -> int:
 
     # 4) Programação no assistant deve devolver código Python
     prompt = "/task Gere um script Python mínimo que imprima 'ok'\\n:q\\n"
-    rc, out = run_cmd(["bash", "-lc", f"printf \"{prompt}\" | ./atena assistant"], timeout=120)
+    rc, out = run_cmd(
+        ["bash", "-lc", f"printf \"{prompt}\" | ./atena assistant"],
+        timeout=120,
+        extra_env={
+            "ATENA_AUTO_BOOTSTRAP": "0",
+            "ATENA_AUTO_PREPARE_LOCAL_MODEL": "0",
+        },
+    )
     has_python_code = "```python" in out or "def main():" in out or "print(\"ok\")" in out
     checks.append(
         CheckResult(

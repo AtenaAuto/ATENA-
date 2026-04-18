@@ -43,6 +43,7 @@ COMMANDS = {
     "digital-organism-audit": ROOT / "protocols" / "atena_digital_organism_audit_mission.py",
     "digital-organism-live-cycle": ROOT / "protocols" / "atena_digital_organism_live_cycle_mission.py",
     "bootstrap": ROOT / "core" / "atena_env_bootstrap.py",
+    "secret-scan": ROOT / "core" / "atena_secret_scan.py",
 }
 
 ALIASES = {
@@ -103,6 +104,7 @@ def render_help() -> None:
         table.add_row("./atena digital-organism-audit", "Auditoria automática: score + estágio de organismo digital")
         table.add_row("./atena digital-organism-live-cycle", "Aprende na internet, cria projeto, executa e testa")
         table.add_row("./atena bootstrap", "Instala dependências mínimas para guardian/produção")
+        table.add_row("./atena secret-scan", "Escaneia o repositório por vazamento de segredos")
         table.add_row("./atena atena-like", "Alias do modo assistant")
         table.add_row("./atena help", "Exibe esta ajuda")
         console.print(table)
@@ -144,6 +146,7 @@ def render_help() -> None:
         print("  ./atena digital-organism-audit # auditoria automática de organismo digital")
         print("  ./atena digital-organism-live-cycle # aprende na internet, cria, executa e testa")
         print("  ./atena bootstrap        # instala dependências mínimas de runtime")
+        print("  ./atena secret-scan      # escaneia o repositório por vazamento de segredos")
         print("  ./atena atena-like      # alias do assistant")
         print("  ./atena help            # ajuda")
 

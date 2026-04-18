@@ -11,6 +11,7 @@ import threading
 import time
 import sys
 import os
+import hashlib
 import logging
 import json
 import re
@@ -514,6 +515,7 @@ def print_help():
             ("/benchmark", "Roda benchmark contínuo e atualiza leaderboard"),
             ("/device-control <pedido> [--confirm]", "Controla dispositivo local com permissões seguras"),
             ("/security-scan [repo|system]", "Executa scanner de segurança e salva artefatos em analysis_reports"),
+            ("/secret-audit", "Audita possíveis segredos no repositório e salva só versão mascarada"),
             ("/policy", "Mostra política de segurança para execução"),
             ("/plan <objetivo>", "Gera um plano de execução detalhado"),
             ("/review", "Revisa as mudanças atuais no código (git diff)"),
@@ -531,7 +533,7 @@ def print_help():
         
         CONSOLE.print(Panel(table, title="[bold cyan]Comandos Disponíveis[/bold cyan]", border_style="cyan"))
     else:
-        print("\nComandos: /task, /task-exec, /self-test, /release-governor, /saas-bootstrap, /telemetry-insights, /orchestrate, /memory-suggest, /benchmark, /device-control, /security-scan, /policy, /plan, /review, /commit, /run, /context, /evolution-status, /model, /clear, /exit\n")
+        print("\nComandos: /task, /task-exec, /self-test, /release-governor, /saas-bootstrap, /telemetry-insights, /orchestrate, /memory-suggest, /benchmark, /device-control, /security-scan, /secret-audit, /policy, /plan, /review, /commit, /run, /context, /evolution-status, /model, /clear, /exit\n")
 
 
 def run_self_test(mode: str = "full") -> tuple[str, str]:
@@ -1339,6 +1341,95 @@ def run_security_scan(scope: str = "repo") -> tuple[str, str]:
     append_learning_memory({"event": "security_scan", "status": status, "scope": scope, "report_path": str(summary_path)})
     return status, str(summary_path)
 
+
+def _mask_secret(value: str) -> dict[str, str]:
+    token = (value or "").strip()
+    if len(token) <= 8:
+        masked = "*" * len(token)
+    else:
+        masked = f"{token[:4]}...{token[-4:]}"
+    fp = hashlib.sha256(token.encode("utf-8")).hexdigest()[:16] if token else ""
+    return {"masked": masked, "fingerprint_sha256_16": fp}
+
+
+def run_secret_audit() -> tuple[str, str]:
+    """
+    Auditoria segura de possíveis segredos no repositório.
+    Nunca salva segredo bruto: apenas valor mascarado + fingerprint.
+    """
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%S")
+    reports_dir = ROOT / "analysis_reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    report_path = reports_dir / f"EXECUCAO_SECRET_AUDIT_{timestamp}.json"
+
+    patterns = [
+        ("github_token", re.compile(r"\b(ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b")),
+        ("api_key", re.compile(r"\b(sk-[A-Za-z0-9]{20,}|AIza[0-9A-Za-z\\-_]{20,})\b")),
+        (
+            "env_secret_value",
+            re.compile(
+                r"(?i)\b(?:token|secret|api[_-]?key|github[_-]?token)\b\s*[:=]\s*[\"']?([A-Za-z0-9_\\-]{16,})[\"']?"
+            ),
+        ),
+    ]
+
+    findings: list[dict[str, object]] = []
+    scanned_files = 0
+    max_file_bytes = 1_000_000
+    skip_dirs = {
+        ".git",
+        "__pycache__",
+        ".venv",
+        "venv",
+        "node_modules",
+        ".mypy_cache",
+        "atena_evolution",
+        "analysis_reports",
+    }
+
+    for file_path in ROOT.rglob("*"):
+        if not file_path.is_file():
+            continue
+        rel = file_path.relative_to(ROOT)
+        if any(part in skip_dirs for part in rel.parts):
+            continue
+        try:
+            if file_path.stat().st_size > max_file_bytes:
+                continue
+            content = file_path.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            continue
+        scanned_files += 1
+        for line_no, line in enumerate(content.splitlines(), start=1):
+            for kind, rgx in patterns:
+                for match in rgx.finditer(line):
+                    raw = match.group(1)
+                    if kind == "env_secret_value" and not re.search(r"\d", raw):
+                        continue
+                    masked = _mask_secret(raw)
+                    findings.append(
+                        {
+                            "file": str(rel),
+                            "line": line_no,
+                            "kind": kind,
+                            "masked": masked["masked"],
+                            "fingerprint_sha256_16": masked["fingerprint_sha256_16"],
+                            "context_redacted": line.replace(raw, masked["masked"])[:260],
+                        }
+                    )
+    status = "warn" if findings else "ok"
+    payload = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "status": status,
+        "scanned_files": scanned_files,
+        "findings_count": len(findings),
+        "note": "Segredos brutos NÃO são armazenados. Apenas versões mascaradas e fingerprint.",
+        "findings": findings[:5000],
+    }
+    report_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    append_learning_memory({"event": "secret_audit", "status": status, "report_path": str(report_path), "findings_count": len(findings)})
+    return status, str(report_path)
+
 @contextmanager
 def atena_thinking(message: str = "Pensando..."):
     use_live_spinner = HAS_RICH and os.getenv("ATENA_USE_LIVE_SPINNER", "0") == "1"
@@ -1532,6 +1623,16 @@ def main():
                 color = "green" if status == "ok" else "yellow"
                 CONSOLE.print(f"[bold {color}]Security scan: {status.upper()}[/bold {color}]")
                 CONSOLE.print(f"[dim]Relatório: {report_path}[/dim]")
+                continue
+
+            if user_input == "/secret-audit":
+                with atena_thinking("Executando auditoria segura de segredos (mascarada)..."):
+                    status, report_path = run_secret_audit()
+                color = "green" if status == "ok" else "yellow"
+                CONSOLE.print(f"[bold {color}]Secret audit: {status.upper()}[/bold {color}]")
+                CONSOLE.print(f"[dim]Relatório: {report_path}[/dim]")
+                if status != "ok":
+                    CONSOLE.print("[yellow]Possíveis segredos detectados. Somente versão mascarada foi salva.[/yellow]")
                 continue
 
             if user_input.startswith("/run "):

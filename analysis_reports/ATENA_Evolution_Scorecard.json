@@ -1,17 +1,17 @@
 {
-  "timestamp": "2026-04-18T01:32:48.469862+00:00",
-  "status": "ok",
-  "score_0_100": 74.1,
+  "timestamp": "2026-04-18T04:42:39.326846+00:00",
+  "status": "warn",
+  "score_0_100": 56.9,
   "pillars": {
     "security": {
       "ok": true,
       "findings": 0
     },
     "reliability": {
-      "sre_risk": "high"
+      "sre_risk": "unknown"
     },
     "research": {
-      "weighted_confidence": 0.86
+      "weighted_confidence": null
     },
     "quality": {
       "artifact_value_avg_0_5": 3.3

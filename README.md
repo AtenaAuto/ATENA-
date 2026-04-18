@@ -125,7 +125,7 @@ cd ..
 | `./atena doctor` | Diagnóstico de ambiente | `./atena doctor` |
 | `./atena guardian` | Gate de segurança essencial | `./atena guardian` |
 | `./atena production-ready` | Validação completa para release | `./atena production-ready` |
-| `./atena hacker-recon --topic <tópico>` | Executa Hacker Recon avançado (batch, score, histórico adaptativo, `--json`, `--output-json`, `--timeout`) | `./atena hacker-recon --batch-file topics.txt --prioritize-history --json --output-json analysis_reports/recon.json` |
+| `./atena hacker-recon --topic <tópico>` | Executa Hacker Recon avançado (batch, paralelo, retries, score, histórico adaptativo, `--json`, `--output-json`, `--timeout`) | `./atena hacker-recon --batch-file topics.txt --parallel 3 --retries 1 --prioritize-history --json --output-json analysis_reports/recon.json` |
 | `./atena code-build` | Gerador automático de projetos | `./atena code-build --type api` |
 | `./atena research-lab` | Propostas de evolução | `./atena research-lab` |
 | `./atena go-no-go` | Checklist pré-divulgação | `./atena go-no-go` |

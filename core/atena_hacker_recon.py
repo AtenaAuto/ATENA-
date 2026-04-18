@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import datetime as dt
 import json
 import subprocess
@@ -158,14 +159,23 @@ def _run_single_topic(base_args: argparse.Namespace, topic: str) -> dict[str, An
     local_args = argparse.Namespace(**vars(base_args))
     local_args.topic = topic
     cmd = _build_main_args(local_args)
+    attempts = 0
+    proc: subprocess.CompletedProcess[str] | None = None
+    timed_out = False
     started = time.time()
-    try:
-        proc = subprocess.run(cmd, cwd=str(ROOT), text=True, capture_output=True, timeout=base_args.timeout)
-        timed_out = False
-    except subprocess.TimeoutExpired as exc:
-        proc = subprocess.CompletedProcess(exc.cmd, returncode=124, stdout=exc.stdout or "", stderr=(exc.stderr or "") + "\nTimeout excedido.")
-        timed_out = True
+    max_attempts = max(1, int(base_args.retries) + 1)
+    while attempts < max_attempts:
+        attempts += 1
+        try:
+            proc = subprocess.run(cmd, cwd=str(ROOT), text=True, capture_output=True, timeout=base_args.timeout)
+            timed_out = False
+        except subprocess.TimeoutExpired as exc:
+            proc = subprocess.CompletedProcess(exc.cmd, returncode=124, stdout=exc.stdout or "", stderr=(exc.stderr or "") + "\nTimeout excedido.")
+            timed_out = True
+        if proc.returncode == 0:
+            break
     elapsed_s = round(time.time() - started, 3)
+    assert proc is not None
     output = f"{proc.stdout}\n{proc.stderr}"
     recon_score = _compute_recon_score(output, proc.returncode)
     return {
@@ -176,6 +186,7 @@ def _run_single_topic(base_args: argparse.Namespace, topic: str) -> dict[str, An
         "timed_out": timed_out,
         "duration_s": elapsed_s,
         "recon_score": recon_score,
+        "attempts": attempts,
         "stdout": proc.stdout,
         "stderr": proc.stderr,
         "output": output,
@@ -197,6 +208,8 @@ def run(argv: list[str]) -> int:
     parser.add_argument("--stop-on-fail", action="store_true", help="Interrompe o batch no primeiro erro.")
     parser.add_argument("--history-json", default="analysis_reports/hacker_recon_history.json", help="Arquivo JSON para histórico de score.")
     parser.add_argument("--prioritize-history", action="store_true", help="No batch, ordena tópicos por score histórico (maior para menor).")
+    parser.add_argument("--parallel", type=int, default=1, help="Executa batch em paralelo (>=1).")
+    parser.add_argument("--retries", type=int, default=0, help="Tentativas extras por tópico em caso de falha.")
     args = parser.parse_args(argv)
     topics = _load_topics(args.topic, args.batch_file)
     if not topics:
@@ -208,17 +221,32 @@ def run(argv: list[str]) -> int:
         topics = sorted(topics, key=lambda t: history_scores.get(t, -1), reverse=True)
 
     results: list[dict[str, Any]] = []
-    for topic in topics:
-        result = _run_single_topic(args, topic)
-        results.append(result)
+    parallel = max(1, int(args.parallel))
+    if parallel == 1 or len(topics) == 1 or args.stop_on_fail:
+        for topic in topics:
+            result = _run_single_topic(args, topic)
+            results.append(result)
 
-        if result["stdout"]:
-            print(result["stdout"], end="")
-        if result["stderr"]:
-            print(result["stderr"], end="", file=sys.stderr)
+            if result["stdout"]:
+                print(result["stdout"], end="")
+            if result["stderr"]:
+                print(result["stderr"], end="", file=sys.stderr)
 
-        if args.stop_on_fail and not result["ok"]:
-            break
+            if args.stop_on_fail and not result["ok"]:
+                break
+    else:
+        with ThreadPoolExecutor(max_workers=parallel) as pool:
+            future_map = {pool.submit(_run_single_topic, args, topic): topic for topic in topics}
+            for future in as_completed(future_map):
+                result = future.result()
+                results.append(result)
+                if result["stdout"]:
+                    print(result["stdout"], end="")
+                if result["stderr"]:
+                    print(result["stderr"], end="", file=sys.stderr)
+        # mantém ordem estável da entrada para facilitar leitura de relatório
+        pos = {topic: i for i, topic in enumerate(topics)}
+        results.sort(key=lambda r: pos.get(r["topic"], 999999))
 
     report_paths: list[str] = []
     if not args.no_report:
@@ -254,6 +282,7 @@ def run(argv: list[str]) -> int:
                 "timed_out": r["timed_out"],
                 "duration_s": r["duration_s"],
                 "recon_score": r["recon_score"],
+                "attempts": r["attempts"],
                 "command": r["command"],
             }
             for r in results

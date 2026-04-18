@@ -7,6 +7,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import os
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -49,6 +50,14 @@ COMMANDS = {
 ALIASES = {
     "atena-like": "assistant",
     "like": "assistant",
+}
+
+MODULE_NOT_FOUND_RE = re.compile(r"No module named ['\"]([A-Za-z0-9_.-]+)['\"]")
+PIP_NAME_OVERRIDES = {
+    "yaml": "pyyaml",
+    "cv2": "opencv-python",
+    "PIL": "Pillow",
+    "sklearn": "scikit-learn",
 }
 
 
@@ -160,6 +169,57 @@ def normalize_command(arg: str | None) -> str:
     return ALIASES.get(arg, arg)
 
 
+def _extract_missing_module(stderr: str, stdout: str) -> str | None:
+    combined = f"{stderr}\n{stdout}"
+    match = MODULE_NOT_FOUND_RE.search(combined)
+    if not match:
+        return None
+    return match.group(1)
+
+
+def _module_to_pip_name(module_name: str) -> str:
+    root = module_name.split(".")[0]
+    return PIP_NAME_OVERRIDES.get(root, root)
+
+
+def _run_with_auto_dep_repair(script: Path, script_args: list[str], env: dict[str, str]) -> int:
+    auto_install = env.get("ATENA_AUTO_INSTALL_MISSING_DEPS", "1") == "1"
+    first = subprocess.run(
+        [sys.executable, str(script), *script_args],
+        cwd=str(ROOT),
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+    if first.stdout:
+        print(first.stdout, end="")
+    if first.stderr:
+        print(first.stderr, end="", file=sys.stderr)
+
+    if first.returncode == 0 or not auto_install:
+        return first.returncode
+
+    missing = _extract_missing_module(first.stderr or "", first.stdout or "")
+    if not missing:
+        return first.returncode
+
+    pkg = _module_to_pip_name(missing)
+    print(f"🔧 ATENA auto-deps: módulo ausente detectado ({missing}). Instalando `{pkg}`...")
+    pip_proc = subprocess.run(
+        [sys.executable, "-m", "pip", "install", pkg],
+        cwd=str(ROOT),
+        env=env,
+        check=False,
+    )
+    if pip_proc.returncode != 0:
+        print(f"❌ Falha ao instalar dependência automática: {pkg}")
+        return first.returncode
+
+    print("✅ Dependência instalada. Reexecutando comando...")
+    retry = subprocess.run([sys.executable, str(script), *script_args], cwd=str(ROOT), env=env)
+    return retry.returncode
+
+
 def main(argv: list[str]) -> int:
     command = normalize_command(argv[1] if len(argv) > 1 else None)
     if command == "help":
@@ -210,8 +270,7 @@ def main(argv: list[str]) -> int:
         # Evita repetir preparação pesada no processo filho do assistant/start.
         env["ATENA_AUTO_PREPARE_LOCAL_MODEL"] = "0"
 
-    result = subprocess.run([sys.executable, str(script), *argv[2:]], cwd=str(ROOT), env=env)
-    return result.returncode
+    return _run_with_auto_dep_repair(script, argv[2:], env)
 
 
 if __name__ == "__main__":

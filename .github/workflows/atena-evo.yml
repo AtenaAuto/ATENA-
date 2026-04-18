@@ -5,7 +5,7 @@ on:
     inputs:
       generations:
         description: "Quantidade de ciclos automáticos"
-        default: "30"
+        default: "500"
   schedule:
     - cron: "*/30 * * * *"
 

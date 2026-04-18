@@ -465,16 +465,17 @@ def git_branch() -> str:
         return "local"
 
 def get_prompt_label(model: str) -> Any:
+    display_model = "local" if model.startswith("local:") else model
     branch = git_branch()
     cwd = Path.cwd().name
     if HAS_RICH:
         prompt = Text()
         prompt.append(f" {branch} ", style="bold white on blue")
         prompt.append(f" {cwd} ", style="bold white on black")
-        prompt.append(f" {model} ", style="bold black on cyan")
+        prompt.append(f" {display_model} ", style="bold black on cyan")
         prompt.append("\n ❯ ", style="bold magenta")
         return prompt
-    return f"[{branch}][{cwd}][{model}] ❯ "
+    return f"[{branch}][{cwd}][{display_model}] ❯ "
 
 def render_banner():
     if HAS_RICH:

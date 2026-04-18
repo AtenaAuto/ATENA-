@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 SECRET_PATTERNS = [
-    re.compile(r"ghp_[A-Za-z0-9]{20,}"),
+    re.compile(r"ghp_[A-Za-z0-9]{10,}"),
     re.compile(r"github_pat_[A-Za-z0-9_]{20,}"),
     re.compile(r"sk-[A-Za-z0-9]{20,}"),
     re.compile(r"AKIA[0-9A-Z]{16}"),

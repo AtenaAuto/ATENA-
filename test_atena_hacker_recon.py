@@ -58,4 +58,30 @@ def test_hacker_recon_timeout_returns_124(monkeypatch, tmp_path):
 
     rc = atena_hacker_recon.run(["--topic", "x", "--timeout", "1", "--no-report"])
 
-    assert rc == 124
+    assert rc == 1
+
+
+def test_hacker_recon_requires_topic_or_batch(monkeypatch):
+    rc = atena_hacker_recon.run([])
+    assert rc == 2
+
+
+def test_hacker_recon_batch_mode_aggregates(monkeypatch, tmp_path):
+    calls = []
+
+    def _fake_run(cmd, cwd=None, text=None, capture_output=None, timeout=None):
+        calls.append(cmd)
+        return SimpleNamespace(returncode=0, stdout=f"Recon: {cmd[-1]}\n", stderr="")
+
+    batch_file = tmp_path / "topics.txt"
+    batch_file.write_text("topic A\ntopic B\n", encoding="utf-8")
+
+    monkeypatch.setattr(atena_hacker_recon.subprocess, "run", _fake_run)
+    monkeypatch.setattr(atena_hacker_recon, "ROOT", tmp_path)
+    monkeypatch.setattr(atena_hacker_recon, "MAIN_SCRIPT", tmp_path / "core" / "main.py")
+    monkeypatch.setattr(atena_hacker_recon, "REPORTS_DIR", tmp_path / "analysis_reports")
+
+    rc = atena_hacker_recon.run(["--batch-file", str(batch_file), "--json", "--no-report"])
+
+    assert rc == 0
+    assert len(calls) == 2

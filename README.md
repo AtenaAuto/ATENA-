@@ -125,7 +125,7 @@ cd ..
 | `./atena doctor` | Diagnóstico de ambiente | `./atena doctor` |
 | `./atena guardian` | Gate de segurança essencial | `./atena guardian` |
 | `./atena production-ready` | Validação completa para release | `./atena production-ready` |
-| `./atena hacker-recon --topic <tópico>` | Executa Hacker Recon avançado (suporta `--auto`, `--cycles`, `--json`, `--output-json`, relatório, `--timeout`) | `./atena hacker-recon --topic "zero-day ai agents" --auto --cycles 3 --json --output-json analysis_reports/recon.json` |
+| `./atena hacker-recon --topic <tópico>` | Executa Hacker Recon avançado (suporta batch via `--batch-file`, `--auto`, `--cycles`, `--json`, `--output-json`, relatório, `--timeout`) | `./atena hacker-recon --batch-file topics.txt --json --output-json analysis_reports/recon.json` |
 | `./atena code-build` | Gerador automático de projetos | `./atena code-build --type api` |
 | `./atena research-lab` | Propostas de evolução | `./atena research-lab` |
 | `./atena go-no-go` | Checklist pré-divulgação | `./atena go-no-go` |

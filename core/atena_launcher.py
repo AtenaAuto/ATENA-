@@ -124,7 +124,7 @@ def render_help() -> None:
         table.add_row("./atena digital-organism-live-cycle", "Aprende na internet, cria projeto, executa e testa")
         table.add_row("./atena bootstrap", "Instala dependências mínimas para guardian/produção")
         table.add_row("./atena secret-scan", "Escaneia o repositório por vazamento de segredos")
-        table.add_row("./atena hacker-recon --topic <tópico>", "Hacker Recon avançado (JSON/score/relatório/timeout)")
+        table.add_row("./atena hacker-recon --topic <tópico>", "Hacker Recon avançado (batch/JSON/score/relatório/timeout)")
         table.add_row("./atena atena-like", "Alias do modo assistant")
         table.add_row("./atena help", "Exibe esta ajuda")
         console.print(table)
@@ -171,7 +171,7 @@ def render_help() -> None:
         print("  ./atena digital-organism-live-cycle # aprende na internet, cria, executa e testa")
         print("  ./atena bootstrap        # instala dependências mínimas de runtime")
         print("  ./atena secret-scan      # escaneia o repositório por vazamento de segredos")
-        print("  ./atena hacker-recon --topic <tópico> [--auto] [--cycles N] [--json] [--output-json arq] [--timeout s]")
+        print("  ./atena hacker-recon --topic <tópico>|--batch-file arq [--auto] [--cycles N] [--json] [--output-json arq] [--timeout s]")
         print("  ./atena atena-like      # alias do assistant")
         print("  ./atena help            # ajuda")
 

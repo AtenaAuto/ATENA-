@@ -34,6 +34,7 @@ COMMANDS = {
     "telemetry-report": ROOT / "protocols" / "atena_telemetry_report_mission.py",
     "evolution-scorecard": ROOT / "core" / "atena_evolution_scorecard.py",
     "memory-relevance-audit": ROOT / "core" / "atena_memory_relevance_audit.py",
+    "memory-maintenance": ROOT / "core" / "atena_memory_maintenance.py",
     "professional-launch": ROOT / "protocols" / "atena_professional_launch_mission.py",
     "enterprise-readiness": ROOT / "protocols" / "atena_enterprise_readiness_mission.py",
     "enterprise-advanced": ROOT / "protocols" / "atena_enterprise_advanced_mission.py",
@@ -105,6 +106,7 @@ def render_help() -> None:
         table.add_row("./atena telemetry-report", "Consolida métricas das missões")
         table.add_row("./atena evolution-scorecard", "Gera scorecard contínuo (segurança, SRE, pesquisa, qualidade)")
         table.add_row("./atena memory-relevance-audit", "Audita relevância da memória de longo prazo")
+        table.add_row("./atena memory-maintenance", "Executa pruning de memórias irrelevantes")
         table.add_row("./atena professional-launch", "Cria plano de lançamento profissional (GTM + operação)")
         table.add_row("./atena enterprise-readiness", "Trilha empresarial com score/threshold (doctor+gate+launch+code-build)")
         table.add_row("./atena enterprise-advanced", "Memória RAG + Planner/Executor/Critic + SRE hardening + skill validation")
@@ -149,6 +151,7 @@ def render_help() -> None:
         print("  ./atena telemetry-report # relatório de telemetria")
         print("  ./atena evolution-scorecard # scorecard contínuo de evolução")
         print("  ./atena memory-relevance-audit # auditoria de relevância da memória")
+        print("  ./atena memory-maintenance # pruning de memórias irrelevantes")
         print("  ./atena professional-launch # plano de lançamento profissional")
         print("  ./atena enterprise-readiness # trilha empresarial com score de aprovação")
         print("  ./atena enterprise-advanced # stack avançada enterprise (RAG/planner/SRE/skills)")

@@ -39,6 +39,7 @@ class AtenaLLMRouter:
         self._local_brain: Optional[AtenaUltraBrain] = None
         self._openai_client = None
         self.auto_prepare_result: Optional[tuple[bool, str]] = None
+        self.require_ready_llm = os.getenv("ATENA_REQUIRE_READY_LLM", "1") == "1"
         self._auto_select_default_backend()
         self._maybe_prepare_default_local_model()
 
@@ -66,9 +67,16 @@ class AtenaLLMRouter:
                 self.auto_prepare_result = self.prepare_free_local_model()
         except Exception as exc:  # noqa: BLE001
             self.auto_prepare_result = (False, f"falha no auto-prepare local: {exc}")
+        if (
+            self.require_ready_llm
+            and self.cfg.provider == "local"
+            and self.auto_prepare_result is not None
+            and not self.auto_prepare_result[0]
+        ):
+            raise RuntimeError(self.auto_prepare_result[1])
 
     def list_options(self) -> list[str]:
-        opts = ["local:local-brain (transformers + fallback heurístico)"]
+        opts = ["local:local-brain (transformers/torch obrigatório)"]
         opts.append("auto:orchestrate (escolhe provider/modelo e prepara runtime)")
         if os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY"):
             opts.append("deepseek:light (deepseek-chat)")

@@ -145,7 +145,7 @@ class AtenaUltraBrain:
         logger.info("🧠 ATENA Ultra-Brain v6.0 Inicializado")
 
     def _init_model(self):
-        """Inicializa o modelo local com suporte a falhas."""
+        """Inicializa o modelo local e exige runtime de LLM válido."""
         if not self.cfg.enable_transformers:
             logger.info("Modo local com transformers desabilitado explicitamente.")
             self.has_transformers = False
@@ -171,14 +171,11 @@ class AtenaUltraBrain:
             )
             self.has_transformers = True
         except Exception as e:
-            logger.warning(f"Não foi possível carregar transformers: {e}. Usando fallback heurístico.")
+            logger.warning(f"Não foi possível carregar transformers: {e}.")
             self.has_transformers = False
 
     def prepare_runtime_model(self) -> Tuple[bool, str]:
-        """
-        Tenta preparar um modelo local gratuito (Qwen) para uso real.
-        Se não conseguir, mantém fallback heurístico sem quebrar o fluxo.
-        """
+        """Tenta preparar um modelo local gratuito (Qwen) para uso real."""
         if self.has_transformers:
             return True, f"Modelo local pronto: {self.cfg.base_model_name}"
 
@@ -198,24 +195,21 @@ class AtenaUltraBrain:
 
         if self.has_transformers:
             return True, f"Modelo local carregado (download/caching automático): {preferred_model}"
-        return False, (
-            "Não foi possível inicializar transformers para baixar/rodar o modelo local. "
-            "ATENA seguirá em modo fallback heurístico."
-        )
+        return False, "Não foi possível inicializar transformers/torch para rodar o modelo local."
 
     def _install_transformers_stack(self) -> Tuple[bool, str]:
-        """
-        Tenta instalar dependências mínimas de LLM local automaticamente.
-        Evita reinstalar se `transformers` já existir.
-        """
-        if importlib.util.find_spec("transformers") is not None:
-            return True, "transformers já disponível"
+        """Tenta instalar dependências mínimas de LLM local automaticamente."""
+        has_transformers = importlib.util.find_spec("transformers") is not None
+        has_torch = importlib.util.find_spec("torch") is not None
+        if has_transformers and has_torch:
+            return True, "transformers/torch já disponíveis"
         try:
             cmd = [
                 sys.executable,
                 "-m",
                 "pip",
                 "install",
+                "torch>=2.3.0",
                 "transformers>=4.41.0",
                 "accelerate>=0.30.0",
                 "safetensors>=0.4.0",
@@ -248,10 +242,15 @@ class AtenaUltraBrain:
 ### Resposta:
 """
         # 3. Gerar Resposta
-        if self.has_transformers:
-            return self._generate_with_transformers(full_prompt)
-        else:
-            return self._simulate_thinking(prompt)
+        if not self.has_transformers:
+            ok, msg = self.prepare_runtime_model()
+            if not ok:
+                raise RuntimeError(
+                    f"LLM local indisponível: {msg}. Configure um backend remoto "
+                    "(OPENAI_API_KEY/DEEPSEEK_API_KEY/ANTHROPIC_API_KEY/DASHSCOPE_API_KEY) "
+                    "ou instale torch+transformers."
+                )
+        return self._generate_with_transformers(full_prompt)
 
     def _generate_with_transformers(self, prompt: str) -> str:
         import torch

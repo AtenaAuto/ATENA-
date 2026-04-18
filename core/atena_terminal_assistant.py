@@ -1137,13 +1137,24 @@ def atena_thinking(message: str = "Pensando..."):
 
 def main():
     render_banner()
-    router = AtenaLLMRouter()
+    try:
+        router = AtenaLLMRouter()
+    except Exception as exc:  # noqa: BLE001
+        console_print(
+            "[ATENA model] erro fatal: LLM obrigatório não foi carregado. "
+            f"Detalhes: {exc}"
+        )
+        console_print(
+            "[ATENA model] configure um backend remoto (OPENAI_API_KEY/DEEPSEEK_API_KEY/"
+            "ANTHROPIC_API_KEY/DASHSCOPE_API_KEY) ou instale torch+transformers."
+        )
+        raise SystemExit(2)
     if router.auto_prepare_result is not None:
         ok_auto, msg_auto = router.auto_prepare_result
         if ok_auto:
             console_print(f"[ATENA model] {msg_auto}")
         else:
-            console_print(f"[ATENA model] aviso: {msg_auto}")
+            console_print(f"[ATENA model] erro: {msg_auto}")
     evolution_state = EvolutionState()
     bg_thread = start_background_evolution(evolution_state)
     if bg_thread is not None:

@@ -91,6 +91,66 @@ def router_generate_with_timeout(
         raise box["error"]
     return str(box.get("value", ""))
 
+
+def _wants_five_topics(user_input: str) -> bool:
+    text = user_input.lower()
+    return ("5 tópicos" in text) or ("5 topicos" in text)
+
+
+def _build_five_topics_prompt(user_input: str) -> str:
+    return (
+        f"{user_input}\n\n"
+        "Responda SOMENTE com JSON válido no formato:\n"
+        '{"topicos":["tópico 1","tópico 2","tópico 3","tópico 4","tópico 5"]}\n'
+        "Exatamente 5 itens curtos."
+    )
+
+
+def _format_five_topics_response(raw_answer: str, original_prompt: str) -> str:
+    text = (raw_answer or "").strip()
+    # 1) JSON direto
+    try:
+        payload = json.loads(text)
+        items = payload.get("topicos") if isinstance(payload, dict) else None
+        if isinstance(items, list) and items:
+            cleaned = [str(x).strip() for x in items if str(x).strip()][:5]
+            if cleaned:
+                return "\n".join(f"{i+1}. {item}" for i, item in enumerate(cleaned))
+    except Exception:
+        pass
+
+    # 2) Extrai bloco JSON embutido na resposta
+    json_match = re.search(r"\{[\s\S]*\"topicos\"\s*:\s*\[[\s\S]*?\][\s\S]*?\}", text)
+    if json_match:
+        try:
+            payload = json.loads(json_match.group(0))
+            items = payload.get("topicos") if isinstance(payload, dict) else None
+            if isinstance(items, list) and items:
+                cleaned = [str(x).strip() for x in items if str(x).strip()][:5]
+                if cleaned:
+                    return "\n".join(f"{i+1}. {item}" for i, item in enumerate(cleaned))
+        except Exception:
+            pass
+
+    # 3) Extrai linhas numeradas
+    lines = [ln.strip(" -•\t") for ln in text.splitlines() if ln.strip()]
+    numbered = [ln for ln in lines if re.match(r"^\d+[\).\s-]+", ln)]
+    if numbered:
+        cleaned = [re.sub(r"^\d+[\).\s-]+", "", ln).strip() for ln in numbered][:5]
+        if cleaned:
+            return "\n".join(f"{i+1}. {item}" for i, item in enumerate(cleaned))
+
+    # 4) Fallback determinístico
+    base = original_prompt.strip().rstrip("?")
+    fallback = [
+        f"Evoluir benchmark contínuo para '{base}'",
+        "Aprimorar memória de longo prazo com validação de relevância",
+        "Fortalecer segurança (redaction + secret scan + gates CI)",
+        "Melhorar confiabilidade SRE (canary + auto-rollback)",
+        "Automatizar avaliação de qualidade com métricas e auditoria",
+    ]
+    return "\n".join(f"{i+1}. {item}" for i, item in enumerate(fallback))
+
 @dataclass
 class EvolutionState:
     cycles: int = 0
@@ -1287,14 +1347,18 @@ def main():
             # Processamento de Tarefas (Task)
             if user_input.startswith("/task "):
                 task_msg = user_input[6:].strip()
+                structured_five = _wants_five_topics(task_msg)
+                effective_prompt = _build_five_topics_prompt(task_msg) if structured_five else task_msg
                 with atena_thinking("Processando tarefa..."):
                     try:
                         answer = router_generate_with_timeout(
                             router=router,
-                            prompt=task_msg,
+                            prompt=effective_prompt,
                             context="Claude Code Style Assistant",
                             timeout_seconds=ROUTER_TIMEOUT_SECONDS,
                         )
+                        if structured_five:
+                            answer = _format_five_topics_response(answer, task_msg)
                     except Exception as exc:
                         answer = f"Timeout/erro ao gerar resposta ({type(exc).__name__}). Tente novamente com /task-exec."
                 
@@ -1306,14 +1370,18 @@ def main():
 
             # Comando padrão (se não começar com / assume-se /task)
             if not user_input.startswith("/"):
+                structured_five = _wants_five_topics(user_input)
+                effective_prompt = _build_five_topics_prompt(user_input) if structured_five else user_input
                 with atena_thinking("Analisando..."):
                     try:
                         answer = router_generate_with_timeout(
                             router=router,
-                            prompt=user_input,
+                            prompt=effective_prompt,
                             context="Claude Code Style Assistant",
                             timeout_seconds=ROUTER_TIMEOUT_SECONDS,
                         )
+                        if structured_five:
+                            answer = _format_five_topics_response(answer, user_input)
                     except Exception as exc:
                         answer = f"Timeout/erro ao gerar resposta ({type(exc).__name__}). Use /task-exec para fluxo estruturado."
                 if HAS_RICH:

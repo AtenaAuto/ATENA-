@@ -139,7 +139,7 @@ cd ..
 #### 0. Modo Computador — Varredura de Códigos
 
 ```bash
-# Executa o modo computador da ATENA e salva artefatos de varredura em analysis_reports/
+# Executa o modo computador da ATENA e salva artefatos de varredura + diff incremental em analysis_reports/
 bash scripts/run_computer_mode_code_scan.sh
 ```
 

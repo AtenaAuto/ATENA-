@@ -26,6 +26,7 @@ def test_bootstrap_installs_missing_dependencies(monkeypatch, capsys) -> None:
     def fake_run(cmd: list[str], check: bool = False):  # noqa: ARG001
         seen_cmd["cmd"] = cmd
         installed_after.add("psutil")
+        installed_after.add("transformers")
         return types.SimpleNamespace(returncode=0)
 
     monkeypatch.setattr(bootstrap, "is_installed", fake_is_installed)
@@ -38,3 +39,4 @@ def test_bootstrap_installs_missing_dependencies(monkeypatch, capsys) -> None:
     assert "psutil" in out
     assert "cmd" in seen_cmd
     assert "psutil" in seen_cmd["cmd"]
+    assert "transformers" in seen_cmd["cmd"]

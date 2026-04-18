@@ -16,6 +16,7 @@ REQUIRED = [
     "aiosqlite",
     "rich",
     "psutil",
+    "transformers",
 ]
 
 

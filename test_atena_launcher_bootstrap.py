@@ -139,3 +139,20 @@ def test_launcher_executes_evolution_scorecard_command(monkeypatch):
     assert rc == 0
     assert len(calls) == 1
     assert calls[0]["cmd"][1].endswith("core/atena_evolution_scorecard.py")
+
+
+def test_launcher_executes_memory_relevance_audit_command(monkeypatch):
+    calls = []
+
+    def _fake_run(cmd, cwd=None, check=False, env=None, timeout=None, **kwargs):
+        calls.append({"cmd": cmd, "cwd": cwd, "check": check, "env": env, "timeout": timeout, "kwargs": kwargs})
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(atena_launcher.subprocess, "run", _fake_run)
+    monkeypatch.setenv("ATENA_AUTO_BOOTSTRAP", "0")
+
+    rc = atena_launcher.main(["./atena", "memory-relevance-audit"])
+
+    assert rc == 0
+    assert len(calls) == 1
+    assert calls[0]["cmd"][1].endswith("core/atena_memory_relevance_audit.py")

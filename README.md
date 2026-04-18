@@ -134,6 +134,8 @@ cd ..
 | `./atena digital-organism-audit` | Auditoria automática de maturidade como organismo digital | `./atena digital-organism-audit` |
 | `./atena digital-organism-live-cycle` | Aprende na internet, cria software, executa/testa, auto-recupera falhas e roda em daemon | `./atena digital-organism-live-cycle --topic "autonomous ai engineering" --iterations 3 --batches 2 --strict --recovery-attempts 2` |
 
+> CI evolução: o workflow `ATENA-EVO` agora inclui um *stagnation guard* que reduz ciclos e ativa `--checker` quando detecta plateau de mutações.
+
 ### Exemplos de Uso
 
 #### 0. Modo Computador — Varredura de Códigos

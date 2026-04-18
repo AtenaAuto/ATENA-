@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from core.enterprise_memory_rag import TenantMemoryRAG, build_reasoning_trace
+from core.enterprise_memory_rag import TenantMemoryRAG, build_reasoning_trace, redact_secrets
 from core.internet_challenge import run_internet_challenge
 from core.planner_executor_critic import run_planner_loop
 from core.sre_auto_hardening import evaluate_regression, generate_postmortem
@@ -90,6 +90,18 @@ def _skill_demo() -> dict[str, object]:
     }
 
 
+def _sanitize_payload_for_persistence(payload: dict[str, object]) -> dict[str, object]:
+    raw = json.dumps(payload, ensure_ascii=False)
+    redacted = redact_secrets(raw)
+    changed = raw != redacted
+    safe_payload = json.loads(redacted)
+    safe_payload["security_redaction"] = {
+        "status": "warn" if changed else "ok",
+        "redacted": changed,
+    }
+    return safe_payload
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="ATENA Enterprise Advanced Mission")
     parser.add_argument("--tenant", default="enterprise-default")
@@ -107,8 +119,9 @@ def main() -> int:
         "skill_marketplace": _skill_demo(),
     }
 
+    safe_payload = _sanitize_payload_for_persistence(payload)
     out = EVOLUTION / "enterprise_advanced_report.json"
-    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    out.write_text(json.dumps(safe_payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print("🏢⚙️ ATENA Enterprise Advanced Mission")
     print("Status: ok")

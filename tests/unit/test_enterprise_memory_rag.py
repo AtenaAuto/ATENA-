@@ -28,3 +28,12 @@ def test_reasoning_trace_redacts_secret():
     )
     assert trace["status"] == "ok"
     assert "[REDACTED_SECRET]" in trace["steps"][0]
+
+
+def test_reasoning_trace_redacts_shorter_github_token_like_string():
+    trace = build_reasoning_trace(
+        steps=["registrar credencial ghp_ABCDEF1234567890XYZ para auditoria"],
+        citations=["doc://security"],
+    )
+    assert trace["status"] == "ok"
+    assert "[REDACTED_SECRET]" in trace["steps"][0]

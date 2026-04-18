@@ -7,18 +7,25 @@ on:
         description: "Quantidade de ciclos automáticos"
         default: "30"
   schedule:
-    - cron: "30 * * * *"
+    - cron: "*/30 * * * *"
 
 permissions:
   contents: write
-  actions: write
+  actions: read
+
+concurrency:
+  group: atena-evo-main
+  cancel-in-progress: false
 
 jobs:
   run-evolution:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup
         uses: actions/setup-python@v5
@@ -33,6 +40,18 @@ jobs:
         run: |
           export PYTHONPATH="$PYTHONPATH:$(pwd):$(pwd)/core"
           python core/main.py --auto --cycles "${{ github.event.inputs.generations || '30' }}"
+
+      - name: Commit evolution state
+        run: |
+          git config user.name "atena-evo-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add atena_evolution || true
+          if git diff --cached --quiet; then
+            echo "No evolution changes to commit."
+            exit 0
+          fi
+          git commit -m "chore(evo): auto-evolution snapshot [skip ci]"
+          git push origin HEAD:main
 
       - name: Save
         if: always()

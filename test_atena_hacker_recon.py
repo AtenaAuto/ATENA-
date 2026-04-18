@@ -19,7 +19,18 @@ def test_hacker_recon_builds_main_command_and_json(monkeypatch, capsys, tmp_path
     monkeypatch.setattr(atena_hacker_recon, "REPORTS_DIR", tmp_path / "analysis_reports")
 
     rc = atena_hacker_recon.run(
-        ["--topic", "agentes ai", "--auto", "--cycles", "2", "--json", "--output-json", "analysis_reports/recon.json"]
+        [
+            "--topic",
+            "agentes ai",
+            "--auto",
+            "--cycles",
+            "2",
+            "--json",
+            "--output-json",
+            "analysis_reports/recon.json",
+            "--history-json",
+            "history.json",
+        ]
     )
 
     captured = capsys.readouterr()
@@ -41,10 +52,11 @@ def test_hacker_recon_no_report(monkeypatch, tmp_path):
     monkeypatch.setattr(atena_hacker_recon, "MAIN_SCRIPT", tmp_path / "core" / "main.py")
     monkeypatch.setattr(atena_hacker_recon, "REPORTS_DIR", tmp_path / "analysis_reports")
 
-    rc = atena_hacker_recon.run(["--topic", "x", "--no-report"])
+    rc = atena_hacker_recon.run(["--topic", "x", "--no-report", "--history-json", "history.json"])
 
     assert rc == 0
     assert not (tmp_path / "analysis_reports").exists()
+    assert (tmp_path / "history.json").exists()
 
 
 def test_hacker_recon_timeout_returns_124(monkeypatch, tmp_path):
@@ -56,7 +68,7 @@ def test_hacker_recon_timeout_returns_124(monkeypatch, tmp_path):
     monkeypatch.setattr(atena_hacker_recon, "MAIN_SCRIPT", tmp_path / "core" / "main.py")
     monkeypatch.setattr(atena_hacker_recon, "REPORTS_DIR", tmp_path / "analysis_reports")
 
-    rc = atena_hacker_recon.run(["--topic", "x", "--timeout", "1", "--no-report"])
+    rc = atena_hacker_recon.run(["--topic", "x", "--timeout", "1", "--no-report", "--history-json", "history.json"])
 
     assert rc == 1
 
@@ -81,7 +93,42 @@ def test_hacker_recon_batch_mode_aggregates(monkeypatch, tmp_path):
     monkeypatch.setattr(atena_hacker_recon, "MAIN_SCRIPT", tmp_path / "core" / "main.py")
     monkeypatch.setattr(atena_hacker_recon, "REPORTS_DIR", tmp_path / "analysis_reports")
 
-    rc = atena_hacker_recon.run(["--batch-file", str(batch_file), "--json", "--no-report"])
+    rc = atena_hacker_recon.run(["--batch-file", str(batch_file), "--json", "--no-report", "--history-json", "history.json"])
 
     assert rc == 0
     assert len(calls) == 2
+
+
+def test_hacker_recon_prioritize_history_reorders_topics(monkeypatch, tmp_path):
+    calls = []
+
+    def _fake_run(cmd, cwd=None, text=None, capture_output=None, timeout=None):
+        calls.append(cmd)
+        return SimpleNamespace(returncode=0, stdout="ok\n", stderr="")
+
+    batch_file = tmp_path / "topics.txt"
+    batch_file.write_text("topic low\ntopic high\n", encoding="utf-8")
+    history_file = tmp_path / "history.json"
+    history_file.write_text(
+        '{"entries":[{"topic":"topic high","recon_score":95},{"topic":"topic low","recon_score":10}]}',
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(atena_hacker_recon.subprocess, "run", _fake_run)
+    monkeypatch.setattr(atena_hacker_recon, "ROOT", tmp_path)
+    monkeypatch.setattr(atena_hacker_recon, "MAIN_SCRIPT", tmp_path / "core" / "main.py")
+    monkeypatch.setattr(atena_hacker_recon, "REPORTS_DIR", tmp_path / "analysis_reports")
+
+    rc = atena_hacker_recon.run(
+        [
+            "--batch-file",
+            str(batch_file),
+            "--no-report",
+            "--prioritize-history",
+            "--history-json",
+            str(history_file),
+        ]
+    )
+
+    assert rc == 0
+    assert calls[0][-1] == "topic high"

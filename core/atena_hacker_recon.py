@@ -55,6 +55,58 @@ def _load_topics(primary_topic: str | None, batch_file: str | None) -> list[str]
     return deduped
 
 
+def _resolve_path(path_value: str) -> Path:
+    p = Path(path_value)
+    if not p.is_absolute():
+        p = ROOT / p
+    return p
+
+
+def _load_history_scores(history_path: Path) -> dict[str, float]:
+    if not history_path.exists():
+        return {}
+    try:
+        data = json.loads(history_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    entries = data.get("entries", [])
+    by_topic: dict[str, list[int]] = {}
+    for entry in entries:
+        topic = entry.get("topic")
+        score = entry.get("recon_score")
+        if not isinstance(topic, str) or not isinstance(score, (int, float)):
+            continue
+        by_topic.setdefault(topic, []).append(int(score))
+    return {topic: sum(scores) / len(scores) for topic, scores in by_topic.items() if scores}
+
+
+def _append_history(history_path: Path, results: list[dict[str, Any]]) -> None:
+    history_path.parent.mkdir(parents=True, exist_ok=True)
+    existing = {"entries": []}
+    if history_path.exists():
+        try:
+            existing = json.loads(history_path.read_text(encoding="utf-8"))
+            if "entries" not in existing or not isinstance(existing["entries"], list):
+                existing = {"entries": []}
+        except json.JSONDecodeError:
+            existing = {"entries": []}
+
+    now = dt.datetime.now(dt.timezone.utc).isoformat()
+    for r in results:
+        existing["entries"].append(
+            {
+                "timestamp_utc": now,
+                "topic": r["topic"],
+                "recon_score": r["recon_score"],
+                "ok": r["ok"],
+                "duration_s": r["duration_s"],
+            }
+        )
+    # mantém histórico compacto (últimas 1000 execuções)
+    existing["entries"] = existing["entries"][-1000:]
+    history_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def _write_report(cmd: list[str], rc: int, output: str, topic: str, duration_s: float, recon_score: int, timed_out: bool) -> Path:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     ts = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d_%H%M%S")
@@ -143,11 +195,17 @@ def run(argv: list[str]) -> int:
     parser.add_argument("--no-report", action="store_true", help="Não salvar relatório em analysis_reports/.")
     parser.add_argument("--timeout", type=int, default=180, help="Timeout máximo da execução em segundos.")
     parser.add_argument("--stop-on-fail", action="store_true", help="Interrompe o batch no primeiro erro.")
+    parser.add_argument("--history-json", default="analysis_reports/hacker_recon_history.json", help="Arquivo JSON para histórico de score.")
+    parser.add_argument("--prioritize-history", action="store_true", help="No batch, ordena tópicos por score histórico (maior para menor).")
     args = parser.parse_args(argv)
     topics = _load_topics(args.topic, args.batch_file)
     if not topics:
         print("❌ Informe --topic ou --batch-file com pelo menos um tópico.")
         return 2
+    history_path = _resolve_path(args.history_json)
+    if args.prioritize_history and len(topics) > 1:
+        history_scores = _load_history_scores(history_path)
+        topics = sorted(topics, key=lambda t: history_scores.get(t, -1), reverse=True)
 
     results: list[dict[str, Any]] = []
     for topic in topics:
@@ -206,10 +264,11 @@ def run(argv: list[str]) -> int:
     if args.json:
         print(json.dumps(summary, ensure_ascii=False, indent=2))
 
+    _append_history(history_path, results)
+    summary["history_path"] = str(history_path)
+
     if args.output_json:
-        output_json_path = Path(args.output_json)
-        if not output_json_path.is_absolute():
-            output_json_path = ROOT / output_json_path
+        output_json_path = _resolve_path(args.output_json)
         output_json_path.parent.mkdir(parents=True, exist_ok=True)
         output_json_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         print(f"🧾 JSON salvo em: {output_json_path}")

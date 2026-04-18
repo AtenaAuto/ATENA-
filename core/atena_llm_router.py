@@ -24,7 +24,7 @@ DEFAULT_QWEN_MODEL = os.getenv("ATENA_QWEN_MODEL") or "qwen-turbo"
 @dataclass
 class LLMConfig:
     provider: str = "local"  # local | openai | compat | custom | deepseek | anthropic | qwen
-    model: str = "local-simbrain"
+    model: str = "local-brain"
     base_url: Optional[str] = None
 
 
@@ -60,7 +60,7 @@ class AtenaLLMRouter:
             self.auto_prepare_result = (False, f"falha no auto-prepare local: {exc}")
 
     def list_options(self) -> list[str]:
-        opts = ["local:local-simbrain (sempre disponível)"]
+        opts = ["local:local-brain (transformers + fallback heurístico)"]
         if os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY"):
             opts.append("deepseek:light (deepseek-chat)")
             opts.append("deepseek:heavy (deepseek-reasoner)")
@@ -97,7 +97,7 @@ class AtenaLLMRouter:
         model = model.strip()
 
         if provider == "local":
-            self.cfg = LLMConfig(provider="local", model="local-simbrain")
+            self.cfg = LLMConfig(provider="local", model="local-brain")
             return True, "backend local ativado"
 
         if provider == "deepseek":

@@ -45,6 +45,7 @@ except Exception:
 # Configurações Globais
 DASHBOARD_PORT = int(os.getenv("ATENA_DASHBOARD_PORT", "8765"))
 ENABLE_DASHBOARD = os.getenv("ATENA_DASHBOARD_ENABLED", "0") == "1"
+ROUTER_TIMEOUT_SECONDS = float(os.getenv("ATENA_ROUTER_TIMEOUT_S", "90"))
 class PlainConsole:
     """Fallback simples para ambientes sem rich."""
 
@@ -69,7 +70,7 @@ def router_generate_with_timeout(
     router: AtenaLLMRouter,
     prompt: str,
     context: str,
-    timeout_seconds: float = 25.0,
+    timeout_seconds: float = ROUTER_TIMEOUT_SECONDS,
 ) -> str:
     """Executa router.generate em thread daemon para evitar travas em TTY."""
     done = threading.Event()
@@ -1281,7 +1282,7 @@ def main():
                             router=router,
                             prompt=task_msg,
                             context="Claude Code Style Assistant",
-                            timeout_seconds=25,
+                            timeout_seconds=ROUTER_TIMEOUT_SECONDS,
                         )
                     except Exception as exc:
                         answer = f"Timeout/erro ao gerar resposta ({type(exc).__name__}). Tente novamente com /task-exec."
@@ -1300,7 +1301,7 @@ def main():
                             router=router,
                             prompt=user_input,
                             context="Claude Code Style Assistant",
-                            timeout_seconds=25,
+                            timeout_seconds=ROUTER_TIMEOUT_SECONDS,
                         )
                     except Exception as exc:
                         answer = f"Timeout/erro ao gerar resposta ({type(exc).__name__}). Use /task-exec para fluxo estruturado."

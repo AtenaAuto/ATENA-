@@ -53,12 +53,12 @@ class AtenaCognitiveConfig:
     model_dir: Path = Path("./atena_brain/models")
     memory_dir: Path = Path("./atena_brain/memory")
     
-    # Modelo Local (fallback default + suporte ao DeepSeek-R1 via workflow env LLM_MODEL_NAME)
-    base_model_name: str = os.environ.get("LLM_MODEL_NAME", "Salesforce/codegen-350M-mono")
+    # Modelo Local padrão para conversa geral
+    base_model_name: str = os.environ.get("LLM_MODEL_NAME", "Qwen/Qwen2.5-0.5B-Instruct")
     device: str = "cuda" if os.environ.get("USE_CUDA") == "1" else "cpu"
     enable_transformers: bool = (
-        os.environ.get("ATENA_ENABLE_HEAVY_LOCAL_LM", "0") == "1"
-        or bool(os.environ.get("LLM_MODEL_NAME"))
+        os.environ.get("ATENA_DISABLE_HEAVY_LOCAL_LM", "0") != "1"
+        and not bool(os.environ.get("PYTEST_CURRENT_TEST"))
     )
     
     # Memória e RAG
@@ -147,10 +147,7 @@ class AtenaUltraBrain:
     def _init_model(self):
         """Inicializa o modelo local com suporte a falhas."""
         if not self.cfg.enable_transformers:
-            logger.info(
-                "Modo local leve ativo (ATENA_ENABLE_HEAVY_LOCAL_LM!=1). "
-                "Usando SimBrain heurístico para respostas rápidas."
-            )
+            logger.info("Modo local com transformers desabilitado explicitamente.")
             self.has_transformers = False
             return
         try:
@@ -174,13 +171,13 @@ class AtenaUltraBrain:
             )
             self.has_transformers = True
         except Exception as e:
-            logger.warning(f"Não foi possível carregar transformers: {e}. Usando modo simulação.")
+            logger.warning(f"Não foi possível carregar transformers: {e}. Usando fallback heurístico.")
             self.has_transformers = False
 
     def prepare_runtime_model(self) -> Tuple[bool, str]:
         """
         Tenta preparar um modelo local gratuito (Qwen) para uso real.
-        Se não conseguir, mantém fallback SimBrain sem quebrar o fluxo.
+        Se não conseguir, mantém fallback heurístico sem quebrar o fluxo.
         """
         if self.has_transformers:
             return True, f"Modelo local pronto: {self.cfg.base_model_name}"
@@ -202,8 +199,8 @@ class AtenaUltraBrain:
         if self.has_transformers:
             return True, f"Modelo local carregado (download/caching automático): {preferred_model}"
         return False, (
-            "Não foi possível inicializar transformers para baixar/rodar o modelo Qwen local. "
-            "ATENA seguirá em modo SimBrain."
+            "Não foi possível inicializar transformers para baixar/rodar o modelo local. "
+            "ATENA seguirá em modo fallback heurístico."
         )
 
     def _install_transformers_stack(self) -> Tuple[bool, str]:
@@ -771,11 +768,11 @@ if __name__ == "__main__":
             return "def quicksort(arr):\n    if len(arr) <= 1: return arr\n    pivot = arr[len(arr)//2]\n    left = [x for x in arr if x < pivot]\n    middle = [x for x in arr if x == pivot]\n    right = [x for x in arr if x > pivot]\n    return quicksort(left) + middle + quicksort(right)"
         if any(k in prompt_l for k in ["oi", "olá", "ola", "e aí", "bom dia", "boa tarde", "boa noite"]):
             return (
-                "Oi! Estou operando em modo local SimBrain e pronta para ajudar com tarefas técnicas. "
+                "Oi! Estou operando em modo local heurístico e pronta para ajudar com tarefas técnicas. "
                 "Se quiser, me passe um objetivo e eu monto um plano executável."
             )
         return (
-            "Estou em modo local SimBrain (heurístico). "
+            "Estou em modo local heurístico. "
             f"Entendi sua solicitação: {prompt}\n"
             "Posso responder com plano técnico, checklist de validação e próximos comandos."
         )

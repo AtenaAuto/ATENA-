@@ -1126,7 +1126,8 @@ def main():
                     "- /model list\n"
                     "- /model set <provider:modelo>\n"
                     "- /model set custom:<modelo>@<base_url>\n"
-                    "- /model prepare-local\n\n"
+                    "- /model prepare-local\n"
+                    "- /model auto\n\n"
                     f"Opções disponíveis:\n{options}"
                 )
                 if HAS_RICH:
@@ -1153,6 +1154,16 @@ def main():
 
             if user_input == "/model prepare-local":
                 ok, msg = router.prepare_free_local_model()
+                color = "green" if ok else "yellow"
+                console_print(
+                    f"[bold {color}]{msg}[/bold {color}]"
+                    if HAS_RICH
+                    else msg
+                )
+                continue
+
+            if user_input == "/model auto":
+                ok, msg = router.auto_orchestrate_llm()
                 color = "green" if ok else "yellow"
                 console_print(
                     f"[bold {color}]{msg}[/bold {color}]"

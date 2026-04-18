@@ -19,6 +19,11 @@ except Exception:  # noqa: BLE001
 
 
 DEFAULT_QWEN_MODEL = os.getenv("ATENA_QWEN_MODEL") or "qwen-turbo"
+LOCAL_MODEL_CANDIDATES = [
+    os.getenv("ATENA_FREE_MODEL_NAME") or "Qwen/Qwen2.5-0.5B-Instruct",
+    "Qwen/Qwen2.5-0.5B-Instruct",
+    "microsoft/Phi-3-mini-4k-instruct",
+]
 
 
 @dataclass
@@ -55,12 +60,16 @@ class AtenaLLMRouter:
         if self.cfg.provider != "local":
             return
         try:
-            self.auto_prepare_result = self.prepare_free_local_model()
+            if os.getenv("ATENA_AUTO_LLM_ORCHESTRATION", "1") == "1":
+                self.auto_prepare_result = self.auto_orchestrate_llm()
+            else:
+                self.auto_prepare_result = self.prepare_free_local_model()
         except Exception as exc:  # noqa: BLE001
             self.auto_prepare_result = (False, f"falha no auto-prepare local: {exc}")
 
     def list_options(self) -> list[str]:
         opts = ["local:local-brain (transformers + fallback heurístico)"]
+        opts.append("auto:orchestrate (escolhe provider/modelo e prepara runtime)")
         if os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY"):
             opts.append("deepseek:light (deepseek-chat)")
             opts.append("deepseek:heavy (deepseek-reasoner)")
@@ -172,6 +181,40 @@ class AtenaLLMRouter:
         if self._local_brain is None:
             self._local_brain = AtenaUltraBrain()
         return self._local_brain
+
+    def auto_orchestrate_llm(self) -> tuple[bool, str]:
+        """
+        Escolhe e prepara automaticamente o melhor backend/modelo disponível.
+        Prioriza APIs quando há credencial; caso contrário cai para LLM local.
+        """
+        # 1) Backends remotos, quando disponíveis
+        if os.getenv("DASHSCOPE_API_KEY") and OpenAI is not None:
+            ok, msg = self.set_backend(f"qwen:{DEFAULT_QWEN_MODEL}")
+            return ok, f"{msg} (seleção automática)"
+        if os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY"):
+            ok, msg = self.set_backend("deepseek:light")
+            if ok:
+                return True, f"{msg} (seleção automática)"
+
+        # 2) Fallback local: tenta modelos candidatos e baixa automaticamente
+        ok, _ = self.set_backend("local:local-brain")
+        if not ok:
+            return False, "falha ao ativar backend local"
+        brain = self._get_local_brain()
+        tried: list[str] = []
+        for model_name in LOCAL_MODEL_CANDIDATES:
+            if not model_name:
+                continue
+            model_name = model_name.strip()
+            if not model_name or model_name in tried:
+                continue
+            tried.append(model_name)
+            os.environ["LLM_MODEL_NAME"] = model_name
+            brain.cfg.base_model_name = model_name
+            ok_local, msg_local = brain.prepare_runtime_model()
+            if ok_local:
+                return True, f"local-brain pronto com {model_name} (seleção automática)"
+        return False, f"não foi possível preparar LLM automaticamente. modelos tentados: {', '.join(tried)}"
 
     def prepare_free_local_model(self) -> tuple[bool, str]:
         """

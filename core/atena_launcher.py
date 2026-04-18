@@ -124,7 +124,7 @@ def render_help() -> None:
         table.add_row("./atena digital-organism-live-cycle", "Aprende na internet, cria projeto, executa e testa")
         table.add_row("./atena bootstrap", "Instala dependências mínimas para guardian/produção")
         table.add_row("./atena secret-scan", "Escaneia o repositório por vazamento de segredos")
-        table.add_row("./atena hacker-recon <tópico>", "Executa modo Hacker Recon por tópico")
+        table.add_row("./atena hacker-recon <tópico>", "Executa modo Hacker Recon (aceita --auto/--cycles)")
         table.add_row("./atena atena-like", "Alias do modo assistant")
         table.add_row("./atena help", "Exibe esta ajuda")
         console.print(table)
@@ -171,7 +171,7 @@ def render_help() -> None:
         print("  ./atena digital-organism-live-cycle # aprende na internet, cria, executa e testa")
         print("  ./atena bootstrap        # instala dependências mínimas de runtime")
         print("  ./atena secret-scan      # escaneia o repositório por vazamento de segredos")
-        print("  ./atena hacker-recon <tópico> # modo Hacker Recon por tópico")
+        print("  ./atena hacker-recon <tópico> [--auto] [--cycles N] # modo Hacker Recon")
         print("  ./atena atena-like      # alias do assistant")
         print("  ./atena help            # ajuda")
 
@@ -183,6 +183,45 @@ def normalize_command(arg: str | None) -> str:
     if arg in ("-h", "--help", "help"):
         return "help"
     return ALIASES.get(arg, arg)
+
+
+def _build_hacker_recon_args(raw_args: list[str]) -> list[str] | None:
+    """Converte argumentos do launcher para parâmetros do core/main.py --recon."""
+    if not raw_args:
+        return None
+
+    topic_parts: list[str] = []
+    passthrough: list[str] = []
+    i = 0
+    while i < len(raw_args):
+        token = raw_args[i]
+        if token == "--topic":
+            if i + 1 >= len(raw_args):
+                return None
+            topic_parts.append(raw_args[i + 1].strip())
+            i += 2
+            continue
+        if token.startswith("--topic="):
+            topic_parts.append(token.split("=", 1)[1].strip())
+            i += 1
+            continue
+        if token in {"--auto", "--deep", "--checker"}:
+            passthrough.append(token)
+            i += 1
+            continue
+        if token == "--cycles":
+            if i + 1 >= len(raw_args):
+                return None
+            passthrough.extend([token, raw_args[i + 1]])
+            i += 2
+            continue
+        topic_parts.append(token)
+        i += 1
+
+    topic = " ".join(p for p in topic_parts if p).strip()
+    if not topic:
+        return None
+    return ["--recon", topic, *passthrough]
 
 
 def _extract_missing_module(stderr: str, stdout: str) -> str | None:
@@ -288,11 +327,12 @@ def main(argv: list[str]) -> int:
 
     script_args = argv[2:]
     if command == "hacker-recon":
-        if not script_args:
-            print("Uso: ./atena hacker-recon <tópico>")
+        mapped_args = _build_hacker_recon_args(script_args)
+        if not mapped_args:
+            print("Uso: ./atena hacker-recon <tópico> [--auto] [--cycles N] [--deep] [--checker]")
+            print("Exemplo: ./atena hacker-recon --topic \"zero-day ai agents\" --auto --cycles 3")
             return 2
-        topic = " ".join(script_args).strip()
-        script_args = ["--recon", topic]
+        script_args = mapped_args
 
     return _run_with_auto_dep_repair(script, script_args, env)
 

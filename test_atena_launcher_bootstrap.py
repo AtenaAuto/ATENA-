@@ -190,3 +190,37 @@ def test_launcher_executes_weekly_evolution_loop_command(monkeypatch):
     assert rc == 0
     assert len(calls) == 1
     assert calls[0]["cmd"][1].endswith("core/atena_weekly_evolution_loop.py")
+
+
+def test_launcher_hacker_recon_requires_topic(monkeypatch):
+    calls = []
+
+    def _fake_run(cmd, cwd=None, check=False, env=None, timeout=None, **kwargs):
+        calls.append({"cmd": cmd, "cwd": cwd, "check": check, "env": env, "timeout": timeout, "kwargs": kwargs})
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(atena_launcher.subprocess, "run", _fake_run)
+    monkeypatch.setenv("ATENA_AUTO_BOOTSTRAP", "0")
+
+    rc = atena_launcher.main(["./atena", "hacker-recon"])
+
+    assert rc == 2
+    assert len(calls) == 0
+
+
+def test_launcher_hacker_alias_routes_to_recon(monkeypatch):
+    calls = []
+
+    def _fake_run(cmd, cwd=None, check=False, env=None, timeout=None, **kwargs):
+        calls.append({"cmd": cmd, "cwd": cwd, "check": check, "env": env, "timeout": timeout, "kwargs": kwargs})
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(atena_launcher.subprocess, "run", _fake_run)
+    monkeypatch.setenv("ATENA_AUTO_BOOTSTRAP", "0")
+
+    rc = atena_launcher.main(["./atena", "hacker", "--topic", "zero-day ai", "--auto", "--cycles", "2"])
+
+    assert rc == 0
+    assert len(calls) == 1
+    assert calls[0]["cmd"][1].endswith("core/main.py")
+    assert calls[0]["cmd"][2:] == ["--recon", "zero-day ai", "--auto", "--cycles", "2"]

@@ -125,6 +125,7 @@ cd ..
 | `./atena doctor` | Diagnóstico de ambiente | `./atena doctor` |
 | `./atena guardian` | Gate de segurança essencial | `./atena guardian` |
 | `./atena production-ready` | Validação completa para release | `./atena production-ready` |
+| `./atena hacker-recon <tópico>` | Executa o modo Hacker Recon por tópico | `./atena hacker-recon "zero-day ai agents"` |
 | `./atena code-build` | Gerador automático de projetos | `./atena code-build --type api` |
 | `./atena research-lab` | Propostas de evolução | `./atena research-lab` |
 | `./atena go-no-go` | Checklist pré-divulgação | `./atena go-no-go` |

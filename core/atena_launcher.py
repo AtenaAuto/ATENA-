@@ -49,11 +49,13 @@ COMMANDS = {
     "digital-organism-live-cycle": ROOT / "protocols" / "atena_digital_organism_live_cycle_mission.py",
     "bootstrap": ROOT / "core" / "atena_env_bootstrap.py",
     "secret-scan": ROOT / "core" / "atena_secret_scan.py",
+    "hacker-recon": ROOT / "core" / "main.py",
 }
 
 ALIASES = {
     "atena-like": "assistant",
     "like": "assistant",
+    "hacker": "hacker-recon",
 }
 
 MODULE_NOT_FOUND_RE = re.compile(r"No module named ['\"]([A-Za-z0-9_.-]+)['\"]")
@@ -122,6 +124,7 @@ def render_help() -> None:
         table.add_row("./atena digital-organism-live-cycle", "Aprende na internet, cria projeto, executa e testa")
         table.add_row("./atena bootstrap", "Instala dependências mínimas para guardian/produção")
         table.add_row("./atena secret-scan", "Escaneia o repositório por vazamento de segredos")
+        table.add_row("./atena hacker-recon <tópico>", "Executa modo Hacker Recon por tópico")
         table.add_row("./atena atena-like", "Alias do modo assistant")
         table.add_row("./atena help", "Exibe esta ajuda")
         console.print(table)
@@ -168,6 +171,7 @@ def render_help() -> None:
         print("  ./atena digital-organism-live-cycle # aprende na internet, cria, executa e testa")
         print("  ./atena bootstrap        # instala dependências mínimas de runtime")
         print("  ./atena secret-scan      # escaneia o repositório por vazamento de segredos")
+        print("  ./atena hacker-recon <tópico> # modo Hacker Recon por tópico")
         print("  ./atena atena-like      # alias do assistant")
         print("  ./atena help            # ajuda")
 
@@ -282,7 +286,15 @@ def main(argv: list[str]) -> int:
         # Evita repetir preparação pesada no processo filho do assistant/start.
         env["ATENA_AUTO_PREPARE_LOCAL_MODEL"] = "0"
 
-    return _run_with_auto_dep_repair(script, argv[2:], env)
+    script_args = argv[2:]
+    if command == "hacker-recon":
+        if not script_args:
+            print("Uso: ./atena hacker-recon <tópico>")
+            return 2
+        topic = " ".join(script_args).strip()
+        script_args = ["--recon", topic]
+
+    return _run_with_auto_dep_repair(script, script_args, env)
 
 
 if __name__ == "__main__":

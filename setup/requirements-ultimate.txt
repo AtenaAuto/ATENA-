@@ -10,3 +10,4 @@ wandb
 optuna
 redis
 openai>=1.0.0
+requests

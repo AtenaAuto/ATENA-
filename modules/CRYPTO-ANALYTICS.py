@@ -3,7 +3,7 @@
 """
 ATENA: OMNI-CRYPTO v4.5
 Foco: Recuperação de Credenciais via Identidade Digital e Vazamentos.
-Copyright (c) 2026 Danilo Gomes.
+Copyright (c) 2026 .
 """
 import hashlib
 import json

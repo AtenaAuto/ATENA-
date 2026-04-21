@@ -133,7 +133,7 @@ cd ..
 | `./atena agi-uplift` | Missão AGI interna (memória/eval/segurança) | `./atena agi-uplift` |
 | `./atena agi-external-validation` | Validação AGI externa independente | `./atena agi-external-validation` |
 | `./atena digital-organism-audit` | Auditoria automática de maturidade como organismo digital | `./atena digital-organism-audit` |
-| `./atena digital-organism-live-cycle` | Aprende na internet, cria software, executa/testa, auto-recupera falhas e roda em daemon | `./atena digital-organism-live-cycle --topic "autonomous ai engineering" --iterations 3 --batches 2 --strict --recovery-attempts 2` |
+| `./atena digital-organism-live-cycle` | Aprende na internet, cria software, executa/testa, auto-recupera falhas e roda em daemon; use `--challenge-level agi-only` para tarefa extremamente difícil | `./atena digital-organism-live-cycle --challenge-level agi-only --iterations 3 --batches 2 --strict --recovery-attempts 2` |
 
 > CI evolução: o workflow `ATENA-EVO` agora inclui um *stagnation guard* que reduz ciclos e ativa `--checker` quando detecta plateau de mutações.
 

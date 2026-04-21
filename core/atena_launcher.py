@@ -123,7 +123,10 @@ def render_help() -> None:
         table.add_row("./atena agi-uplift", "Missão de elevação AGI-like (memória/avaliação/segurança)")
         table.add_row("./atena agi-external-validation", "Validação externa AGI-like com score independente")
         table.add_row("./atena digital-organism-audit", "Auditoria automática: score + estágio de organismo digital")
-        table.add_row("./atena digital-organism-live-cycle", "Aprende na internet, cria projeto, executa e testa")
+        table.add_row(
+            "./atena digital-organism-live-cycle",
+            "Aprende na internet, cria projeto, executa e testa (suporta --challenge-level agi-only)",
+        )
         table.add_row("./atena bootstrap", "Instala dependências mínimas para guardian/produção")
         table.add_row("./atena secret-scan", "Escaneia o repositório por vazamento de segredos")
         table.add_row("./atena hacker-recon --topic <tópico>", "Hacker Recon avançado (batch/paralelo/retry/JSON/histórico)")
@@ -171,7 +174,7 @@ def render_help() -> None:
         print("  ./atena agi-uplift      # missão de elevação AGI-like")
         print("  ./atena agi-external-validation # validação externa AGI-like")
         print("  ./atena digital-organism-audit # auditoria automática de organismo digital")
-        print("  ./atena digital-organism-live-cycle # aprende na internet, cria, executa e testa")
+        print("  ./atena digital-organism-live-cycle # aprende na internet, cria, executa e testa (use --challenge-level agi-only)")
         print("  ./atena bootstrap        # instala dependências mínimas de runtime")
         print("  ./atena secret-scan      # escaneia o repositório por vazamento de segredos")
         print("  ./atena hacker-recon --topic <tópico>|--batch-file arq [...flags...] [--parallel N] [--retries N]")

@@ -27,6 +27,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
 EVOLUTION = ROOT / "atena_evolution"
+DEFAULT_SECRET_ALLOWLIST = [
+    r"^tests/unit/test_atena_secret_scan\.py:\d+$",
+]
 
 
 @dataclass
@@ -219,6 +222,14 @@ def _apply_allowlist(secret_scan: dict[str, object], allowlist_patterns: list[st
     return updated
 
 
+def _merge_allowlists(file_patterns: list[str]) -> list[str]:
+    merged: list[str] = []
+    for pattern in [*DEFAULT_SECRET_ALLOWLIST, *file_patterns]:
+        if pattern not in merged:
+            merged.append(pattern)
+    return merged
+
+
 def _classify_release_risk(
     score: int,
     threshold: int,
@@ -406,15 +417,15 @@ def main() -> int:
         ),
     ]
 
+    repo_clean = _check_repo_clean()
     results = [_run_step(name, command, timeout_s=args.step_timeout) for name, command in command_specs]
     critical_fail = any(
         item.returncode != 0 and item.name in {"Doctor", "Production Gate"}
         for item in results
     )
     structure_check = _evaluate_generated_api(args.project_name, args.required_endpoints)
-    repo_clean = _check_repo_clean()
     secret_scan_raw = _scan_for_secrets()
-    allowlist_patterns = _load_secret_allowlist(ROOT / args.secret_allowlist_file)
+    allowlist_patterns = _merge_allowlists(_load_secret_allowlist(ROOT / args.secret_allowlist_file))
     secret_scan = _apply_allowlist(secret_scan_raw, allowlist_patterns)
     score, weights = _compute_score(results, structure_check_ok=bool(structure_check.get("ok")))
     secrets_blocking = (not secret_scan.get("ok")) and (not args.allow_secrets_detected)

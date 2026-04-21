@@ -86,7 +86,7 @@ def _build_software_scaffold(
     return {
         "README.md": f"""# {project_name}
 
-Software gerado automaticamente pela missão `future-ai` da ATENA.
+Plataforma SaaS **completa (base de produção)** gerada automaticamente pela missão `future-ai` da ATENA.
 
 ## Tema
 - {topic}
@@ -97,49 +97,232 @@ Software gerado automaticamente pela missão `future-ai` da ATENA.
 ## Keywords
 - {keyword_text}
 
+## Arquitetura entregue
+- `app/main.py`: bootstrap e demo de fluxo ponta-a-ponta
+- `app/domain.py`: entidades de domínio (tenant/workspace/channel/message/user)
+- `app/realtime.py`: gateway de mensagens em tempo real (in-memory)
+- `app/moderation.py`: moderação de conteúdo (regras básicas)
+- `app/billing.py`: cálculo de assinatura e add-ons
+- `app/service.py`: orquestração do SaaS e plano técnico
+- `tests/`: testes de domínio + fluxo funcional
+- `docker-compose.yml` + `.env.example`: base para operação local
+
 ## Como executar
 ```bash
 python -m app.main
+pytest -q tests
 ```
 """,
         "app/__init__.py": "",
         "app/main.py": f"""from __future__ import annotations
 
-from app.service import build_intervention_plan
+from app.service import create_platform_blueprint
 
 
 def main() -> None:
-    plan = build_intervention_plan(topic={topic!r}, challenge={challenge_text!r})
-    print("ATENA Future AI Software")
-    print(plan)
+    blueprint = create_platform_blueprint(topic={topic!r}, challenge={challenge_text!r})
+    print("ATENA Future AI SaaS Platform")
+    print("workspace:", blueprint["workspace"])
+    print("plan:", blueprint["plan"])
+    print("monthly_price:", blueprint["billing"]["monthly_price"])
+    print("event_sample:", blueprint["realtime_event"])
 
 
 if __name__ == "__main__":
     main()
 """,
+        "app/domain.py": """from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+
+
+@dataclass
+class Tenant:
+    tenant_id: str
+    name: str
+    plan: str = "pro"
+
+
+@dataclass
+class User:
+    user_id: str
+    display_name: str
+    role: str = "member"
+
+
+@dataclass
+class Workspace:
+    workspace_id: str
+    tenant_id: str
+    name: str
+    channels: list[str] = field(default_factory=list)
+
+
+@dataclass
+class Message:
+    workspace_id: str
+    channel_id: str
+    author_id: str
+    content: str
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+""",
+        "app/realtime.py": """from __future__ import annotations
+
+from app.domain import Message
+
+
+class RealtimeGateway:
+    def __init__(self) -> None:
+        self._events: list[dict[str, str]] = []
+
+    def publish_message(self, message: Message) -> dict[str, str]:
+        event = {
+            "type": "message.created",
+            "workspace_id": message.workspace_id,
+            "channel_id": message.channel_id,
+            "author_id": message.author_id,
+            "content": message.content,
+            "created_at": message.created_at,
+        }
+        self._events.append(event)
+        return event
+
+    def latest_event(self) -> dict[str, str] | None:
+        if not self._events:
+            return None
+        return self._events[-1]
+""",
+        "app/moderation.py": """from __future__ import annotations
+
+BLOCKED_TERMS = {"malware", "leak", "exploit"}
+
+
+def validate_message(content: str) -> tuple[bool, str]:
+    normalized = content.strip().lower()
+    if not normalized:
+        return False, "empty_message"
+    for term in BLOCKED_TERMS:
+        if term in normalized:
+            return False, f"blocked_term:{term}"
+    return True, "ok"
+""",
+        "app/billing.py": """from __future__ import annotations
+
+PLAN_PRICE = {
+    "starter": 29,
+    "pro": 99,
+    "enterprise": 499,
+}
+
+
+def estimate_monthly_price(plan: str, seats: int, addons: int = 0) -> int:
+    base = PLAN_PRICE.get(plan, PLAN_PRICE["pro"])
+    normalized_seats = max(1, seats)
+    normalized_addons = max(0, addons)
+    return base + (normalized_seats * 4) + (normalized_addons * 15)
+""",
         "app/service.py": """from __future__ import annotations
+
+from app.billing import estimate_monthly_price
+from app.domain import Message, Tenant, Workspace
+from app.moderation import validate_message
+from app.realtime import RealtimeGateway
 
 
 def build_intervention_plan(topic: str, challenge: str) -> str:
     return (
         f"Plano inicial para '{topic}': "
-        f"atacar '{challenge}' com coleta de sinais, priorização causal e execução auditável."
+        f"atacar '{challenge}' com arquitetura SaaS multi-tenant, observabilidade, "
+        "moderação e entrega incremental orientada por métricas."
     )
+
+
+def create_platform_blueprint(topic: str, challenge: str) -> dict[str, object]:
+    tenant = Tenant(tenant_id="tn-001", name="Atena Enterprise", plan="enterprise")
+    workspace = Workspace(workspace_id="ws-001", tenant_id=tenant.tenant_id, name="Core", channels=["general"])
+    plan = build_intervention_plan(topic, challenge)
+
+    message = Message(
+        workspace_id=workspace.workspace_id,
+        channel_id="general",
+        author_id="user-001",
+        content="deploy sem incidentes e com rastreabilidade total",
+    )
+    moderation_ok, reason = validate_message(message.content)
+    if not moderation_ok:
+        raise ValueError(f"mensagem bloqueada: {reason}")
+
+    gateway = RealtimeGateway()
+    event = gateway.publish_message(message)
+    monthly_price = estimate_monthly_price(plan=tenant.plan, seats=25, addons=2)
+
+    return {
+        "tenant": tenant.name,
+        "workspace": workspace.name,
+        "plan": plan,
+        "billing": {"monthly_price": monthly_price, "currency": "USD"},
+        "realtime_event": event,
+    }
 """,
         "tests/test_service.py": """from __future__ import annotations
 
-from app.service import build_intervention_plan
+from app.service import build_intervention_plan, create_platform_blueprint
 
 
 def test_build_intervention_plan() -> None:
     plan = build_intervention_plan("educacao", "evasao escolar")
     assert "educacao" in plan
     assert "evasao escolar" in plan
+
+
+def test_create_platform_blueprint_has_billing_and_event() -> None:
+    payload = create_platform_blueprint("comunicacao corporativa", "reduzir latencia")
+    assert payload["billing"]["monthly_price"] > 0
+    assert payload["realtime_event"]["type"] == "message.created"
+""",
+        "tests/test_platform.py": """from __future__ import annotations
+
+from app.billing import estimate_monthly_price
+from app.moderation import validate_message
+
+
+def test_billing_grows_with_seats() -> None:
+    starter = estimate_monthly_price(plan="starter", seats=1, addons=0)
+    scaled = estimate_monthly_price(plan="starter", seats=30, addons=0)
+    assert scaled > starter
+
+
+def test_moderation_blocks_disallowed_terms() -> None:
+    ok, reason = validate_message("tem leak de dados")
+    assert ok is False
+    assert reason.startswith("blocked_term:")
+""",
+        ".env.example": """APP_ENV=dev
+APP_REGION=us-east-1
+APP_LOG_LEVEL=info
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/atena
+REDIS_URL=redis://localhost:6379/0
+""",
+        "docker-compose.yml": """version: "3.9"
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: atena
+    ports:
+      - "5432:5432"
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
 """,
         "pyproject.toml": f"""[project]
 name = "{project_name}"
 version = "0.1.0"
-description = "Software gerado pela missão future-ai da ATENA"
+description = "SaaS completo base gerado pela missão future-ai da ATENA"
 requires-python = ">=3.10"
 dependencies = []
 """,

@@ -29,6 +29,7 @@ if str(ROOT) not in sys.path:
 
 from core.atena_llm_router import AtenaLLMRouter
 from core.internet_challenge import run_internet_challenge
+from core.atena_module_preloader import preload_all_modules
 
 try:
     from rich.console import Console
@@ -1444,6 +1445,14 @@ def atena_thinking(message: str = "Pensando..."):
 def main():
     render_banner()
     router = AtenaLLMRouter()
+    if os.getenv("ATENA_PRELOAD_ALL_MODULES", "1") == "1":
+        preload_result = preload_all_modules(ROOT / "modules")
+        loaded_count = int(preload_result.get("loaded_count", 0))
+        total = int(preload_result.get("total", 0))
+        failed_count = int(preload_result.get("failed_count", 0))
+        console_print(
+            f"[ATENA preload] módulos carregados: {loaded_count}/{total} (falhas: {failed_count})"
+        )
     if router.auto_prepare_result is not None:
         ok_auto, msg_auto = router.auto_prepare_result
         if ok_auto:

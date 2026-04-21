@@ -91,8 +91,12 @@ docs/GUARDIAN_REPORT_*.md
 docs/PRODUCTION_GATE_*.md
 docs/GO_NO_GO_REPORT_*.md
 docs/EXTERNAL_AGI_VALIDATION_*.md
+docs/BLUEPRINT_FUTURO_IA_*.md
+docs/PROPOSTA_LAB_PESQUISA_AUTONOMA_*.md
 analysis_reports/ATENA_Avaliacao_Organismo_Digital_Automatica_*.md
 analysis_reports/ATENA_Organismo_Digital_*.md
+analysis_reports/future_ai_mission_last_run.json
+output/future_ai_*/
 atena_evolution/
 !atena_evolution/.gitkeep
 

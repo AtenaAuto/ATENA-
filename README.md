@@ -128,6 +128,7 @@ cd ..
 | `./atena hacker-recon --topic <tópico>` | Executa Hacker Recon avançado (batch, paralelo, retries, score, histórico adaptativo, `--json`, `--output-json`, `--timeout`) | `./atena hacker-recon --batch-file topics.txt --parallel 3 --retries 1 --prioritize-history --json --output-json analysis_reports/recon.json` |
 | `./atena code-build` | Gerador automático de projetos | `./atena code-build --type api` |
 | `./atena research-lab` | Propostas de evolução | `./atena research-lab` |
+| `./atena future-ai` | Gera inovação técnica; inclui `app-food-delivery-complete` para app completo de delivery com backend + mobile | `./atena future-ai --mode app-food-delivery-complete --topic "delivery de comida" --json` |
 | `./atena go-no-go` | Checklist pré-divulgação | `./atena go-no-go` |
 | `./atena agi-uplift` | Missão AGI interna (memória/eval/segurança) | `./atena agi-uplift` |
 | `./atena agi-external-validation` | Validação AGI externa independente | `./atena agi-external-validation` |

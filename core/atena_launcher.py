@@ -22,6 +22,7 @@ COMMANDS = {
     "skills": ROOT / "core" / "atena_skills.py",
     "pipeline": ROOT / "core" / "atena_pipeline.py",
     "research-lab": ROOT / "protocols" / "atena_research_lab_mission.py",
+    "future-ai": ROOT / "protocols" / "atena_future_ai_mission.py",
     "learn-status": ROOT / "core" / "atena_learning_status.py",
     "push-safe": ROOT / "core" / "atena_push_safe.py",
     "dashboard": ROOT / "core" / "atena_local_dashboard.py",
@@ -97,6 +98,7 @@ def render_help() -> None:
         table.add_row("./atena skills", "Descoberta + validação das skills")
         table.add_row("./atena pipeline", "Pipeline: web -> análise -> relatório")
         table.add_row("./atena research-lab", "Gera proposta avançada para evolução da ATENA")
+        table.add_row("./atena future-ai", "Cria blueprint prático de inovação para o futuro da IA")
         table.add_row("./atena learn-status", "Mostra memória de aprendizado persistida")
         table.add_row("./atena push-safe", "Push apenas após doctor --full aprovado")
         table.add_row("./atena dashboard", "Dashboard local com chat estilo assistant")
@@ -144,6 +146,7 @@ def render_help() -> None:
         print("  ./atena skills          # descoberta/validação de skills")
         print("  ./atena pipeline        # web -> análise -> relatório")
         print("  ./atena research-lab    # proposta avançada de evolução")
+        print("  ./atena future-ai       # blueprint prático para o futuro da IA")
         print("  ./atena learn-status    # status do aprendizado persistente")
         print("  ./atena push-safe       # push condicionado a aprovação")
         print("  ./atena dashboard       # dashboard local com chat")
@@ -198,8 +201,22 @@ def _module_to_pip_name(module_name: str) -> str:
     return PIP_NAME_OVERRIDES.get(root, root)
 
 
-def _run_with_auto_dep_repair(script: Path, script_args: list[str], env: dict[str, str]) -> int:
+def _run_with_auto_dep_repair(
+    script: Path,
+    script_args: list[str],
+    env: dict[str, str],
+    interactive: bool = False,
+) -> int:
     auto_install = env.get("ATENA_AUTO_INSTALL_MISSING_DEPS", "1") == "1"
+    if interactive:
+        first = subprocess.run(
+            [sys.executable, str(script), *script_args],
+            cwd=str(ROOT),
+            env=env,
+            check=False,
+        )
+        return first.returncode
+
     first = subprocess.run(
         [sys.executable, str(script), *script_args],
         cwd=str(ROOT),
@@ -286,7 +303,8 @@ def main(argv: list[str]) -> int:
         # Evita repetir preparação pesada no processo filho do assistant/start.
         env["ATENA_AUTO_PREPARE_LOCAL_MODEL"] = "0"
 
-    return _run_with_auto_dep_repair(script, argv[2:], env)
+    interactive = command in {"assistant", "dialog"}
+    return _run_with_auto_dep_repair(script, argv[2:], env, interactive=interactive)
 
 
 if __name__ == "__main__":

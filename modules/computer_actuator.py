@@ -50,21 +50,42 @@ class ComputerActuator(BaseActuator):
         logger.info(f"[ComputerActuator] Inicializado no sistema {self.os_info['system']}")
 
     def execute_command(self, command: str, timeout: int = 60) -> Dict[str, Any]:
-        """Executa um comando no shell do sistema e retorna a saída."""
+        """Executa um comando no shell do sistema e retorna a saída.
+
+        Para `python3 -c <código>`, executa como lista de argumentos para evitar
+        problemas de escape de aspas aninhadas no shell.
+        """
         logger.info(f"[ComputerActuator] Executando: {command}")
         try:
-            result = subprocess.run(
-                command,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=timeout
-            )
+            # Tratamento especial para python3 -c: evita quebra de escape com aspas
+            stripped = command.strip()
+            if stripped.startswith("python3 -c "):
+                code = stripped[len("python3 -c "):].strip()
+                # Remove aspas externas simples ou duplas se existirem
+                if (code.startswith("'") and code.endswith("'")) or \
+                   (code.startswith('"') and code.endswith('"')):
+                    code = code[1:-1]
+                cmd_list = ["python3", "-c", code]
+                result = subprocess.run(
+                    cmd_list,
+                    shell=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                )
+            else:
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                )
             return {
                 "success": result.returncode == 0,
                 "exit_code": result.returncode,
                 "stdout": result.stdout,
-                "stderr": result.stderr
+                "stderr": result.stderr,
             }
         except subprocess.TimeoutExpired:
             logger.error(f"[ComputerActuator] Timeout ao executar: {command}")

@@ -68,23 +68,29 @@ copy .env.example .env
 ### Instalação em Linux/macOS 🐧🍎
 
 ```bash
-# Clonar repositório
-git clone https://github.com/AtenaAuto/ATENA-.git
-cd ATENA-
+# Go to the root content directory to ensure a clean start
+%cd /content
 
-# Criar ambiente virtual
-python3 -m venv venv
-source venv/bin/activate
+# Remove any existing ATENA- directory to prevent nesting issues
+!rm -rf ATENA-
 
-# Instalar dependências
-cd setup
-pip install -r requirements-pinned.txt
-pip install -r requirements-dev.txt  # Para desenvolvimento
-cd ..
+# Clone the repository
+!git clone https://github.com/AtenaAuto/ATENA-.git
 
-# Configurar variáveis de ambiente
-cp .env.example .env
-# Edite .env com suas credenciais
+# Change into the cloned repository's root directory
+%cd ATENA-
+
+# Now navigate to the setup directory and install dependencies
+%cd setup
+!pip install -r requirements-pinned.txt
+!pip install -r requirements-dev.txt  # Para desenvolvimento
+
+# Go back to the root of the ATENA- directory after installation
+%cd ..
+# Verificar se ambiente está pronto
+!./atena doctor
+
+# Deve mostrar status de todos os componentes
 ```
 
 ### Instalação em Android (Termux) 📱

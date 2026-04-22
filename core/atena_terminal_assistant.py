@@ -17,12 +17,14 @@ import json
 import re
 import socket
 import urllib.parse
+import urllib.request
 import webbrowser
 from dataclasses import dataclass, field
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
+from xml.etree import ElementTree
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -295,6 +297,31 @@ def _build_source_findings(details: dict[str, object], limit: int = 3) -> list[s
     return findings[:limit]
 
 
+def _google_news_fallback_results(query: str, limit: int = 5) -> list[str]:
+    try:
+        encoded = urllib.parse.quote(query)
+        url = (
+            "https://news.google.com/rss/search"
+            f"?q={encoded}&hl=pt-BR&gl=BR&ceid=BR:pt-419"
+        )
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (ATENA research fallback)"},
+        )
+        with urllib.request.urlopen(req, timeout=20) as resp:  # nosec - controlled URL
+            raw = resp.read().decode("utf-8", errors="ignore")
+        root = ElementTree.fromstring(raw)
+        rows: list[str] = []
+        for item in root.findall("./channel/item")[:limit]:
+            title = (item.findtext("title") or "").strip()
+            link = (item.findtext("link") or "").strip()
+            if title and link:
+                rows.append(f"- {title}\n  {link}")
+        return rows
+    except Exception:
+        return []
+
+
 def run_user_internet_research(user_input: str) -> str:
     topic = _extract_internet_topic(user_input)
     if not topic:
@@ -314,11 +341,13 @@ def run_user_internet_research(user_input: str) -> str:
     topic_terms = [t for t in re.findall(r"[a-z0-9à-ú]+", topic_lower) if t not in stop_terms and len(t) >= 3]
 
     if is_sports_schedule and isinstance(all_sources, list):
+        had_sports_source = False
         for item in all_sources:
             if not isinstance(item, dict):
                 continue
             if str(item.get("source", "")).lower() != "thesportsdb" or not bool(item.get("ok")):
                 continue
+            had_sports_source = True
             details = item.get("details", {})
             events = details.get("events", []) if isinstance(details, dict) else []
             if isinstance(events, list) and events:
@@ -339,17 +368,25 @@ def run_user_internet_research(user_input: str) -> str:
                         "Próximos jogos encontrados:\n"
                         f"{chr(10).join(event_lines)}"
                     )
-                return (
-                    "## Resultado da pesquisa\n\n"
-                    f"**Tema:** {topic}\n\n"
-                    "Não encontrei um calendário confiável com esse termo. "
-                    "Tente informar o nome completo do time (ex.: `Santos Futebol Clube`)."
-                )
+        google_rows = _google_news_fallback_results(topic)
+        if google_rows:
+            return (
+                "## Resultado da pesquisa (fallback Google)\n\n"
+                f"**Tema:** {topic}\n\n"
+                "Não consegui confirmar pelo feed esportivo direto. "
+                "Segue resultado completo encontrado no Google News:\n\n"
+                + "\n".join(google_rows)
+            )
+        if had_sports_source:
+            return (
+                "## Resultado da pesquisa\n\n"
+                f"**Tema:** {topic}\n\n"
+                "Não encontrei um calendário confiável com esse termo."
+            )
         return (
             "## Resultado da pesquisa\n\n"
             f"**Tema:** {topic}\n\n"
-            "Não consegui confirmar a próxima partida com confiança nas fontes esportivas. "
-            "Tente usar o nome completo do clube e a competição (ex.: `Santos Futebol Clube Série B próximo jogo`)."
+            "Não consegui confirmar a próxima partida com confiança nas fontes esportivas nem no fallback do Google."
         )
 
     all_findings: list[str] = []
@@ -370,6 +407,10 @@ def run_user_internet_research(user_input: str) -> str:
                     if is_relevant:
                         all_findings.append(f"- **{source_name}**: {finding[:240]}")
     final_findings = all_findings if all_findings else fallback_findings
+    if not final_findings:
+        google_rows = _google_news_fallback_results(topic)
+        if google_rows:
+            final_findings = google_rows
     key_findings = "\n".join(final_findings[:8]) if final_findings else "- Não encontrei resultados úteis para esse tema."
     return (
         f"## Resultado da pesquisa\n\n"

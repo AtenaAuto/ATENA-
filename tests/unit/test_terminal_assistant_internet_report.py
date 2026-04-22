@@ -87,6 +87,7 @@ def test_run_user_internet_research_prioritizes_sports_schedule(monkeypatch):
 
 
 def test_run_user_internet_research_sports_schedule_without_relevant_match(monkeypatch):
+    monkeypatch.setattr(ta, "_google_news_fallback_results", lambda topic, limit=5: [])
     monkeypatch.setattr(
         ta,
         "run_internet_challenge",
@@ -107,14 +108,21 @@ def test_run_user_internet_research_sports_schedule_without_relevant_match(monke
 def test_run_user_internet_research_sports_schedule_without_sports_source(monkeypatch):
     monkeypatch.setattr(
         ta,
+        "_google_news_fallback_results",
+        lambda topic, limit=5: ["- Flamengo enfrenta Time X\n  https://news.google.com/example"],
+    )
+    monkeypatch.setattr(
+        ta,
         "run_internet_challenge",
         lambda topic: {"all_sources": [{"source": "wikipedia", "ok": True, "details": {"title": "Santos"}}]},
     )
     report = ta.run_user_internet_research("pesquisa que dia o santos joga")
-    assert "Não consegui confirmar a próxima partida" in report
+    assert "fallback Google" in report
+    assert "news.google.com/example" in report
 
 
 def test_run_user_internet_research_sports_schedule_ignores_filler_terms(monkeypatch):
+    monkeypatch.setattr(ta, "_google_news_fallback_results", lambda topic, limit=5: [])
     monkeypatch.setattr(
         ta,
         "run_internet_challenge",
@@ -131,3 +139,14 @@ def test_run_user_internet_research_sports_schedule_ignores_filler_terms(monkeyp
     report = ta.run_user_internet_research("pesquisa pra mim que dia o flamengo joga")
     assert "Próximos jogos encontrados" in report
     assert "2026-05-04: Flamengo vs Vasco" in report
+
+
+def test_run_user_internet_research_general_fallback_google(monkeypatch):
+    monkeypatch.setattr(
+        ta,
+        "_google_news_fallback_results",
+        lambda topic, limit=5: ["- Resultado Google\n  https://news.google.com/result"],
+    )
+    monkeypatch.setattr(ta, "run_internet_challenge", lambda topic: {"all_sources": []})
+    report = ta.run_user_internet_research("pesquise na internet sobre assunto sem fonte")
+    assert "Resultado Google" in report

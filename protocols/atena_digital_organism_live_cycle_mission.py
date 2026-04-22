@@ -14,10 +14,31 @@ if str(ROOT) not in sys.path:
 
 from core.atena_digital_organism_live_cycle import run_live_cycle, run_live_cycles, run_live_daemon
 
+AGI_CHALLENGE_PRESETS = {
+    "default": "autonomous ai engineering",
+    "hard": "autonomous incident response system with self-healing and adversarial validation",
+    "agi-only": "autonomous multi-agent red-team blue-team researcher that learns online, writes code, executes tests, and self-recovers under uncertainty",
+}
+
+
+def _resolve_topic(topic: str, challenge_level: str) -> str:
+    normalized_level = (challenge_level or "default").strip().lower()
+    preset = AGI_CHALLENGE_PRESETS.get(normalized_level, AGI_CHALLENGE_PRESETS["default"])
+    cleaned_topic = (topic or "").strip()
+    if cleaned_topic:
+        return cleaned_topic
+    return preset
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Executa live cycle de organismo digital")
-    parser.add_argument("--topic", default="autonomous ai engineering", help="Tópico para aprendizado na internet")
+    parser.add_argument("--topic", default="", help="Tópico para aprendizado na internet")
+    parser.add_argument(
+        "--challenge-level",
+        choices=sorted(AGI_CHALLENGE_PRESETS.keys()),
+        default="default",
+        help="Preset de dificuldade para gerar um desafio mais complexo quando --topic não for informado",
+    )
     parser.add_argument("--iterations", type=int, default=1, help="Quantidade de ciclos autônomos encadeados")
     parser.add_argument("--batches", type=int, default=1, help="Quantidade de batches autônomas em modo daemon")
     parser.add_argument(
@@ -32,11 +53,12 @@ def main() -> int:
         help="Falha se a batch não demonstrar aprendizado consistente",
     )
     args = parser.parse_args()
+    resolved_topic = _resolve_topic(args.topic, args.challenge_level)
 
     if args.batches > 1:
         payload = run_live_daemon(
             ROOT,
-            seed_topic=args.topic,
+            seed_topic=resolved_topic,
             batches=args.batches,
             iterations_per_batch=args.iterations,
             strict=args.strict,
@@ -55,7 +77,7 @@ def main() -> int:
         return 0 if summary["status"] == "ok" else 2
 
     if args.iterations > 1:
-        payload = run_live_cycles(ROOT, seed_topic=args.topic, iterations=args.iterations, strict=args.strict)
+        payload = run_live_cycles(ROOT, seed_topic=resolved_topic, iterations=args.iterations, strict=args.strict)
         summary = payload["summary"]
         print("🧠⚙️🧪 ATENA Digital Organism Live Batch")
         print(f"seed_topic={summary['seed_topic']}")
@@ -68,7 +90,7 @@ def main() -> int:
         print(f"markdown={summary['batch_markdown']}")
         return 0 if summary["status"] == "ok" else 2
 
-    payload = run_live_cycle(ROOT, topic=args.topic, max_recovery_attempts=max(0, args.recovery_attempts))
+    payload = run_live_cycle(ROOT, topic=resolved_topic, max_recovery_attempts=max(0, args.recovery_attempts))
     print("🧠⚙️🧪 ATENA Digital Organism Live Cycle")
     print(f"topic={payload['topic']}")
     print(f"status={payload['status']}")

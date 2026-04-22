@@ -24,6 +24,7 @@ from core.production_advanced_suite import (
     run_rag_governance_check,
     run_security_check,
 )
+from core.atena_subagent_solver import solve_with_subagent
 from core.production_gate import evaluate_go_live
 from core.production_contracts import validate_contract
 from core.production_guardrails import Action, AuditLogger, PolicyEngine, Role
@@ -183,6 +184,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_ic = sub.add_parser("incident-commander", help="Gera plano de resposta a incidente (MVP)")
     p_ic.add_argument("--scenario", default="latency-spike")
+
+    p_sub = sub.add_parser("subagent-solve", help="Cria subagente para um problema e integra ao fluxo principal")
+    p_sub.add_argument("--problem", required=True)
+    p_sub.add_argument("--code-only", action="store_true", help="Retorna apenas o código gerado quando disponível")
 
     return parser
 
@@ -431,6 +436,16 @@ def main() -> int:
         payload = run_incident_commander(args.scenario, EVOLUTION / "telemetry.jsonl")
         _emit("incident-commander", payload)
         return 0
+
+    if args.cmd == "subagent-solve":
+        payload = solve_with_subagent(args.problem, history_path=EVOLUTION / "telemetry.jsonl")
+        if getattr(args, "code_only", False):
+            code_solution = payload.get("code_solution")
+            if isinstance(code_solution, str) and code_solution.strip():
+                print(code_solution.rstrip())
+                return 0
+        _emit("subagent-solve", payload)
+        return 0 if payload.get("status") == "ok" else 2
 
     return 2
 

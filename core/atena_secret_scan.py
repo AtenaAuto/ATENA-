@@ -65,12 +65,12 @@ _DOTFILE_NAMES = {".env", ".env.example", ".env.local", ".env.production", ".env
 SECRET_PATTERNS: list[tuple[str, re.Pattern]] = [
 
     # ── GitHub ──────────────────────────────────────────────────────────────
-    ("github_classic",      re.compile(r"\bghp_[A-Za-z0-9]{36,}\b")),
-    ("github_actions",      re.compile(r"\bghs_[A-Za-z0-9]{36,}\b")),
-    ("github_oauth",        re.compile(r"\bgho_[A-Za-z0-9]{36,}\b")),
-    ("github_user",         re.compile(r"\bghu_[A-Za-z0-9]{36,}\b")),
-    ("github_refresh",      re.compile(r"\bghr_[A-Za-z0-9]{36,}\b")),
-    ("github_pat",          re.compile(r"\bgithub_pat_[A-Za-z0-9_]{36,}\b")),
+    ("github_classic",      re.compile(r"\bghp_[A-Za-z0-9]{20,}\b")),
+    ("github_actions",      re.compile(r"\bghs_[A-Za-z0-9]{20,}\b")),
+    ("github_oauth",        re.compile(r"\bgho_[A-Za-z0-9]{20,}\b")),
+    ("github_user",         re.compile(r"\bghu_[A-Za-z0-9]{20,}\b")),
+    ("github_refresh",      re.compile(r"\bghr_[A-Za-z0-9]{20,}\b")),
+    ("github_pat",          re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b")),
 
     # ── OpenAI ──────────────────────────────────────────────────────────────
     ("openai_project_key",  re.compile(r"\bsk-proj-[A-Za-z0-9_\-]{20,}\b")),

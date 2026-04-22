@@ -128,11 +128,12 @@ cd ..
 | `./atena hacker-recon --topic <tópico>` | Executa Hacker Recon avançado (batch, paralelo, retries, score, histórico adaptativo, `--json`, `--output-json`, `--timeout`) | `./atena hacker-recon --batch-file topics.txt --parallel 3 --retries 1 --prioritize-history --json --output-json analysis_reports/recon.json` |
 | `./atena code-build` | Gerador automático de projetos | `./atena code-build --type api` |
 | `./atena research-lab` | Propostas de evolução | `./atena research-lab` |
+| `./atena future-ai` | Gera inovação técnica; inclui `app-food-delivery-complete` para app completo de delivery com backend + mobile | `./atena future-ai --mode app-food-delivery-complete --topic "delivery de comida" --json` |
 | `./atena go-no-go` | Checklist pré-divulgação | `./atena go-no-go` |
 | `./atena agi-uplift` | Missão AGI interna (memória/eval/segurança) | `./atena agi-uplift` |
 | `./atena agi-external-validation` | Validação AGI externa independente | `./atena agi-external-validation` |
 | `./atena digital-organism-audit` | Auditoria automática de maturidade como organismo digital | `./atena digital-organism-audit` |
-| `./atena digital-organism-live-cycle` | Aprende na internet, cria software, executa/testa, auto-recupera falhas e roda em daemon | `./atena digital-organism-live-cycle --topic "autonomous ai engineering" --iterations 3 --batches 2 --strict --recovery-attempts 2` |
+| `./atena digital-organism-live-cycle` | Aprende na internet, cria software, executa/testa, auto-recupera falhas e roda em daemon; use `--challenge-level agi-only` para tarefa extremamente difícil | `./atena digital-organism-live-cycle --challenge-level agi-only --iterations 3 --batches 2 --strict --recovery-attempts 2` |
 
 > CI evolução: o workflow `ATENA-EVO` agora inclui um *stagnation guard* que reduz ciclos e ativa `--checker` quando detecta plateau de mutações.
 
@@ -177,7 +178,15 @@ result = await run_mission(
 )
 ```
 
-#### 3. Validação de Código
+#### 3. Resolver problema complexo com subagente especialista
+
+```bash
+./atena production-center subagent-solve --problem "Invente um algoritmo que ordene números usando apenas operações de comparação, mas sem if/else ou operadores ternários; explorar truques com min/max e arrays"
+```
+
+Saída esperada (resumida): `status: ok`, `subagent: specialist-solver`, plano incremental, recomendações de rollout e `contract_valid: true`.
+
+#### 4. Validação de Código
 
 ```python
 from core.security_validator import validate_code_safe, SecurityLevel

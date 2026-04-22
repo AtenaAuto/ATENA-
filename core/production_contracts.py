@@ -30,6 +30,22 @@ REQUIRED_FIELDS: dict[str, set[str]] = {
     "security-check": {"status", "risk_score", "blocked", "reasons", "recommended_action"},
     "finops-route": {"status", "mode", "reason", "estimated_cost_units", "budget_ok"},
     "incident-commander": {"status", "scenario", "severity", "actions", "summary"},
+    "subagent-solve": {
+        "status",
+        "subagent",
+        "problem",
+        "plan",
+        "integration",
+        "result",
+        "recommendations",
+        "learning",
+        "inferred_language",
+        "diagnosis",
+        "bug_found",
+        "confidence",
+        "fix_suggestion",
+        "generated_at",
+    },
 }
 
 

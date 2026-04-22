@@ -6,6 +6,7 @@ from pathlib import Path
 
 from core.atena_digital_organism_live_cycle import (
     _pick_project_type,
+    _safe_project_name,
     run_live_cycle,
     run_live_cycles,
     run_live_daemon,
@@ -21,6 +22,13 @@ def test_pick_project_type_prefers_api_when_sources_strong():
         ],
     }
     assert _pick_project_type(payload) == "api"
+
+
+def test_safe_project_name_truncates_long_topics():
+    topic = "x" * 300
+    name = _safe_project_name(topic)
+    assert len(name) <= 90
+    assert name.count("-") >= 1
 
 
 def test_run_live_cycle_creates_memory_and_artifacts(monkeypatch, tmp_path: Path):

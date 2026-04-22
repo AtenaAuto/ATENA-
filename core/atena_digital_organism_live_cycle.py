@@ -22,6 +22,14 @@ def _slugify(text: str) -> str:
     return safe or "atena-project"
 
 
+def _safe_project_name(topic: str, max_slug_len: int = 80) -> str:
+    slug = _slugify(topic)
+    if len(slug) > max_slug_len:
+        slug = slug[:max_slug_len].rstrip("-")
+    ts = datetime.now(timezone.utc).strftime("%H%M%S")
+    return f"{slug}-{ts}"
+
+
 def _memory_success_bias(root: Path) -> dict[str, float]:
     memory_path = root / "atena_evolution" / "digital_organism_memory.jsonl"
     if not memory_path.exists():
@@ -172,7 +180,7 @@ def _build_and_validate(
     project_type: str,
     code_module: AtenaCodeModule,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    project_name = f"{_slugify(topic)}-{datetime.now(timezone.utc).strftime('%H%M%S')}"
+    project_name = _safe_project_name(topic)
     build = code_module.build(project_type=project_type, project_name=project_name)
     build_payload = {
         "ok": build.ok,

@@ -307,8 +307,11 @@ def run_user_internet_research(user_input: str) -> str:
     all_sources = payload.get("all_sources", [])
     topic_lower = topic.lower()
     is_sports_schedule = ("joga" in topic_lower) or ("jogo" in topic_lower and "que dia" in topic_lower)
-    stop_terms = {"que", "dia", "o", "a", "de", "do", "da", "na", "no", "joga", "jogo"}
-    topic_terms = [t for t in re.findall(r"[a-z0-9à-ú]+", topic_lower) if t not in stop_terms]
+    stop_terms = {
+        "que", "dia", "o", "a", "de", "do", "da", "na", "no", "joga", "jogo",
+        "pra", "para", "mim", "me", "por", "favor", "quando", "qual", "quais",
+    }
+    topic_terms = [t for t in re.findall(r"[a-z0-9à-ú]+", topic_lower) if t not in stop_terms and len(t) >= 3]
 
     if is_sports_schedule and isinstance(all_sources, list):
         for item in all_sources:
@@ -1699,6 +1702,11 @@ def main():
                 user_input = input().strip()
             else:
                 user_input = input(prompt).strip()
+
+            if user_input.startswith(".task "):
+                user_input = "/task " + user_input[len(".task "):]
+            elif user_input.startswith(".internet "):
+                user_input = "/internet " + user_input[len(".internet "):]
             
             if not user_input:
                 continue

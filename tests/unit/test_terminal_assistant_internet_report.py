@@ -112,3 +112,22 @@ def test_run_user_internet_research_sports_schedule_without_sports_source(monkey
     )
     report = ta.run_user_internet_research("pesquisa que dia o santos joga")
     assert "Não consegui confirmar a próxima partida" in report
+
+
+def test_run_user_internet_research_sports_schedule_ignores_filler_terms(monkeypatch):
+    monkeypatch.setattr(
+        ta,
+        "run_internet_challenge",
+        lambda topic: {
+            "all_sources": [
+                {
+                    "source": "thesportsdb",
+                    "ok": True,
+                    "details": {"events": [{"title": "Flamengo vs Vasco", "date": "2026-05-04"}]},
+                },
+            ]
+        },
+    )
+    report = ta.run_user_internet_research("pesquisa pra mim que dia o flamengo joga")
+    assert "Próximos jogos encontrados" in report
+    assert "2026-05-04: Flamengo vs Vasco" in report

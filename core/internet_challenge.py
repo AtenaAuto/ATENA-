@@ -118,8 +118,19 @@ def run_internet_challenge(topic: str) -> dict[str, object]:
         lower = text.lower()
         if "joga" not in lower:
             return ""
+        known_teams = (
+            "flamengo", "santos", "palmeiras", "corinthians", "sao paulo", "são paulo",
+            "vasco", "botafogo", "fluminense", "gremio", "grêmio", "internacional",
+            "atletico", "atlético", "cruzeiro", "bahia", "fortaleza",
+        )
+        for team in known_teams:
+            if team in lower:
+                return team
         raw = lower
-        for token in ("pesquisa", "pesquise", "que dia", "qual dia", "quando", "o", "a", "joga", "?"):
+        for token in (
+            "pesquisa", "pesquise", "que dia", "qual dia", "quando", "o", "a",
+            "joga", "?", "pra", "para", "mim", "me", "por favor",
+        ):
             raw = raw.replace(token, " ")
         cleaned = " ".join(part for part in raw.split() if part)
         return cleaned.strip()

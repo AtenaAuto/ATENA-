@@ -52,6 +52,7 @@ def test_run_user_internet_research_returns_complete_report(monkeypatch):
     assert "Evidências por fonte" in report
     assert "org/agent-framework" in report
     assert "Fontes com falha: crossref" in report
+    assert "Fonte:" not in report
 
 
 def test_run_user_internet_research_without_topic_guides_user():

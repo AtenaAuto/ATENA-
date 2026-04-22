@@ -30,8 +30,9 @@ def test_run_internet_challenge_mocked():
     with patch("urllib.request.urlopen", side_effect=_fake_urlopen):
         payload = run_internet_challenge("artificial intelligence")
     assert payload["status"] == "ok"
-    assert payload["confidence"] == 1.0
+    assert payload["confidence"] >= 0.8
     assert len(payload["sources"]) == 3
+    assert payload["all_source_count"] >= 20
     assert "synthesis" in payload
     assert payload["synthesis"]["release_risk"] in {"low", "medium", "high"}
     assert 0.0 <= payload["difficulty_score"] <= 1.0

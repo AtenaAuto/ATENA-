@@ -23,13 +23,25 @@ class SourceResult:
 SOURCE_WEIGHTS: dict[str, float] = {
     "wikipedia": 0.6,
     "github": 0.9,
+    "gitlab": 0.8,
     "hackernews": 0.5,
     "arxiv": 1.0,
     "crossref": 1.0,
     "openalex": 0.95,
+    "semantic_scholar": 0.95,
+    "openlibrary": 0.6,
+    "wikidata": 0.65,
+    "duckduckgo": 0.5,
     "stackoverflow": 0.7,
     "reddit": 0.45,
     "npm": 0.65,
+    "cratesio": 0.65,
+    "maven": 0.65,
+    "packagist": 0.6,
+    "pubmed": 0.95,
+    "clinicaltrials": 0.9,
+    "zenodo": 0.9,
+    "gutenberg": 0.55,
     "europepmc": 0.95,
 }
 
@@ -42,8 +54,23 @@ def _fetch_raw(url: str, timeout: int = 15) -> str:
     # Mantém chamada compatível com mocks que esperam URL textual (não Request object).
     for attempt in range(1, retries + 1):
         try:
-            with urllib.request.urlopen(url, timeout=timeout) as response:  # nosec - controlled URLs
-                return response.read().decode("utf-8", errors="ignore")
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": (
+                        "ATENA/1.0 (+https://github.com/AtenaAuto/ATENA-; "
+                        "compatible; research-bot)"
+                    ),
+                    "Accept": "application/json, text/plain, */*",
+                },
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as response:  # nosec - controlled URLs
+                    return response.read().decode("utf-8", errors="ignore")
+            except TypeError:
+                # Compatibilidade com mocks de teste que esperam URL textual.
+                with urllib.request.urlopen(url, timeout=timeout) as response:  # nosec - controlled URLs
+                    return response.read().decode("utf-8", errors="ignore")
         except Exception as exc:  # noqa: BLE001
             last_err = exc
             if attempt < retries:
@@ -83,11 +110,23 @@ def _estimate_source_quality(source: str, details: dict[str, object], ok: bool) 
 
 def run_internet_challenge(topic: str) -> dict[str, object]:
     query = urllib.parse.quote(topic.strip())
+    topic_raw = topic.strip()
     sources: list[SourceResult] = []
 
     # 1) Wikipedia summary
     try:
-        wiki = _fetch_json(f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}")
+        search = _fetch_json(
+            f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={query}&format=json&srlimit=1"
+        )
+        page_title = ""
+        results = search.get("query", {}).get("search", [])
+        if isinstance(results, list) and results:
+            page_title = str(results[0].get("title", "")).strip()
+        if not page_title:
+            page_title = topic_raw
+        wiki = _fetch_json(
+            f"https://en.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(page_title)}"
+        )
         sources.append(
             SourceResult(
                 source="wikipedia",
@@ -117,7 +156,19 @@ def run_internet_challenge(topic: str) -> dict[str, object]:
     except Exception as exc:  # noqa: BLE001
         sources.append(SourceResult(source="github", ok=False, details={"error": str(exc)}))
 
-    # 3) Hacker News relevance via Algolia API
+    # 3) GitLab repositories relevance
+    try:
+        gitlab = _fetch_json(
+            f"https://gitlab.com/api/v4/projects?search={query}&simple=true&order_by=star_count&sort=desc&per_page=3"
+        )
+        repos = []
+        if isinstance(gitlab, list):
+            repos = [{"full_name": item.get("path_with_namespace")} for item in gitlab[:3]]
+        sources.append(SourceResult(source="gitlab", ok=True, details={"top_repos": repos}))
+    except Exception as exc:  # noqa: BLE001
+        sources.append(SourceResult(source="gitlab", ok=False, details={"error": str(exc)}))
+
+    # 4) Hacker News relevance via Algolia API
     try:
         hn = _fetch_json(f"https://hn.algolia.com/api/v1/search?query={query}&tags=story&hitsPerPage=3")
         hits = [
@@ -131,7 +182,7 @@ def run_internet_challenge(topic: str) -> dict[str, object]:
     except Exception as exc:  # noqa: BLE001
         sources.append(SourceResult(source="hackernews", ok=False, details={"error": str(exc)}))
 
-    # 4) arXiv papers
+    # 5) arXiv papers
     try:
         raw = _fetch_text(
             f"https://export.arxiv.org/api/query?search_query=all:{query}&start=0&max_results=3"
@@ -152,7 +203,7 @@ def run_internet_challenge(topic: str) -> dict[str, object]:
     except Exception as exc:  # noqa: BLE001
         sources.append(SourceResult(source="arxiv", ok=False, details={"error": str(exc)}))
 
-    # 5) Crossref works
+    # 6) Crossref works
     try:
         crossref = _fetch_json(
             f"https://api.crossref.org/works?query={query}&rows=3&select=title,DOI,is-referenced-by-count"
@@ -173,7 +224,7 @@ def run_internet_challenge(topic: str) -> dict[str, object]:
     except Exception as exc:  # noqa: BLE001
         sources.append(SourceResult(source="crossref", ok=False, details={"error": str(exc)}))
 
-    # 6) OpenAlex works
+    # 7) OpenAlex works
     try:
         openalex = _fetch_json(
             f"https://api.openalex.org/works?search={query}&per-page=3&select=display_name,cited_by_count"
@@ -189,7 +240,52 @@ def run_internet_challenge(topic: str) -> dict[str, object]:
     except Exception as exc:  # noqa: BLE001
         sources.append(SourceResult(source="openalex", ok=False, details={"error": str(exc)}))
 
-    # 7) StackExchange Q&A signals
+    # 8) Semantic Scholar works
+    try:
+        s2 = _fetch_json(
+            f"https://api.semanticscholar.org/graph/v1/paper/search?query={query}&limit=3&fields=title,citationCount"
+        )
+        papers = [
+            {"title": p.get("title"), "citations": p.get("citationCount")}
+            for p in s2.get("data", [])[:3]
+        ]
+        sources.append(SourceResult(source="semantic_scholar", ok=True, details={"papers": papers}))
+    except Exception as exc:  # noqa: BLE001
+        sources.append(SourceResult(source="semantic_scholar", ok=False, details={"error": str(exc)}))
+
+    # 9) OpenLibrary books
+    try:
+        books = _fetch_json(f"https://openlibrary.org/search.json?q={query}&limit=3")
+        docs = [
+            {"title": item.get("title"), "year": item.get("first_publish_year")}
+            for item in books.get("docs", [])[:3]
+        ]
+        sources.append(SourceResult(source="openlibrary", ok=True, details={"works": docs}))
+    except Exception as exc:  # noqa: BLE001
+        sources.append(SourceResult(source="openlibrary", ok=False, details={"error": str(exc)}))
+
+    # 10) Wikidata entities
+    try:
+        wikidata = _fetch_json(
+            f"https://www.wikidata.org/w/api.php?action=wbsearchentities&search={query}&language=en&format=json&limit=3"
+        )
+        entities = [{"title": item.get("label")} for item in wikidata.get("search", [])[:3]]
+        sources.append(SourceResult(source="wikidata", ok=True, details={"works": entities}))
+    except Exception as exc:  # noqa: BLE001
+        sources.append(SourceResult(source="wikidata", ok=False, details={"error": str(exc)}))
+
+    # 11) DuckDuckGo instant answer
+    try:
+        ddg = _fetch_json(f"https://api.duckduckgo.com/?q={query}&format=json&no_html=1&skip_disambig=1")
+        abstract = str(ddg.get("AbstractText", "")).strip()
+        heading = str(ddg.get("Heading", "")).strip()
+        sources.append(
+            SourceResult(source="duckduckgo", ok=True, details={"title": heading, "extract": abstract[:280]})
+        )
+    except Exception as exc:  # noqa: BLE001
+        sources.append(SourceResult(source="duckduckgo", ok=False, details={"error": str(exc)}))
+
+    # 12) StackExchange Q&A signals
     try:
         stack = _fetch_json(
             "https://api.stackexchange.com/2.3/search/advanced"
@@ -206,7 +302,7 @@ def run_internet_challenge(topic: str) -> dict[str, object]:
     except Exception as exc:  # noqa: BLE001
         sources.append(SourceResult(source="stackoverflow", ok=False, details={"error": str(exc)}))
 
-    # 8) Reddit community trends
+    # 13) Reddit community trends
     try:
         reddit = _fetch_json(f"https://www.reddit.com/search.json?q={query}&limit=3&sort=relevance")
         posts = [
@@ -220,7 +316,7 @@ def run_internet_challenge(topic: str) -> dict[str, object]:
     except Exception as exc:  # noqa: BLE001
         sources.append(SourceResult(source="reddit", ok=False, details={"error": str(exc)}))
 
-    # 9) npm package ecosystem
+    # 14) npm package ecosystem
     try:
         npm = _fetch_json(f"https://registry.npmjs.org/-/v1/search?text={query}&size=3")
         packages = [
@@ -234,7 +330,81 @@ def run_internet_challenge(topic: str) -> dict[str, object]:
     except Exception as exc:  # noqa: BLE001
         sources.append(SourceResult(source="npm", ok=False, details={"error": str(exc)}))
 
-    # 10) Europe PMC biomedical/research signals
+    # 15) crates.io ecosystem
+    try:
+        crates = _fetch_json(f"https://crates.io/api/v1/crates?page=1&per_page=3&q={query}")
+        items = [{"name": c.get("id"), "version": c.get("max_version")} for c in crates.get("crates", [])[:3]]
+        sources.append(SourceResult(source="cratesio", ok=True, details={"packages": items}))
+    except Exception as exc:  # noqa: BLE001
+        sources.append(SourceResult(source="cratesio", ok=False, details={"error": str(exc)}))
+
+    # 16) Maven Central
+    try:
+        maven = _fetch_json(
+            f"https://search.maven.org/solrsearch/select?q={query}&rows=3&wt=json"
+        )
+        docs = []
+        for item in maven.get("response", {}).get("docs", [])[:3]:
+            docs.append({"name": item.get("id"), "version": item.get("latestVersion")})
+        sources.append(SourceResult(source="maven", ok=True, details={"packages": docs}))
+    except Exception as exc:  # noqa: BLE001
+        sources.append(SourceResult(source="maven", ok=False, details={"error": str(exc)}))
+
+    # 17) Packagist
+    try:
+        packagist = _fetch_json(f"https://packagist.org/search.json?q={query}&per_page=3")
+        packages = [{"name": p.get("name")} for p in packagist.get("results", [])[:3]]
+        sources.append(SourceResult(source="packagist", ok=True, details={"packages": packages}))
+    except Exception as exc:  # noqa: BLE001
+        sources.append(SourceResult(source="packagist", ok=False, details={"error": str(exc)}))
+
+    # 18) PubMed (NCBI)
+    try:
+        pubmed = _fetch_json(
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+            f"?db=pubmed&retmode=json&retmax=3&term={query}"
+        )
+        ids = pubmed.get("esearchresult", {}).get("idlist", [])[:3]
+        papers = [{"title": f"PubMed ID {pid}"} for pid in ids]
+        sources.append(SourceResult(source="pubmed", ok=True, details={"papers": papers}))
+    except Exception as exc:  # noqa: BLE001
+        sources.append(SourceResult(source="pubmed", ok=False, details={"error": str(exc)}))
+
+    # 19) ClinicalTrials.gov
+    try:
+        ctf = _fetch_json(
+            f"https://clinicaltrials.gov/api/v2/studies?query.term={query}&pageSize=3"
+        )
+        studies = []
+        for row in ctf.get("studies", [])[:3]:
+            title = (
+                row.get("protocolSection", {})
+                .get("identificationModule", {})
+                .get("briefTitle")
+            )
+            studies.append({"title": title})
+        sources.append(SourceResult(source="clinicaltrials", ok=True, details={"papers": studies}))
+    except Exception as exc:  # noqa: BLE001
+        sources.append(SourceResult(source="clinicaltrials", ok=False, details={"error": str(exc)}))
+
+    # 20) Zenodo
+    try:
+        zenodo = _fetch_json(f"https://zenodo.org/api/records?q={query}&size=3")
+        hits = zenodo.get("hits", {}).get("hits", [])[:3]
+        records = [{"title": h.get("metadata", {}).get("title")} for h in hits]
+        sources.append(SourceResult(source="zenodo", ok=True, details={"papers": records}))
+    except Exception as exc:  # noqa: BLE001
+        sources.append(SourceResult(source="zenodo", ok=False, details={"error": str(exc)}))
+
+    # 21) Gutenberg books
+    try:
+        gutenberg = _fetch_json(f"https://gutendex.com/books?search={query}&page=1")
+        books = [{"title": b.get("title")} for b in gutenberg.get("results", [])[:3]]
+        sources.append(SourceResult(source="gutenberg", ok=True, details={"works": books}))
+    except Exception as exc:  # noqa: BLE001
+        sources.append(SourceResult(source="gutenberg", ok=False, details={"error": str(exc)}))
+
+    # 22) Europe PMC biomedical/research signals
     try:
         epmc = _fetch_json(
             f"https://www.ebi.ac.uk/europepmc/webservices/rest/search?query={query}&format=json&pageSize=3"

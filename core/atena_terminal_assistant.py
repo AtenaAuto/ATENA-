@@ -321,7 +321,6 @@ def run_user_internet_research(user_input: str) -> str:
             details = item.get("details", {})
             snippet = _summarize_source_detail(details if isinstance(details, dict) else {})
             icon = "✅" if ok else "❌"
-            link = _source_link(source_name, topic)
             if ok:
                 ok_count += 1
                 if quality >= 0.7:
@@ -332,8 +331,7 @@ def run_user_internet_research(user_input: str) -> str:
             else:
                 failed_sources.append(source_name)
             rows.append(
-                f"- {icon} **{source_name}** (quality={quality:.2f}): {snippet}\n"
-                f"  Fonte: {link}"
+                f"- {icon} **{source_name}** (quality={quality:.2f}): {snippet}"
             )
 
     synthesis = payload.get("synthesis", {})

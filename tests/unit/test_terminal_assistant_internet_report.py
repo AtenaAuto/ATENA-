@@ -47,11 +47,9 @@ def test_run_user_internet_research_returns_complete_report(monkeypatch):
 
     report = ta.run_user_internet_research("pesquise na internet sobre ai agents")
 
-    assert "Relatório completo de pesquisa na internet" in report
-    assert "Achados principais" in report
-    assert "Evidências por fonte" in report
+    assert "Resultado da pesquisa" in report
     assert "org/agent-framework" in report
-    assert "Fontes com falha: crossref" in report
+    assert "crossref" not in report
     assert "Fonte:" not in report
 
 

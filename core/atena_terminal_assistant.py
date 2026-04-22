@@ -299,72 +299,28 @@ def run_user_internet_research(user_input: str) -> str:
     if not topic:
         return (
             "## Pesquisa na internet\n\n"
-            "Use `/internet <tema>` para eu pesquisar em múltiplas fontes e entregar um relatório completo.\n"
+            "Use `/internet <tema>` para eu pesquisar e mostrar só o resultado final.\n"
             "Exemplo: `/internet ai agent safety evaluation benchmarks 2026`."
         )
     payload = run_internet_challenge(topic)
-    status = str(payload.get("status", "unknown")).upper()
-    weighted_conf = float(payload.get("weighted_confidence", 0.0))
     all_sources = payload.get("all_sources", [])
-    rows = []
     all_findings: list[str] = []
-    ok_count = 0
-    high_quality_count = 0
-    failed_sources: list[str] = []
     if isinstance(all_sources, list):
         for item in all_sources:
             if not isinstance(item, dict):
                 continue
             source_name = str(item.get("source", "unknown"))
             ok = bool(item.get("ok"))
-            quality = float(item.get("quality_score", 0.0))
             details = item.get("details", {})
-            snippet = _summarize_source_detail(details if isinstance(details, dict) else {})
-            icon = "✅" if ok else "❌"
             if ok:
-                ok_count += 1
-                if quality >= 0.7:
-                    high_quality_count += 1
                 findings = _build_source_findings(details if isinstance(details, dict) else {})
                 for finding in findings:
                     all_findings.append(f"- **{source_name}**: {finding[:240]}")
-            else:
-                failed_sources.append(source_name)
-            rows.append(
-                f"- {icon} **{source_name}** (quality={quality:.2f}): {snippet}"
-            )
-
-    synthesis = payload.get("synthesis", {})
-    coverage = ""
-    next_action = ""
-    if isinstance(synthesis, dict):
-        coverage = str(synthesis.get("coverage_summary", ""))
-        next_action = str(synthesis.get("next_action", ""))
-
-    recommendation = str(payload.get("recommendation", "n/d"))
-    risk = str(synthesis.get("release_risk", "n/d")) if isinstance(synthesis, dict) else "n/d"
-    body = "\n".join(rows) if rows else "- Nenhuma fonte retornou resultados utilizáveis."
-    key_findings = (
-        "\n".join(all_findings[:8])
-        if all_findings
-        else "- Não foi possível extrair achados de fontes bem-sucedidas."
-    )
-    failures = ", ".join(failed_sources) if failed_sources else "nenhuma"
+    key_findings = "\n".join(all_findings[:8]) if all_findings else "- Não encontrei resultados úteis para esse tema."
     return (
-        f"## Relatório completo de pesquisa na internet\n\n"
-        f"**Tema pesquisado:** {topic}\n"
-        f"**Status:** {status}\n"
-        f"**Confiança ponderada:** {weighted_conf:.2f}\n"
-        f"**Cobertura:** {ok_count}/{len(all_sources) if isinstance(all_sources, list) else 0} fontes bem-sucedidas\n"
-        f"**Fontes de alta qualidade:** {high_quality_count}\n"
-        f"**Risco de confiabilidade:** {risk}\n\n"
-        f"### Achados principais\n{key_findings}\n\n"
-        f"### Evidências por fonte\n{body}\n\n"
-        f"### Diagnóstico e próximos passos\n"
-        f"- Resumo de cobertura: {coverage or 'n/d'}\n"
-        f"- Fontes com falha: {failures}\n"
-        f"- Recomendação: {recommendation}\n"
-        f"- Próxima ação sugerida: {next_action or 'n/d'}"
+        f"## Resultado da pesquisa\n\n"
+        f"**Tema:** {topic}\n\n"
+        f"{key_findings}"
     )
 
 

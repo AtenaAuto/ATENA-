@@ -160,8 +160,24 @@ INTERNET_REQUEST_PATTERNS = (
     r"\bna internet\b",
     r"\bprocure\b.*\binternet\b",
     r"\bbusque\b.*\binternet\b",
+    r"\bache\b.*\binternet\b",
+    r"\bencontre\b.*\binternet\b",
     r"\bsearch\b.*\bweb\b",
     r"\bweb search\b",
+    r"\brelat[oó]rio\b.*\binternet\b",
+)
+
+WEB_FACT_QUESTION_PATTERNS = (
+    r"^(quem|qual|quais|o que|oque|quando|onde|como)\b",
+    r"^(what|who|when|where|which|how)\b",
+)
+
+WEB_FACT_SIGNAL_PATTERNS = (
+    r"\b(hoje|atual|atualmente|agora|recente|últim|ultimo|latest|today|recent)\b",
+    r"\b(preço|preco|cotação|cotacao|valor|dólar|dolar|bitcoin|btc|eth)\b",
+    r"\b(oscar|grammy|nba|nfl|eleiç|election|presidente|ceo|lançamento|release)\b",
+    r"\b(202[0-9]|19[0-9]{2})\b",
+    r"\?$",
 )
 
 
@@ -171,18 +187,37 @@ def _is_internet_request(user_input: str) -> bool:
         return False
     if text.startswith("/internet "):
         return True
+    if text.startswith("/internet"):
+        return True
     return any(re.search(pattern, text) for pattern in INTERNET_REQUEST_PATTERNS)
+
+
+def _is_web_fact_question(user_input: str) -> bool:
+    text = (user_input or "").strip().lower()
+    if not text:
+        return False
+    if text.startswith("/"):
+        return False
+    starts_like_question = any(re.search(pattern, text) for pattern in WEB_FACT_QUESTION_PATTERNS)
+    has_web_signal = any(re.search(pattern, text) for pattern in WEB_FACT_SIGNAL_PATTERNS)
+    return starts_like_question and has_web_signal
 
 
 def _extract_internet_topic(user_input: str) -> str:
     text = (user_input or "").strip()
+    if text.lower() == "/internet":
+        return ""
     if text.lower().startswith("/internet "):
         return text[len("/internet "):].strip()
 
     cleaned = re.sub(r"(?i)\bpesquis[ae]\b", "", text)
     cleaned = re.sub(r"(?i)\b(procure|busque)\b", "", cleaned)
+    cleaned = re.sub(r"(?i)\b(entregue|gere|monte|fa[çc]a)\b", "", cleaned)
+    cleaned = re.sub(r"(?i)\b(me|um|uma|o|a|e|and)\b", "", cleaned)
     cleaned = re.sub(r"(?i)\b(na|no)\s+internet\b", "", cleaned)
     cleaned = re.sub(r"(?i)\binternet\b", "", cleaned)
+    cleaned = re.sub(r"(?i)\b(relat[oó]rio|completo|final|atualizado|sobre|da|do|de)\b", "", cleaned)
+    cleaned = re.sub(r"(?i)\s{2,}", " ", cleaned)
     cleaned = re.sub(r"(?i)^[:\-\s]+", "", cleaned).strip()
     return cleaned if cleaned else text
 
@@ -232,15 +267,52 @@ def _summarize_source_detail(details: dict[str, object]) -> str:
     return str(err)[:220] if err else "sem detalhes relevantes."
 
 
+def _build_source_findings(details: dict[str, object], limit: int = 3) -> list[str]:
+    findings: list[str] = []
+    if not isinstance(details, dict):
+        return findings
+    for key in ("extract", "title"):
+        value = details.get(key)
+        if isinstance(value, str) and value.strip():
+            findings.append(value.strip())
+            return findings[:limit]
+    for key in ("top_repos", "hits", "papers", "works", "questions", "posts", "packages"):
+        items = details.get(key)
+        if not isinstance(items, list):
+            continue
+        for item in items[:limit]:
+            if not isinstance(item, dict):
+                continue
+            candidate = (
+                item.get("title")
+                or item.get("full_name")
+                or item.get("name")
+                or item.get("display_name")
+            )
+            if isinstance(candidate, str) and candidate.strip():
+                findings.append(candidate.strip())
+    return findings[:limit]
+
+
 def run_user_internet_research(user_input: str) -> str:
     topic = _extract_internet_topic(user_input)
+    if not topic:
+        return (
+            "## Pesquisa na internet\n\n"
+            "Use `/internet <tema>` para eu pesquisar em múltiplas fontes e entregar um relatório completo.\n"
+            "Exemplo: `/internet ai agent safety evaluation benchmarks 2026`."
+        )
     payload = run_internet_challenge(topic)
     status = str(payload.get("status", "unknown")).upper()
     weighted_conf = float(payload.get("weighted_confidence", 0.0))
     all_sources = payload.get("all_sources", [])
     rows = []
+    all_findings: list[str] = []
+    ok_count = 0
+    high_quality_count = 0
+    failed_sources: list[str] = []
     if isinstance(all_sources, list):
-        for item in all_sources[:6]:
+        for item in all_sources:
             if not isinstance(item, dict):
                 continue
             source_name = str(item.get("source", "unknown"))
@@ -250,6 +322,15 @@ def run_user_internet_research(user_input: str) -> str:
             snippet = _summarize_source_detail(details if isinstance(details, dict) else {})
             icon = "✅" if ok else "❌"
             link = _source_link(source_name, topic)
+            if ok:
+                ok_count += 1
+                if quality >= 0.7:
+                    high_quality_count += 1
+                findings = _build_source_findings(details if isinstance(details, dict) else {})
+                for finding in findings:
+                    all_findings.append(f"- **{source_name}**: {finding[:240]}")
+            else:
+                failed_sources.append(source_name)
             rows.append(
                 f"- {icon} **{source_name}** (quality={quality:.2f}): {snippet}\n"
                 f"  Fonte: {link}"
@@ -262,13 +343,30 @@ def run_user_internet_research(user_input: str) -> str:
         coverage = str(synthesis.get("coverage_summary", ""))
         next_action = str(synthesis.get("next_action", ""))
 
+    recommendation = str(payload.get("recommendation", "n/d"))
+    risk = str(synthesis.get("release_risk", "n/d")) if isinstance(synthesis, dict) else "n/d"
     body = "\n".join(rows) if rows else "- Nenhuma fonte retornou resultados utilizáveis."
+    key_findings = (
+        "\n".join(all_findings[:8])
+        if all_findings
+        else "- Não foi possível extrair achados de fontes bem-sucedidas."
+    )
+    failures = ", ".join(failed_sources) if failed_sources else "nenhuma"
     return (
-        f"## Pesquisa na internet: {topic}\n\n"
-        f"Status: **{status}** | Confiança ponderada: **{weighted_conf:.2f}**\n\n"
-        f"{body}\n\n"
-        f"Resumo de cobertura: {coverage or 'n/d'}\n"
-        f"Próxima ação sugerida: {next_action or 'n/d'}"
+        f"## Relatório completo de pesquisa na internet\n\n"
+        f"**Tema pesquisado:** {topic}\n"
+        f"**Status:** {status}\n"
+        f"**Confiança ponderada:** {weighted_conf:.2f}\n"
+        f"**Cobertura:** {ok_count}/{len(all_sources) if isinstance(all_sources, list) else 0} fontes bem-sucedidas\n"
+        f"**Fontes de alta qualidade:** {high_quality_count}\n"
+        f"**Risco de confiabilidade:** {risk}\n\n"
+        f"### Achados principais\n{key_findings}\n\n"
+        f"### Evidências por fonte\n{body}\n\n"
+        f"### Diagnóstico e próximos passos\n"
+        f"- Resumo de cobertura: {coverage or 'n/d'}\n"
+        f"- Fontes com falha: {failures}\n"
+        f"- Recomendação: {recommendation}\n"
+        f"- Próxima ação sugerida: {next_action or 'n/d'}"
     )
 
 
@@ -624,7 +722,7 @@ def print_help():
         table.add_column("Descrição", style="white")
         
         commands = [
-            ("/task <msg>", "Executa uma tarefa ou responde uma pergunta"),
+            ("/task <msg>", "Executa tarefa; perguntas factuais disparam relatório de internet automaticamente"),
             ("/internet <tema>", "Pesquisa tema na internet em múltiplas fontes com links"),
             ("/task-exec <objetivo>", "Planeja e executa comandos seguros com relatório"),
             ("/self-test [quick]", "Executa validações automáticas da ATENA e gera relatório"),
@@ -1812,7 +1910,7 @@ def main():
             # Processamento de Tarefas (Task)
             if user_input.startswith("/task "):
                 task_msg = user_input[6:].strip()
-                if _is_internet_request(task_msg):
+                if _is_internet_request(task_msg) or _is_web_fact_question(task_msg):
                     with atena_thinking("Pesquisando na internet..."):
                         answer = run_user_internet_research(task_msg)
                     if HAS_RICH:
@@ -1843,7 +1941,7 @@ def main():
 
             # Comando padrão (se não começar com / assume-se /task)
             if not user_input.startswith("/"):
-                if _is_internet_request(user_input):
+                if _is_internet_request(user_input) or _is_web_fact_question(user_input):
                     with atena_thinking("Pesquisando na internet..."):
                         answer = run_user_internet_research(user_input)
                     if HAS_RICH:

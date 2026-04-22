@@ -60,3 +60,55 @@ def test_run_user_internet_research_returns_complete_report(monkeypatch):
 def test_run_user_internet_research_without_topic_guides_user():
     report = ta.run_user_internet_research("/internet")
     assert "Use `/internet <tema>`" in report
+
+
+def test_run_user_internet_research_prioritizes_sports_schedule(monkeypatch):
+    monkeypatch.setattr(
+        ta,
+        "run_internet_challenge",
+        lambda topic: {
+            "all_sources": [
+                {
+                    "source": "thesportsdb",
+                    "ok": True,
+                    "details": {
+                        "events": [
+                            {"title": "Santos vs Palmeiras", "date": "2026-04-25"},
+                            {"title": "Corinthians vs Santos", "date": "2026-05-02"},
+                        ]
+                    },
+                },
+            ]
+        },
+    )
+    report = ta.run_user_internet_research("pesquisa que dia o santos joga")
+    assert "Próximos jogos encontrados" in report
+    assert "2026-04-25: Santos vs Palmeiras" in report
+
+
+def test_run_user_internet_research_sports_schedule_without_relevant_match(monkeypatch):
+    monkeypatch.setattr(
+        ta,
+        "run_internet_challenge",
+        lambda topic: {
+            "all_sources": [
+                {
+                    "source": "thesportsdb",
+                    "ok": True,
+                    "details": {"events": [{"title": "Time X vs Time Y", "date": "2026-04-25"}]},
+                },
+            ]
+        },
+    )
+    report = ta.run_user_internet_research("pesquisa que dia o santos joga")
+    assert "Não encontrei um calendário confiável" in report
+
+
+def test_run_user_internet_research_sports_schedule_without_sports_source(monkeypatch):
+    monkeypatch.setattr(
+        ta,
+        "run_internet_challenge",
+        lambda topic: {"all_sources": [{"source": "wikipedia", "ok": True, "details": {"title": "Santos"}}]},
+    )
+    report = ta.run_user_internet_research("pesquisa que dia o santos joga")
+    assert "Não consegui confirmar a próxima partida" in report

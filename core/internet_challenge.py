@@ -43,6 +43,7 @@ SOURCE_WEIGHTS: dict[str, float] = {
     "zenodo": 0.9,
     "gutenberg": 0.55,
     "europepmc": 0.95,
+    "thesportsdb": 0.9,
 }
 
 
@@ -93,7 +94,7 @@ def _estimate_source_quality(source: str, details: dict[str, object], ok: bool) 
     weight = SOURCE_WEIGHTS.get(source, 0.5)
     signals = 0.0
 
-    for key in ("top_repos", "hits", "papers", "works", "questions", "posts", "packages"):
+    for key in ("top_repos", "hits", "papers", "works", "questions", "posts", "packages", "events"):
         value = details.get(key)
         if isinstance(value, list):
             signals += min(len(value), 3) / 3
@@ -112,6 +113,16 @@ def run_internet_challenge(topic: str) -> dict[str, object]:
     query = urllib.parse.quote(topic.strip())
     topic_raw = topic.strip()
     sources: list[SourceResult] = []
+
+    def _extract_team_name_for_schedule(text: str) -> str:
+        lower = text.lower()
+        if "joga" not in lower:
+            return ""
+        raw = lower
+        for token in ("pesquisa", "pesquise", "que dia", "qual dia", "quando", "o", "a", "joga", "?"):
+            raw = raw.replace(token, " ")
+        cleaned = " ".join(part for part in raw.split() if part)
+        return cleaned.strip()
 
     # 1) Wikipedia summary
     try:
@@ -419,6 +430,36 @@ def run_internet_challenge(topic: str) -> dict[str, object]:
         sources.append(SourceResult(source="europepmc", ok=True, details={"papers": papers}))
     except Exception as exc:  # noqa: BLE001
         sources.append(SourceResult(source="europepmc", ok=False, details={"error": str(exc)}))
+
+    # 23) TheSportsDB - próximo jogo (intenção esportiva)
+    team_name = _extract_team_name_for_schedule(topic_raw)
+    if team_name:
+        try:
+            team_search = _fetch_json(
+                f"https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t={urllib.parse.quote(team_name)}"
+            )
+            teams = team_search.get("teams") if isinstance(team_search, dict) else None
+            team_id = ""
+            if isinstance(teams, list) and teams:
+                team_id = str(teams[0].get("idTeam", "")).strip()
+            events = []
+            if team_id:
+                next_events = _fetch_json(
+                    f"https://www.thesportsdb.com/api/v1/json/3/eventsnext.php?id={urllib.parse.quote(team_id)}"
+                )
+                raw_events = next_events.get("events", []) if isinstance(next_events, dict) else []
+                for evt in raw_events[:3]:
+                    if not isinstance(evt, dict):
+                        continue
+                    events.append(
+                        {
+                            "title": f"{evt.get('strEvent', '')}".strip(),
+                            "date": evt.get("dateEvent"),
+                        }
+                    )
+            sources.append(SourceResult(source="thesportsdb", ok=bool(events), details={"events": events}))
+        except Exception as exc:  # noqa: BLE001
+            sources.append(SourceResult(source="thesportsdb", ok=False, details={"error": str(exc)}))
 
     successful = [s for s in sources if s.ok]
     confidence = round(len(successful) / len(sources), 2) if sources else 0.0

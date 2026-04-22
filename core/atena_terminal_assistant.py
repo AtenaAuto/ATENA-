@@ -256,7 +256,7 @@ def _summarize_source_detail(details: dict[str, object]) -> str:
         value = details.get(key)
         if isinstance(value, str) and value.strip():
             return value.strip()[:220]
-    for key in ("top_repos", "hits", "papers", "works", "questions", "posts", "packages"):
+    for key in ("top_repos", "hits", "papers", "works", "questions", "posts", "packages", "events"):
         value = details.get(key)
         if isinstance(value, list) and value:
             first = value[0]
@@ -277,7 +277,7 @@ def _build_source_findings(details: dict[str, object], limit: int = 3) -> list[s
         if isinstance(value, str) and value.strip():
             findings.append(value.strip())
             return findings[:limit]
-    for key in ("top_repos", "hits", "papers", "works", "questions", "posts", "packages"):
+    for key in ("top_repos", "hits", "papers", "works", "questions", "posts", "packages", "events"):
         items = details.get(key)
         if not isinstance(items, list):
             continue
@@ -305,7 +305,52 @@ def run_user_internet_research(user_input: str) -> str:
         )
     payload = run_internet_challenge(topic)
     all_sources = payload.get("all_sources", [])
+    topic_lower = topic.lower()
+    is_sports_schedule = ("joga" in topic_lower) or ("jogo" in topic_lower and "que dia" in topic_lower)
+    stop_terms = {"que", "dia", "o", "a", "de", "do", "da", "na", "no", "joga", "jogo"}
+    topic_terms = [t for t in re.findall(r"[a-z0-9à-ú]+", topic_lower) if t not in stop_terms]
+
+    if is_sports_schedule and isinstance(all_sources, list):
+        for item in all_sources:
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("source", "")).lower() != "thesportsdb" or not bool(item.get("ok")):
+                continue
+            details = item.get("details", {})
+            events = details.get("events", []) if isinstance(details, dict) else []
+            if isinstance(events, list) and events:
+                event_lines: list[str] = []
+                for evt in events[:3]:
+                    if not isinstance(evt, dict):
+                        continue
+                    title = str(evt.get("title", "")).strip()
+                    date = str(evt.get("date", "")).strip()
+                    title_lower = title.lower()
+                    is_relevant = any(term in title_lower for term in topic_terms) if topic_terms else True
+                    if title and date and is_relevant:
+                        event_lines.append(f"- {date}: {title}")
+                if event_lines:
+                    return (
+                        "## Resultado da pesquisa\n\n"
+                        f"**Tema:** {topic}\n\n"
+                        "Próximos jogos encontrados:\n"
+                        f"{chr(10).join(event_lines)}"
+                    )
+                return (
+                    "## Resultado da pesquisa\n\n"
+                    f"**Tema:** {topic}\n\n"
+                    "Não encontrei um calendário confiável com esse termo. "
+                    "Tente informar o nome completo do time (ex.: `Santos Futebol Clube`)."
+                )
+        return (
+            "## Resultado da pesquisa\n\n"
+            f"**Tema:** {topic}\n\n"
+            "Não consegui confirmar a próxima partida com confiança nas fontes esportivas. "
+            "Tente usar o nome completo do clube e a competição (ex.: `Santos Futebol Clube Série B próximo jogo`)."
+        )
+
     all_findings: list[str] = []
+    fallback_findings: list[str] = []
     if isinstance(all_sources, list):
         for item in all_sources:
             if not isinstance(item, dict):
@@ -316,8 +361,13 @@ def run_user_internet_research(user_input: str) -> str:
             if ok:
                 findings = _build_source_findings(details if isinstance(details, dict) else {})
                 for finding in findings:
-                    all_findings.append(f"- **{source_name}**: {finding[:240]}")
-    key_findings = "\n".join(all_findings[:8]) if all_findings else "- Não encontrei resultados úteis para esse tema."
+                    fallback_findings.append(f"- **{source_name}**: {finding[:240]}")
+                    finding_lower = finding.lower()
+                    is_relevant = any(term in finding_lower for term in topic_terms) if topic_terms else True
+                    if is_relevant:
+                        all_findings.append(f"- **{source_name}**: {finding[:240]}")
+    final_findings = all_findings if all_findings else fallback_findings
+    key_findings = "\n".join(final_findings[:8]) if final_findings else "- Não encontrei resultados úteis para esse tema."
     return (
         f"## Resultado da pesquisa\n\n"
         f"**Tema:** {topic}\n\n"

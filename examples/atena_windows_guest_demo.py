@@ -578,6 +578,27 @@ class AtenaWindowsDesktopShell:
             self.kernel.log.append(f"Stress -> progs={len(progs)} duration={duration} runs={runs}")
             return {"ok": True, "programs": progs, "runs": runs}
 
+        if parts[0] == "web-publish":
+            provider = "cloudflare"
+            port = 8765
+            if "--provider" in parts:
+                provider = parts[parts.index("--provider") + 1]
+            if "--port" in parts:
+                port = int(parts[parts.index("--port") + 1])
+            page = create_xterm_web_page(ws_url=f"ws://127.0.0.1:{port}/ws")
+            if provider == "ngrok":
+                tunnel_cmd = f"ngrok http {port}"
+            else:
+                tunnel_cmd = f"cloudflared tunnel --url http://127.0.0.1:{port}"
+            self.kernel.log.append(f"WebPublish -> provider={provider} port={port}")
+            return {
+                "ok": True,
+                "provider": provider,
+                "port": port,
+                "page": page,
+                "tunnel_command": tunnel_cmd,
+            }
+
         return {"ok": False, "error": f"unknown command: {cmd}"}
 
     def complete(self, prefix: str) -> list[str]:
@@ -597,6 +618,7 @@ class AtenaWindowsDesktopShell:
             "export",
             "snapshot",
             "stress",
+            "web-publish",
         ]
         return sorted([c for c in commands if c.startswith(prefix)])
 
@@ -604,6 +626,38 @@ class AtenaWindowsDesktopShell:
 def shell_execute_bridge(shell: AtenaWindowsDesktopShell, cmd: str) -> dict[str, Any]:
     """Ponto de integração ATENA real -> shell da VM."""
     return shell.execute(cmd)
+
+
+def create_xterm_web_page(output_dir: str = "/tmp/atena_windows_web", ws_url: str = "ws://127.0.0.1:8765/ws") -> dict[str, str]:
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    index = out / "index.html"
+    index.write_text(
+        f"""<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>ATENA-Windows Web Terminal</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css"/>
+    <style>html,body,#terminal{{height:100%;margin:0;background:#111;color:#eee}}</style>
+  </head>
+  <body>
+    <div id="terminal"></div>
+    <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+    <script>
+      const term = new Terminal({{cursorBlink:true}});
+      term.open(document.getElementById('terminal'));
+      term.writeln('ATENA-Windows Web Terminal');
+      const ws = new WebSocket('{ws_url}');
+      ws.onopen = () => term.writeln('connected');
+      ws.onmessage = (ev) => term.writeln(ev.data);
+      term.onData((data) => ws.send(data));
+    </script>
+  </body>
+</html>""",
+        encoding="utf-8",
+    )
+    return {"index_html": str(index), "ws_url": ws_url}
 
 
 def remote_install_program(
@@ -688,6 +742,7 @@ def run_atena_windows_guest_in_vm() -> dict[str, Any]:
     snapshot_load_result = shell_execute_bridge(shell, "snapshot load base")
     update_result = shell_execute_bridge(shell, "update atena_self.exe")
     stress_result = shell_execute_bridge(shell, "stress --progs 1 --duration 2")
+    web_publish_result = shell_execute_bridge(shell, "web-publish --provider ngrok --port 8765")
     whoami_result = shell_execute_bridge(shell, "whoami")
     logs_result = shell_execute_bridge(shell, "logs")
     list_programs_result = shell_execute_bridge(shell, "list-programs")
@@ -718,6 +773,7 @@ def run_atena_windows_guest_in_vm() -> dict[str, Any]:
         "remove_result": remove_result,
         "update_result": update_result,
         "stress_result": stress_result,
+        "web_publish_result": web_publish_result,
         "whoami_result": whoami_result,
         "list_programs_result": list_programs_result,
         "result": result,

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from examples.atena_windows_guest_demo import (
     run_atena_windows_guest_in_vm,
     run_atena_windows_stress_in_vm,
@@ -30,6 +32,10 @@ def test_atena_windows_guest_demo_runs_with_pe_loader_and_win32_api_calls():
     assert report["update_result"]["ok"] is True
     assert report["stress_result"]["ok"] is True
     assert report["stress_result"]["runs"] == 2
+    assert report["web_publish_result"]["ok"] is True
+    assert report["web_publish_result"]["provider"] == "ngrok"
+    assert report["web_publish_result"]["tunnel_command"] == "ngrok http 8765"
+    assert report["web_publish_result"]["page"]["index_html"].endswith("index.html")
     assert report["logs_result"]["ok"] is True
     assert report["shell_history"] == [
         "login admin atena",
@@ -47,6 +53,7 @@ def test_atena_windows_guest_demo_runs_with_pe_loader_and_win32_api_calls():
         "snapshot load base",
         "update atena_self.exe",
         "stress --progs 1 --duration 2",
+        "web-publish --provider ngrok --port 8765",
         "whoami",
         "logs",
         "list-programs",
@@ -60,6 +67,9 @@ def test_atena_windows_guest_demo_runs_with_pe_loader_and_win32_api_calls():
     assert "remote-install notepad.exe" in logs
     assert "InstallProgram -> atena_self.exe" in self_logs
     assert "ExportProgram -> atena_self.exe to /vm/exports/atena_self.apkg" in "\n".join(report["logs_result"]["logs"])
+    html = Path(report["web_publish_result"]["page"]["index_html"]).read_text(encoding="utf-8")
+    assert "xterm.js" in html
+    assert "WebSocket" in html
     assert "CreateWindowA" in logs
     assert "WM_CLOSE" in logs
 

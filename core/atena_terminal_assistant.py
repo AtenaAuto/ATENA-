@@ -156,6 +156,7 @@ def _format_five_topics_response(raw_answer: str, original_prompt: str) -> str:
 
 
 INTERNET_REQUEST_PATTERNS = (
+    r"^\s*pesquis[ae]\b",
     r"\bpesquis[ae]\b.*\binternet\b",
     r"\bna internet\b",
     r"\bprocure\b.*\binternet\b",

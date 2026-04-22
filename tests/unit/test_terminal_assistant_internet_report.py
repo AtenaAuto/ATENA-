@@ -8,6 +8,10 @@ def test_is_internet_request_detects_report_request():
     assert ta._is_internet_request("Me dá um relatório completo da internet sobre IA") is True
 
 
+def test_is_internet_request_detects_plain_pesquisa_prompt():
+    assert ta._is_internet_request("pesquisa que dia que o santos joga") is True
+
+
 def test_extract_internet_topic_from_complete_report_prompt():
     topic = ta._extract_internet_topic(
         "Pesquise na internet e entregue um relatório completo sobre ai agent safety benchmarks 2026"

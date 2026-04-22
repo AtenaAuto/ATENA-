@@ -16,6 +16,7 @@ import logging
 import json
 import re
 import socket
+import urllib.parse
 import webbrowser
 from dataclasses import dataclass, field
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
@@ -152,6 +153,124 @@ def _format_five_topics_response(raw_answer: str, original_prompt: str) -> str:
         "Automatizar avaliação de qualidade com métricas e auditoria",
     ]
     return "\n".join(f"{i+1}. {item}" for i, item in enumerate(fallback))
+
+
+INTERNET_REQUEST_PATTERNS = (
+    r"\bpesquis[ae]\b.*\binternet\b",
+    r"\bna internet\b",
+    r"\bprocure\b.*\binternet\b",
+    r"\bbusque\b.*\binternet\b",
+    r"\bsearch\b.*\bweb\b",
+    r"\bweb search\b",
+)
+
+
+def _is_internet_request(user_input: str) -> bool:
+    text = (user_input or "").strip().lower()
+    if not text:
+        return False
+    if text.startswith("/internet "):
+        return True
+    return any(re.search(pattern, text) for pattern in INTERNET_REQUEST_PATTERNS)
+
+
+def _extract_internet_topic(user_input: str) -> str:
+    text = (user_input or "").strip()
+    if text.lower().startswith("/internet "):
+        return text[len("/internet "):].strip()
+
+    cleaned = re.sub(r"(?i)\bpesquis[ae]\b", "", text)
+    cleaned = re.sub(r"(?i)\b(procure|busque)\b", "", cleaned)
+    cleaned = re.sub(r"(?i)\b(na|no)\s+internet\b", "", cleaned)
+    cleaned = re.sub(r"(?i)\binternet\b", "", cleaned)
+    cleaned = re.sub(r"(?i)^[:\-\s]+", "", cleaned).strip()
+    return cleaned if cleaned else text
+
+
+def _source_link(source_name: str, topic: str) -> str:
+    query = urllib.parse.quote(topic)
+    source = source_name.lower()
+    if source == "wikipedia":
+        return f"https://en.wikipedia.org/w/index.php?search={query}"
+    if source == "github":
+        return f"https://github.com/search?q={query}&type=repositories"
+    if source == "hackernews":
+        return f"https://hn.algolia.com/?q={query}"
+    if source == "arxiv":
+        return f"https://arxiv.org/search/?query={query}&searchtype=all"
+    if source == "crossref":
+        return f"https://search.crossref.org/?q={query}"
+    if source == "openalex":
+        return f"https://openalex.org/works?search={query}"
+    if source == "stackoverflow":
+        return f"https://stackoverflow.com/search?q={query}"
+    if source == "reddit":
+        return f"https://www.reddit.com/search/?q={query}"
+    if source == "npm":
+        return f"https://www.npmjs.com/search?q={query}"
+    if source == "europepmc":
+        return f"https://europepmc.org/search?query={query}"
+    return f"https://duckduckgo.com/?q={query}"
+
+
+def _summarize_source_detail(details: dict[str, object]) -> str:
+    if not isinstance(details, dict):
+        return "sem detalhes."
+    for key in ("extract", "title"):
+        value = details.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()[:220]
+    for key in ("top_repos", "hits", "papers", "works", "questions", "posts", "packages"):
+        value = details.get(key)
+        if isinstance(value, list) and value:
+            first = value[0]
+            if isinstance(first, dict):
+                candidate = first.get("title") or first.get("full_name") or first.get("name")
+                if isinstance(candidate, str) and candidate.strip():
+                    return candidate.strip()[:220]
+    err = details.get("error")
+    return str(err)[:220] if err else "sem detalhes relevantes."
+
+
+def run_user_internet_research(user_input: str) -> str:
+    topic = _extract_internet_topic(user_input)
+    payload = run_internet_challenge(topic)
+    status = str(payload.get("status", "unknown")).upper()
+    weighted_conf = float(payload.get("weighted_confidence", 0.0))
+    all_sources = payload.get("all_sources", [])
+    rows = []
+    if isinstance(all_sources, list):
+        for item in all_sources[:6]:
+            if not isinstance(item, dict):
+                continue
+            source_name = str(item.get("source", "unknown"))
+            ok = bool(item.get("ok"))
+            quality = float(item.get("quality_score", 0.0))
+            details = item.get("details", {})
+            snippet = _summarize_source_detail(details if isinstance(details, dict) else {})
+            icon = "✅" if ok else "❌"
+            link = _source_link(source_name, topic)
+            rows.append(
+                f"- {icon} **{source_name}** (quality={quality:.2f}): {snippet}\n"
+                f"  Fonte: {link}"
+            )
+
+    synthesis = payload.get("synthesis", {})
+    coverage = ""
+    next_action = ""
+    if isinstance(synthesis, dict):
+        coverage = str(synthesis.get("coverage_summary", ""))
+        next_action = str(synthesis.get("next_action", ""))
+
+    body = "\n".join(rows) if rows else "- Nenhuma fonte retornou resultados utilizáveis."
+    return (
+        f"## Pesquisa na internet: {topic}\n\n"
+        f"Status: **{status}** | Confiança ponderada: **{weighted_conf:.2f}**\n\n"
+        f"{body}\n\n"
+        f"Resumo de cobertura: {coverage or 'n/d'}\n"
+        f"Próxima ação sugerida: {next_action or 'n/d'}"
+    )
+
 
 @dataclass
 class EvolutionState:
@@ -506,6 +625,7 @@ def print_help():
         
         commands = [
             ("/task <msg>", "Executa uma tarefa ou responde uma pergunta"),
+            ("/internet <tema>", "Pesquisa tema na internet em múltiplas fontes com links"),
             ("/task-exec <objetivo>", "Planeja e executa comandos seguros com relatório"),
             ("/self-test [quick]", "Executa validações automáticas da ATENA e gera relatório"),
             ("/release-governor", "Executa gates security/release/perf e decide GO/NO-GO"),
@@ -534,7 +654,7 @@ def print_help():
         
         CONSOLE.print(Panel(table, title="[bold cyan]Comandos Disponíveis[/bold cyan]", border_style="cyan"))
     else:
-        print("\nComandos: /task, /task-exec, /self-test, /release-governor, /saas-bootstrap, /telemetry-insights, /orchestrate, /memory-suggest, /benchmark, /device-control, /security-scan, /secret-audit, /policy, /plan, /review, /commit, /run, /context, /evolution-status, /model, /clear, /exit\n")
+        print("\nComandos: /task, /internet, /task-exec, /self-test, /release-governor, /saas-bootstrap, /telemetry-insights, /orchestrate, /memory-suggest, /benchmark, /device-control, /security-scan, /secret-audit, /policy, /plan, /review, /commit, /run, /context, /evolution-status, /model, /clear, /exit\n")
 
 
 def run_self_test(mode: str = "full") -> tuple[str, str]:
@@ -1667,6 +1787,15 @@ def main():
                     CONSOLE.print(summary)
                 continue
 
+            if user_input.startswith("/internet "):
+                with atena_thinking("Pesquisando na internet..."):
+                    answer = run_user_internet_research(user_input)
+                if HAS_RICH:
+                    CONSOLE.print(Panel(Markdown(answer), title="[bold cyan]ATENA[/bold cyan]", border_style="cyan"))
+                else:
+                    print(f"\nATENA:\n{answer}\n")
+                continue
+
             if user_input.startswith("/saas-bootstrap "):
                 project_name = user_input[len("/saas-bootstrap "):].strip()
                 with atena_thinking("Gerando stack SaaS completa..."):
@@ -1683,6 +1812,14 @@ def main():
             # Processamento de Tarefas (Task)
             if user_input.startswith("/task "):
                 task_msg = user_input[6:].strip()
+                if _is_internet_request(task_msg):
+                    with atena_thinking("Pesquisando na internet..."):
+                        answer = run_user_internet_research(task_msg)
+                    if HAS_RICH:
+                        CONSOLE.print(Panel(Markdown(answer), title="[bold cyan]ATENA[/bold cyan]", border_style="cyan"))
+                    else:
+                        print(f"\nATENA:\n{answer}\n")
+                    continue
                 structured_five = _wants_five_topics(task_msg)
                 effective_prompt = _build_five_topics_prompt(task_msg) if structured_five else task_msg
                 with atena_thinking("Processando tarefa..."):
@@ -1706,6 +1843,14 @@ def main():
 
             # Comando padrão (se não começar com / assume-se /task)
             if not user_input.startswith("/"):
+                if _is_internet_request(user_input):
+                    with atena_thinking("Pesquisando na internet..."):
+                        answer = run_user_internet_research(user_input)
+                    if HAS_RICH:
+                        CONSOLE.print(Panel(Markdown(answer), title="[bold cyan]ATENA[/bold cyan]", border_style="cyan"))
+                    else:
+                        print(f"\nATENA:\n{answer}\n")
+                    continue
                 structured_five = _wants_five_topics(user_input)
                 effective_prompt = _build_five_topics_prompt(user_input) if structured_five else user_input
                 with atena_thinking("Analisando..."):

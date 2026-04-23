@@ -178,7 +178,7 @@ WEB_FACT_QUESTION_PATTERNS = (
 WEB_FACT_SIGNAL_PATTERNS = (
     r"\b(hoje|atual|atualmente|agora|recente|últim|ultimo|latest|today|recent)\b",
     r"\b(preço|preco|cotação|cotacao|valor|dólar|dolar|bitcoin|btc|eth)\b",
-    r"\b(oscar|grammy|nba|nfl|eleiç|election|presidente|ceo|lançamento|release)\b",
+    r"\b(oscar|grammy|nba|nfl|eleiç|election|presidente|ceo|lançamento|release|futebol|flamengo|santos|palmeiras|corinthians)\b",
     r"\b(202[0-9]|19[0-9]{2})\b",
     r"\?$",
 )
@@ -197,9 +197,7 @@ def _is_internet_request(user_input: str) -> bool:
 
 def _is_web_fact_question(user_input: str) -> bool:
     text = (user_input or "").strip().lower()
-    if not text:
-        return False
-    if text.startswith("/"):
+    if not text or text.startswith("/"):
         return False
     starts_like_question = any(re.search(pattern, text) for pattern in WEB_FACT_QUESTION_PATTERNS)
     has_web_signal = any(re.search(pattern, text) for pattern in WEB_FACT_SIGNAL_PATTERNS)
@@ -216,7 +214,7 @@ def _extract_internet_topic(user_input: str) -> str:
     cleaned = re.sub(r"(?i)\bpesquis[ae]\b", "", text)
     cleaned = re.sub(r"(?i)\b(procure|busque)\b", "", cleaned)
     cleaned = re.sub(r"(?i)\b(entregue|gere|monte|fa[çc]a)\b", "", cleaned)
-    cleaned = re.sub(r"(?i)\b(me|um|uma|o|a|e|and)\b", "", cleaned)
+    cleaned = re.sub(r"(?i)\b(me|um|uma|o|a|e|and|pra|para|mim|por favor)\b", "", cleaned)
     cleaned = re.sub(r"(?i)\b(na|no)\s+internet\b", "", cleaned)
     cleaned = re.sub(r"(?i)\binternet\b", "", cleaned)
     cleaned = re.sub(r"(?i)\b(relat[oó]rio|completo|final|atualizado|sobre|da|do|de)\b", "", cleaned)

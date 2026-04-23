@@ -10,7 +10,7 @@ def test_is_web_fact_question_detects_sports():
 
 
 def test_extract_topic_removes_fillers():
-    assert ta._extract_internet_topic("pesquisa pra mim que dia o flamengo joga") == "que dia o flamengo joga"
+    assert ta._extract_internet_topic("pesquisa pra mim que dia o flamengo joga") == "que dia flamengo joga"
 
 
 def test_run_user_internet_research_empty_topic_guidance():

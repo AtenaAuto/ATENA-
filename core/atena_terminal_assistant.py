@@ -317,8 +317,13 @@ def _google_news_fallback_results(query: str, limit: int = 5) -> list[str]:
         for item in root.findall("./channel/item")[:limit]:
             title = (item.findtext("title") or "").strip()
             link = (item.findtext("link") or "").strip()
+            source_node = item.find("source")
+            source_url = ""
+            if source_node is not None:
+                source_url = str(source_node.attrib.get("url", "")).strip()
+            display_link = source_url or link
             if title and link:
-                rows.append(f"- {title}\n  {link}")
+                rows.append(f"- {title}\n  {display_link}")
         return rows
     except Exception:
         return []

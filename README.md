@@ -46,28 +46,30 @@
 ### Instalação em Windows 💻
 
 ```bash
-# Go to the root content directory to ensure a clean start
-%cd /content
+# Ir para uma pasta onde você quer baixar o projeto
+cd C:\Users\SeuUsuario
 
-# Remove any existing ATENA- directory to prevent nesting issues
-!rm -rf ATENA-
+# Remover pasta existente (se existir)
+Remove-Item -Recurse -Force ATENA- -ErrorAction SilentlyContinue
 
-# Clone the repository
-!git clone https://github.com/AtenaAuto/ATENA-.git
+# Clonar o repositório
+git clone https://github.com/AtenaAuto/ATENA-.git
 
-# Change into the cloned repository's root directory
-%cd ATENA-
+# Entrar na pasta
+cd ATENA-
 
-# Now navigate to the setup directory and install dependencies
-%cd setup
-!pip install -r requirements-pinned.txt
-!pip install -r requirements-dev.txt
+# Ir para setup
+cd setup
 
-# Go back to the root of the ATENA- directory after installation
-%cd ..
+# Instalar dependências
+pip install -r requirements-pinned.txt
+pip install -r requirements-dev.txt
 
-# Now try to run the atena assistant command
-!./atena assistant
+# Voltar para raiz
+cd ..
+
+# Rodar o assistente
+.\atena assistant
 ```
 
 ### Instalação em Linux/macOS 🐧🍎

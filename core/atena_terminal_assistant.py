@@ -159,6 +159,7 @@ def _format_five_topics_response(raw_answer: str, original_prompt: str) -> str:
 
 INTERNET_REQUEST_PATTERNS = (
     r"^\s*pesquis[ae]\b",
+    r"\bpesquis[ae]\b",
     r"\bpesquis[ae]\b.*\binternet\b",
     r"\bna internet\b",
     r"\bprocure\b.*\binternet\b",
@@ -210,6 +211,9 @@ def _extract_internet_topic(user_input: str) -> str:
         return ""
     if text.lower().startswith("/internet "):
         return text[len("/internet "):].strip()
+
+    cleaned = re.sub(r"(?i)^\s*(ask\s+atena|pergunte\s+atena|atena)\s*[:,\-]?\s*", "", text)
+    text = cleaned if cleaned else text
 
     cleaned = re.sub(r"(?i)\bpesquis[ae]\b", "", text)
     cleaned = re.sub(r"(?i)\b(procure|busque)\b", "", cleaned)

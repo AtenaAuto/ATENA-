@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🔱 ATENA Ω - Simulador de Vida Artificial Evolutiva (SVAE)
-Um sistema complexo onde organismos digitais evoluem através de algoritmos genéticos
-e pequenas redes neurais para sobreviver em um ambiente hostil.
+🔱 ATENA Ω - Simulador de Vida Artificial Evolutiva (SVAE) v1.1.0
+Implementação com coleta de dados históricos para análise de insights.
 """
 
 import numpy as np
@@ -14,9 +13,6 @@ from datetime import datetime
 
 class Organism:
     def __init__(self, dna=None):
-        # DNA define os pesos da rede neural (4 inputs, 2 outputs)
-        # Inputs: [Distância Comida, Energia Atual, Velocidade Atual, Idade]
-        # Outputs: [Aceleração, Rotação]
         if dna is None:
             self.dna = np.random.uniform(-1, 1, (4, 2))
         else:
@@ -28,7 +24,6 @@ class Organism:
         self.alive = True
 
     def think(self, inputs):
-        """Processa inputs através da rede neural baseada no DNA."""
         inputs = np.array(inputs)
         outputs = np.tanh(np.dot(inputs, self.dna))
         return outputs
@@ -39,8 +34,6 @@ class Organism:
         
         outputs = self.think(inputs)
         accel, rotate = outputs
-        
-        # Consumo de energia baseado no movimento
         cost = (abs(accel) + abs(rotate)) * 0.1 + 0.05
         self.energy -= cost
         self.age += 1
@@ -54,66 +47,65 @@ class Environment:
         self.pop_size = pop_size
         self.population = [Organism() for _ in range(pop_size)]
         self.generation = 1
-        self.food_positions = np.random.uniform(0, 100, (20, 2))
+        self.history = []
 
     def run_generation(self, steps=100):
         print(f"🧬 Geração {self.generation} em curso...")
         for _ in range(steps):
             for org in self.population:
                 if org.alive:
-                    # Simula inputs (distâncias fictícias para o teste)
                     dist_food = random.random() * 10
                     inputs = [dist_food, org.energy/100.0, 0.5, org.age/100.0]
                     org.update(inputs)
-                    
-                    # Simula encontrar comida
                     if random.random() < 0.05:
                         org.energy = min(100, org.energy + 20)
                         org.fitness += 5
 
-        # Avalia fitness e evolui
+        self.collect_stats()
         self.evolve()
 
+    def collect_stats(self):
+        fitness_scores = [org.fitness for org in self.population]
+        stats = {
+            "generation": self.generation,
+            "avg_fitness": float(np.mean(fitness_scores)),
+            "best_fitness": float(np.max(fitness_scores)),
+            "survival_rate": float(sum(1 for org in self.population if org.alive) / self.pop_size),
+            "avg_age": float(np.mean([org.age for org in self.population]))
+        }
+        self.history.append(stats)
+        print(f"📊 Stats G{self.generation}: Avg Fitness={stats['avg_fitness']:.2f} | Best={stats['best_fitness']:.2f}")
+
     def evolve(self):
-        # Seleciona os melhores
         self.population.sort(key=lambda x: x.fitness, reverse=True)
         elites = self.population[:self.pop_size // 5]
-        
         new_pop = []
-        # Elitismo
         for e in elites:
             new_pop.append(Organism(e.dna))
-        
-        # Reprodução com mutação
         while len(new_pop) < self.pop_size:
             parent = random.choice(elites)
             child_dna = parent.dna + np.random.normal(0, 0.1, parent.dna.shape)
             new_pop.append(Organism(child_dna))
-            
         self.population = new_pop
         self.generation += 1
-        
-        best_fitness = elites[0].fitness
-        print(f"✅ Evolução Concluída. Melhor Fitness: {best_fitness:.2f}")
 
 def main():
     sim = Environment(pop_size=100)
-    for i in range(5):
+    for i in range(10): # Aumentado para 10 gerações para melhores insights
         sim.run_generation(steps=50)
     
-    # Salva o estado final
     report = {
         "timestamp": datetime.now().isoformat(),
-        "final_generation": sim.generation,
-        "best_fitness": max(o.fitness for o in sim.population),
-        "status": "Missão de Evolução AGI Concluída"
+        "total_generations": sim.generation - 1,
+        "evolution_history": sim.history,
+        "status": "Análise de Evolução ATENA Concluída"
     }
     
     os.makedirs("/home/ubuntu/ATENA-/analysis_reports", exist_ok=True)
     with open("/home/ubuntu/ATENA-/analysis_reports/evolution_report.json", "w") as f:
         json.dump(report, f, indent=4)
     
-    print("\n🏆 Relatório de Evolução gerado com sucesso.")
+    print("\n🏆 Relatório detalhado gerado em analysis_reports/evolution_report.json")
 
 if __name__ == "__main__":
     main()

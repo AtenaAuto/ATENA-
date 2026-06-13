@@ -27,6 +27,7 @@ COMMANDS = {
     "push-safe": ROOT / "core" / "atena_push_safe.py",
     "dashboard": ROOT / "core" / "atena_local_dashboard.py",
     "quantum": ROOT / "skills" / "atena_quantum_logic.py",
+    "biotech": ROOT / "modules" / "atena_biotech_spam.py",
     "codex-advanced": ROOT / "protocols" / "atena_codex_advanced_mission.py",
     "modules-smoke": ROOT / "protocols" / "atena_module_smoke_mission.py",
     "genius": ROOT / "protocols" / "atena_genius_mission.py",
@@ -102,6 +103,7 @@ def render_help() -> None:
         table.add_row("./atena future-ai", "Cria blueprint prático de inovação para o futuro da IA")
         table.add_row("./atena learn-status", "Mostra memória de aprendizado persistida")
         table.add_row("./atena push-safe", "Push apenas após doctor --full aprovado")
+        table.add_row("./atena biotech", "Análise de sequências genéticas e proteínas")
         table.add_row("./atena quantum", "Simulador de lógica quântica autônomo")
         table.add_row("./atena dashboard", "Dashboard local com chat estilo assistant")
         table.add_row("./atena codex-advanced", "Missão avançada usando módulo AtenaCodex")
